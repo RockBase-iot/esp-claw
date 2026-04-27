@@ -113,7 +113,7 @@ menu "Default LLM Settings"
         default "openai_compatible" if BASIC_DEMO_LLM_PROVIDER_OPENAI
         default "openai_compatible" if BASIC_DEMO_LLM_PROVIDER_QWEN
         default "anthropic" if BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
-        default "custom" if BASIC_DEMO_LLM_PROVIDER_CUSTOM
+        default "openai_compatible" if BASIC_DEMO_LLM_PROVIDER_CUSTOM
         help
             Default backend type for claw_core.
             The provider preset above already fills this for standard providers.
