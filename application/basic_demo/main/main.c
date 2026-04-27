@@ -7,6 +7,7 @@
 #if defined(CONFIG_BASIC_DEMO_ENABLE_EMOTE)
 #include "app_expression_emote.h"
 #endif
+#include "app_status_screen.h"
 #include "basic_demo_settings.h"
 #include "basic_demo_wifi.h"
 #include "cap_lua.h"
@@ -83,6 +84,13 @@ static void on_wifi_state_changed(bool connected, void *user_ctx)
 #else
     (void)connected;
 #endif
+
+    /* Briefly show the structured status overlay on every Wi-Fi change. */
+    app_status_screen_set_settings(&s_settings);
+    esp_err_t status_err = app_status_screen_request_status(5000);
+    if (status_err != ESP_OK && status_err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGD(TAG, "status overlay request failed: %s", esp_err_to_name(status_err));
+    }
 }
 
 static esp_err_t init_nvs(void)
@@ -201,6 +209,16 @@ void app_main(void)
     ESP_ERROR_CHECK(basic_demo_settings_load(&s_settings));
     init_timezone(s_settings.time_timezone); // no need to check error
     ESP_ERROR_CHECK(esp_board_manager_init());
+
+    /* Boot splash: rendered to the LCD before emote takes over the panel. */
+    esp_err_t splash_err = app_status_screen_init();
+    if (splash_err == ESP_OK) {
+        app_status_screen_set_settings(&s_settings);
+        app_status_screen_show_splash(2000);
+    } else if (splash_err != ESP_ERR_NOT_SUPPORTED) {
+        ESP_LOGW(TAG, "status screen init failed: %s", esp_err_to_name(splash_err));
+    }
+
 #if defined(CONFIG_BASIC_DEMO_ENABLE_EMOTE)
     ESP_ERROR_CHECK(app_expression_emote_start());
 #endif

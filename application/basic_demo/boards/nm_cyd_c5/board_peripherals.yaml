@@ -35,13 +35,14 @@ peripherals:
         max_transfer_sz: 6400          # 320 * 2 * 10 lines
 
   # LCD backlight is wired to GPIO25 and active HIGH on NM-CYD-C5.
+  # 10-bit LEDC -> max duty 1023 = backlight fully ON.
   - name: ledc_backlight
     type: ledc
     role: none
     config:
       gpio_num: 25
       freq_hz: 5000
-      duty: 0
+      duty: 1023
       duty_resolution: LEDC_TIMER_10_BIT
       output_invert: false
 
