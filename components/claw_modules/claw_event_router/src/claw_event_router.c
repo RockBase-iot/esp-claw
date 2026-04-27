@@ -84,6 +84,16 @@ typedef struct {
 
 static claw_event_router_runtime_t *s_runtime = NULL;
 
+static claw_event_router_message_observer_fn s_message_observer = NULL;
+static void *s_message_observer_ctx = NULL;
+
+void claw_event_router_set_message_observer(claw_event_router_message_observer_fn observer,
+                                            void *user_ctx)
+{
+    s_message_observer = observer;
+    s_message_observer_ctx = user_ctx;
+}
+
 static cJSON *claw_event_router_rule_to_json(const claw_event_router_rule_t *rule);
 static esp_err_t claw_event_router_load_rules_from_file(const char *path,
                                                         claw_event_router_rule_t **out_rules,
@@ -2325,6 +2335,12 @@ esp_err_t claw_event_router_publish_message(const char *source_cap,
     event.session_policy = CLAW_EVENT_SESSION_POLICY_CHAT;
     snprintf(event.event_id, sizeof(event.event_id), "msg-%" PRId64, event.timestamp_ms);
     event.text = (char *)text;
+
+    if (s_message_observer) {
+        s_message_observer(channel, chat_id, sender_id, text, event.timestamp_ms,
+                           s_message_observer_ctx);
+    }
+
     return claw_event_router_publish(&event);
 }
 

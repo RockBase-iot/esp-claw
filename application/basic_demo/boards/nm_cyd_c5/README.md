@@ -85,3 +85,16 @@ if gps.valid then
     print(string.format("Got fix: %.6f, %.6f", gps.lat, gps.lon))
 end
 ```
+
+## Connect to Other LLM
+
+### For Kimi LLM Settings:
+
+LLM Provider: Custom
+API Key: ****
+Model: kimi-k2.6
+LLM Advanced Options: 
+ - Backend Type: openai_compatible
+ - Profile: openai
+ - Base URL: https://api.moonshot.cn/v1
+ - Auth Type: bearer

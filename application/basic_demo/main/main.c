@@ -7,7 +7,10 @@
 #if defined(CONFIG_BASIC_DEMO_ENABLE_EMOTE)
 #include "app_expression_emote.h"
 #endif
+#include "app_boot_button.h"
+#include "app_message_inbox.h"
 #include "app_status_screen.h"
+#include "app_touch_xpt2046.h"
 #include "basic_demo_settings.h"
 #include "basic_demo_wifi.h"
 #include "cap_lua.h"
@@ -23,9 +26,56 @@
 #include "nvs_flash.h"
 #include "wear_levelling.h"
 #include "esp_board_manager_includes.h"
+#include "claw_event_publisher.h"
 
 static const char *TAG = "basic_demo";
 static basic_demo_settings_t s_settings = {0};
+
+#define BASIC_DEMO_BOOT_BUTTON_GPIO   28
+
+/* NM-CYD-C5 on-board XPT2046 resistive touch (shares SPI2 with the LCD).
+ * Calibration values are taken from the TFT_eSPI reference for this panel
+ * in landscape (rotation=1): { xMin, xMax, yMin, yMax, swap_xy }.
+ * Tweak in the field if the reported coordinates are offset. */
+#define BASIC_DEMO_TOUCH_CS_GPIO      1
+#define BASIC_DEMO_TOUCH_SCREEN_W     320
+#define BASIC_DEMO_TOUCH_SCREEN_H     240
+
+static void on_touch_tap(int x, int y, int pressure, void *user_ctx)
+{
+    (void)user_ctx;
+    /* The user explicitly asked: only print, do NOT change the page. */
+    ESP_LOGI(TAG, "touch tap (%d, %d) pressure=%d", x, y, pressure);
+}
+
+static void on_message_inbox_changed(void *user_ctx)
+{
+    (void)user_ctx;
+    /* Inbox grew -> redraw current page (e.g. unread badge bumps), and pop
+     * the status page for a few seconds so the new-message banner is visible
+     * even when the emote view currently owns the screen. */
+    app_status_screen_request_refresh();
+    app_status_screen_show_page(APP_STATUS_PAGE_STATUS, 5000);
+}
+
+static void on_im_message_observed(const char *channel,
+                                   const char *chat_id,
+                                   const char *sender_id,
+                                   const char *text,
+                                   int64_t timestamp_ms,
+                                   void *user_ctx)
+{
+    (void)chat_id;
+    (void)user_ctx;
+    app_message_inbox_record(channel, sender_id, text, timestamp_ms);
+}
+
+static void on_boot_button_pressed(void *user_ctx)
+{
+    (void)user_ctx;
+    ESP_LOGI(TAG, "BOOT pressed -> next page");
+    app_status_screen_next_page();
+}
 
 const char *basic_demo_fatfs_base_path = "/fatfs";
 #define BASIC_DEMO_FATFS_PARTITION_LABEL "storage"
@@ -85,12 +135,13 @@ static void on_wifi_state_changed(bool connected, void *user_ctx)
     (void)connected;
 #endif
 
-    /* Briefly show the structured status overlay on every Wi-Fi change. */
+    /* Keep settings cached for when the user opens the status page via BOOT.
+     * Do NOT auto-pop the status overlay on every Wi-Fi event: it steals the
+     * display owner from the emote at the very moment the emote is trying to
+     * transition to "swim/Wi-Fi connected", and the gfx engine then keeps
+     * flushing its cached "offline" frame after the overlay expires.
+     * Press BOOT to view the structured status page on demand. */
     app_status_screen_set_settings(&s_settings);
-    esp_err_t status_err = app_status_screen_request_status(5000);
-    if (status_err != ESP_OK && status_err != ESP_ERR_INVALID_STATE) {
-        ESP_LOGD(TAG, "status overlay request failed: %s", esp_err_to_name(status_err));
-    }
 }
 
 static esp_err_t init_nvs(void)
@@ -210,6 +261,11 @@ void app_main(void)
     init_timezone(s_settings.time_timezone); // no need to check error
     ESP_ERROR_CHECK(esp_board_manager_init());
 
+    /* Message inbox + IM event observer must be ready before any IM cap starts. */
+    ESP_ERROR_CHECK(app_message_inbox_init());
+    app_message_inbox_set_change_callback(on_message_inbox_changed, NULL);
+    claw_event_router_set_message_observer(on_im_message_observed, NULL);
+
     /* Boot splash: rendered to the LCD before emote takes over the panel. */
     esp_err_t splash_err = app_status_screen_init();
     if (splash_err == ESP_OK) {
@@ -217,6 +273,41 @@ void app_main(void)
         app_status_screen_show_splash(2000);
     } else if (splash_err != ESP_ERR_NOT_SUPPORTED) {
         ESP_LOGW(TAG, "status screen init failed: %s", esp_err_to_name(splash_err));
+    }
+
+    /* BOOT key (GPIO28) cycles through the on-screen pages. */
+    esp_err_t btn_err = app_boot_button_init(BASIC_DEMO_BOOT_BUTTON_GPIO,
+                                             on_boot_button_pressed, NULL);
+    if (btn_err != ESP_OK) {
+        ESP_LOGW(TAG, "BOOT button init failed: %s", esp_err_to_name(btn_err));
+    }
+
+    /* XPT2046 resistive touch -> just log the screen-mapped coordinates. */
+    {
+        app_touch_xpt2046_config_t tcfg = {
+            .host          = SPI2_HOST,
+            .cs_gpio       = BASIC_DEMO_TOUCH_CS_GPIO,
+            .irq_gpio      = -1,
+            .screen_width  = BASIC_DEMO_TOUCH_SCREEN_W,
+            .screen_height = BASIC_DEMO_TOUCH_SCREEN_H,
+            .calibration = {
+                /* TFT_eSPI rotation=1 calData: {200, 3428, 345, 3437, 1}.
+                 * Empirical check on this panel: top-left raw (~398, ~454)
+                 * mapped to (319, 239) without inversion, so both axes need
+                 * to be flipped to align with screen origin (top-left). */
+                .raw_x_min = 200,
+                .raw_x_max = 3428,
+                .raw_y_min = 345,
+                .raw_y_max = 3437,
+                .swap_xy   = true,
+                .invert_x  = true,
+                .invert_y  = true,
+            },
+        };
+        esp_err_t touch_err = app_touch_xpt2046_init(&tcfg, on_touch_tap, NULL);
+        if (touch_err != ESP_OK) {
+            ESP_LOGW(TAG, "touch init failed: %s", esp_err_to_name(touch_err));
+        }
     }
 
 #if defined(CONFIG_BASIC_DEMO_ENABLE_EMOTE)
@@ -232,9 +323,6 @@ void app_main(void)
         ESP_LOGE(TAG, "Wi-Fi start failed: %s", esp_err_to_name(wifi_err));
     } else {
         ESP_ERROR_CHECK(config_http_server_start());
-        if (captive_dns_start() != ESP_OK) {
-            ESP_LOGW(TAG, "Captive DNS could not start, portal pop-up disabled");
-        }
 
         if (s_settings.wifi_ssid[0] != '\0') {
             if (basic_demo_wifi_wait_connected(30000) == ESP_OK) {
@@ -244,11 +332,19 @@ void app_main(void)
             }
         }
 
-        ESP_LOGW(TAG,
-                 "*** Provisioning portal: SSID=\"%s\" (open) IP=%s URL=http://%s/ ***",
-                 basic_demo_wifi_get_ap_ssid(),
-                 basic_demo_wifi_get_ap_ip(),
-                 basic_demo_wifi_get_ap_ip());
+        /* Captive DNS is only useful when the soft-AP is running (pure-AP or
+         * AP-fallback after STA exhausts retries). In STA-only mode the AP
+         * never starts, so skip it to avoid binding :53 unnecessarily. */
+        if (basic_demo_wifi_is_ap_active()) {
+            if (captive_dns_start() != ESP_OK) {
+                ESP_LOGW(TAG, "Captive DNS could not start, portal pop-up disabled");
+            }
+            ESP_LOGW(TAG,
+                     "*** Provisioning portal: SSID=\"%s\" (open) IP=%s URL=http://%s/ ***",
+                     basic_demo_wifi_get_ap_ssid(),
+                     basic_demo_wifi_get_ap_ip(),
+                     basic_demo_wifi_get_ap_ip());
+        }
     }
 
     ESP_ERROR_CHECK(app_claw_start(&s_settings));

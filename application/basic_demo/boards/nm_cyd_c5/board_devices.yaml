@@ -13,7 +13,7 @@ devices:
       mirror_x: false
       mirror_y: true
       swap_xy: true
-      invert_color: true
+      invert_color: false
       x_max: 320
       y_max: 240
       io_spi_config:

@@ -15,42 +15,29 @@
 extern "C" {
 #endif
 
-/**
- * @brief Initialize the status screen subsystem.
- *
- * Acquires the LCD panel handle from board_manager and allocates the
- * full-frame RGB565 buffer used to render the boot splash and the
- * runtime status page.
- *
- * Must be called after esp_board_manager_init() succeeds and before the
- * first call to app_status_screen_show_splash() / show_status().
- */
+typedef enum {
+    APP_STATUS_PAGE_STATUS    = 0,    /* System / Wi-Fi / LLM / IM status */
+    APP_STATUS_PAGE_MESSAGES  = 1,    /* Inbox list                       */
+    APP_STATUS_PAGE_COUNT
+} app_status_page_t;
+
 esp_err_t app_status_screen_init(void);
 
-/**
- * @brief Cache the latest settings snapshot used by the status page.
- *
- * The status page displays Wi-Fi / LLM / IM information sourced from the
- * latest cached settings. Safe to call before init.
- */
 void app_status_screen_set_settings(const basic_demo_settings_t *settings);
 
-/**
- * @brief Render the boot splash directly onto the LCD and hold for hold_ms.
- *
- * Called synchronously between board_manager init and the emote start so
- * the splash is visible before emote takes over the display.
- */
+/** Render the boot splash and hold for hold_ms. Synchronous. */
 esp_err_t app_status_screen_show_splash(uint32_t hold_ms);
 
-/**
- * @brief Schedule a status page overlay on the LCD for hold_ms.
- *
- * Spawns a short-lived task that acquires DISPLAY_ARBITER_OWNER_LUA,
- * paints the status page, holds it for the requested duration, and then
- * releases ownership back to the emote face. Safe to invoke from event
- * callbacks (non-blocking).
- */
+/** Show one of the pages and hold for hold_ms (0 = until released). */
+esp_err_t app_status_screen_show_page(app_status_page_t page, uint32_t hold_ms);
+
+/** Switch to the next page (cyclic) and hold for the default duration. */
+esp_err_t app_status_screen_next_page(void);
+
+/** Repaint the active page if currently visible (e.g. inbox changed). */
+void app_status_screen_request_refresh(void);
+
+/** Backwards-compat shortcut: show the status page for hold_ms. */
 esp_err_t app_status_screen_request_status(uint32_t hold_ms);
 
 #ifdef __cplusplus
