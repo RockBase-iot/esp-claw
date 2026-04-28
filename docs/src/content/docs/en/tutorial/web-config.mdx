@@ -5,11 +5,11 @@ description: Change Wi‑Fi, LLM, IM, and files from a browser on the LAN—no r
 
 import { Aside, Steps, LinkCard } from '@astrojs/starlight/components';
 
-`basic_demo` starts a small HTTP server after Wi‑Fi is up, serves the config UI, and exposes JSON APIs. Implementation: `application/basic_demo/main/config_http_server.c`.
+`edge_agent` starts a small HTTP server after Wi‑Fi is up, serves the config UI, and exposes JSON APIs. Implementation: `application/edge_agent/components/http_server/`.
 
 ## Open the config UI
 
-Your computer or phone must be on the **same LAN** as the board, or connected to the **board-provided SoftAP hotspot** (in `basic_demo`, default SSID is `esp-claw-xxxx`, where `xxxx` is derived from the device MAC address).
+Your computer or phone must be on the **same LAN** as the board, or connected to the **board-provided SoftAP hotspot** (in `edge_agent`, default SSID is `esp-claw-xxxx`, where `xxxx` is derived from the device MAC address).
 
 In the browser open:
 [http://esp-claw.local/](http://esp-claw.local/)
@@ -112,7 +112,7 @@ After enabling Admin mode, you can manually add Skills, edit automation rules, m
 
 ## Security
 
-**`basic_demo` is not designed for production. Its HTTP server assumes a trusted environment and returns almost all information to help with debugging.**
+**`edge_agent` is not designed for production. Its HTTP server assumes a trusted environment and returns almost all information to help with debugging.**
 
 <Aside type="caution" title="Security notes">
   - **Do not expose the web config page port to the public Internet.**

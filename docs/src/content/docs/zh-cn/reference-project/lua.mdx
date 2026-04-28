@@ -9,10 +9,11 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 脚本在设备上运行时能调用哪些原生能力（GPIO、延时、向 Event Router 发布事件等），由应用注册的 `lua_module_*` 模块决定。`claw_event_router` 的 `run_script` 动作也可直接触发 Lua 脚本，无需大语言模型参与。
 
-`basic_demo` 自带了多个示例脚本：
-- `camera_preview_demo.lua`：展示 `camera` + `display` + `board_manager` + `delay` 的联合用法。
-- `system_demo.lua`：展示 `system` 模块的时间、运行时长、IP 与内存/Wi‑Fi 信息读取。
-- `clock_dial_demo.lua` / `flappybird.lua`：展示显示渲染与脚本交互能力的综合示例。
+`edge_agent` 自带了多个示例脚本（位于 `application/edge_agent/main/lua_scripts/`）：
+- `advance_camera_preview.lua`：展示 `camera` + `display` + `board_manager` + `delay` 的联合用法。
+- `advance_clock_dial_demo.lua` / `advance_flappybird.lua`：展示显示渲染与脚本交互能力的综合示例。
+- `advance_audio_fft.lua`：展示音频采集与频谱分析。
+- `advance_lcd_touch_paint.lua`：展示触摸屏绘图能力。
 
 <LinkCard href="@lang/reference-cap/cap-lua" title="cap_lua" description="工具列表、异步执行与自动化 run_script" />
 <LinkCard href="@lang/reference-cap/lua-modules" title="Lua 扩展模块" description="lua_module_* 的注册机制与脚本内可用的原生能力" />

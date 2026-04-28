@@ -305,6 +305,9 @@ static const char *basic_demo_llm_provider_name(const basic_demo_settings_t *set
     if (settings->llm_profile[0] && (strcmp(settings->llm_profile, "qwen") == 0 || strcmp(settings->llm_profile, "qwen_compatible") == 0)) {
         return "Qwen Compatible";
     }
+    if (settings->llm_base_url[0] && strcmp(settings->llm_base_url, "https://api.deepseek.com") == 0) {
+        return "DeepSeek";
+    }
     if (settings->llm_profile[0] && strcmp(settings->llm_profile, "openai") == 0) {
         return "OpenAI";
     }

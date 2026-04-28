@@ -6,22 +6,22 @@ description: Order from app_main until subsystems are ready
 import { Steps, FileTree, LinkCard } from '@astrojs/starlight/components';
 import LinkToSource from '@/components/LinkToSource.astro';
 
-This walkthrough uses sample app `application/basic_demo`, covering entry <LinkToSource relativePath="application/basic_demo/main/main.c" /> and wiring in <LinkToSource relativePath="application/basic_demo/main/app_claw.c" />.
+This walkthrough uses sample app `application/edge_agent`, covering entry <LinkToSource relativePath="application/edge_agent/main/main.c" /> and wiring in <LinkToSource relativePath="components/common/app_claw/app_claw.c" />.
 
 ## `main.c` entry
 
-<LinkToSource relativePath="application/basic_demo/main/main.c" /> initializes required system pieces and peripherals so the ESP-Claw Agent can run.
+<LinkToSource relativePath="application/edge_agent/main/main.c" /> initializes required system pieces and peripherals so the ESP-Claw Agent can run.
 
 <Steps>
 1. **Init NVS and load settings**
 
-    On boot, `basic_demo` initializes the NVS partition (`nvs_flash_init`).
-    Then `basic_demo_settings_init` + `basic_demo_settings_load` pull Wi‑Fi, LLM, IM, search, time zone, etc. into RAM.
+    On boot, `edge_agent` initializes the NVS partition (`nvs_flash_init`).
+    Then `app_config_init` + `app_config_load` pull Wi‑Fi, LLM, IM, search, time zone, etc. into RAM.
 
 2. **Init Board Manager and optional Emote**
 
     Call `esp_board_manager_init` to assemble board-level device handles.<br />
-    If `CONFIG_BASIC_DEMO_ENABLE_EMOTE` is enabled, `app_expression_emote_start` is also invoked afterward to start the emote-display component and set the screen to an offline hint state.
+    If `CONFIG_APP_CLAW_ENABLE_EMOTE` is enabled, `app_claw_ui_start` is also invoked afterward to start the emote-display component and set the screen to an offline hint state.
 
 3. **Mount FATFS**
 
@@ -30,13 +30,13 @@ This walkthrough uses sample app `application/basic_demo`, covering entry <LinkT
 
 4. **Init Wi‑Fi and state callback**
 
-    Attempt Wi‑Fi init (`basic_demo_wifi_init` / `basic_demo_wifi_start`): connect to configured SSID and start SoftAP for Web configuration and offline operations.<br />
-    - After `basic_demo_wifi_init`, `basic_demo_wifi_register_state_callback` is registered: if emote is enabled, it updates emote and text status on Wi‑Fi connect/disconnect, and can display intermediate state such as current AP SSID.<br />
+    Attempt Wi‑Fi init (`wifi_manager_init` / `wifi_manager_start`): connect to configured SSID and start SoftAP for Web configuration and offline operations.<br />
+    - After `wifi_manager_init`, `wifi_manager_register_state_callback` is registered: if emote is enabled, it updates emote and text status on Wi‑Fi connect/disconnect, and can display intermediate state such as current AP SSID.<br />
     - On failure, log and continue. Offline rules and Lua can still run without a Wi‑Fi link.
 
 5. **Start HTTP server**
 
-    Bring up the config HTTP server (`config_http_server_init` / `config_http_server_start`) for Web-based settings.
+    Bring up the config HTTP server (`http_server_init` / `http_server_start`) for Web-based settings.
     Captive DNS (`captive_dns_start`) is started as well, so SoftAP provisioning can auto-redirect to the portal page.
 
 6. **Start ESP-Claw Agent stack**
@@ -47,7 +47,7 @@ This walkthrough uses sample app `application/basic_demo`, covering entry <LinkT
 
 ## `app_claw.c` Agent wiring
 
-<LinkToSource relativePath="application/basic_demo/main/app_claw.c" /> initializes the Agent stack in order, then launches the Console REPL.
+<LinkToSource relativePath="components/common/app_claw/app_claw.c" /> initializes the Agent stack in order, then launches the Console REPL.
 
 <Steps>
 1. **Init Session Manager and Event Router**
@@ -63,7 +63,7 @@ This walkthrough uses sample app `application/basic_demo`, covering entry <LinkT
 
 3. **Init Memory**
 
-    `claw_memory_init` sets session history root (`/fatfs/sessions/`), long-term memory directory (`/fatfs/memory`), and per-message limits (`basic_demo` defaults to 1024 chars per message).
+    `claw_memory_init` sets session history root (`/fatfs/sessions/`), long-term memory directory (`/fatfs/memory`), and per-message limits (`edge_agent` defaults to 1024 chars per message).
     If required structured-memory files are missing, they are created automatically.
 
 4. **Init Skills**
@@ -101,7 +101,7 @@ This walkthrough uses sample app `application/basic_demo`, covering entry <LinkT
 
 8. **Start Event Router, time sync, scheduler, and Console REPL**
 
-    `claw_event_router_start` begins processing inbound events, then `cap_time_sync_service_start` starts SNTP (first successful sync triggers `cap_scheduler_handle_time_sync` to rebase the scheduler), then `cap_scheduler_start` starts the scheduler task, then `basic_demo_cli_start` opens the Console REPL—wiring complete.
+    `claw_event_router_start` begins processing inbound events, then `cap_time_sync_service_start` starts SNTP (first successful sync triggers `cap_scheduler_handle_time_sync` to rebase the scheduler), then `cap_scheduler_start` starts the scheduler task, then `app_claw_cli_start` opens the Console REPL—wiring complete.
 
 </Steps>
 

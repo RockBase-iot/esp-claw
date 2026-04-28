@@ -29,7 +29,7 @@ import { Steps, Aside, Badge } from '@astrojs/starlight/components';
     ESP-Claw uses ESP Board Manager to support multiple development boards.
 
     To add other boards, see the [ESP Board Manager component](https://github.com/espressif/esp-gmf/blob/main/packages/esp_board_manager/docs/how_to_customize_board.md),
-    and put the board adaptation files in [`application/basic_demo/boards`](https://github.com/espressif/esp-claw/tree/master/application/basic_demo/boards).
+    and put the board adaptation files in [`application/edge_agent/boards`](https://github.com/espressif/esp-claw/tree/master/application/edge_agent/boards).
 
     Welcome to submit the board adaptation code to the ESP-Claw repository via Pull Request.
    </Aside>
@@ -38,7 +38,7 @@ import { Steps, Aside, Badge } from '@astrojs/starlight/components';
 
    ```bash
    git clone https://github.com/espressif/esp-claw.git
-   cd esp-claw/application/basic_demo
+   cd esp-claw/application/edge_agent
    ```
 
 3. **Select a development board**
@@ -54,7 +54,7 @@ import { Steps, Aside, Badge } from '@astrojs/starlight/components';
       idf.py gen-bmgr-config -c ./boards -l
       ```
 
-      Or check the `application/basic_demo/boards` directory.
+      Or check the `application/edge_agent/boards` directory.
    </Aside>
 
    <Aside type="note" title="Why set-target is not needed">
@@ -67,7 +67,7 @@ import { Steps, Aside, Badge } from '@astrojs/starlight/components';
    idf.py menuconfig
    ```
    Suggested changes:
-   - <kbd>(Top)</kbd> → <kbd>Basic Demo Config</kbd>
+   - <kbd>(Top)</kbd> → <kbd>App Claw Config</kbd>
      - Apply [Configuration](@lang/reference-project/configuration#basic-config) for baseline settings.
    - <kbd>(Top)</kbd> → <kbd>Component config</kbd> → <kbd>ESP-Claw Core</kbd> → <kbd>Agent stage notification verbosity</kbd>
      - Simple by default;

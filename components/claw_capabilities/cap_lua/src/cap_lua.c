@@ -29,8 +29,15 @@ typedef struct cap_lua_runtime_cleanup_node {
     struct cap_lua_runtime_cleanup_node *next;
 } cap_lua_runtime_cleanup_node_t;
 
+typedef struct cap_lua_package_path_dir_node {
+    char dir[CAP_LUA_JOB_PATH_MAX];
+    struct cap_lua_package_path_dir_node *next;
+} cap_lua_package_path_dir_node_t;
+
 char g_cap_lua_base_dir[128];
 static cap_lua_module_t s_modules[CAP_LUA_MAX_MODULES];
+static cap_lua_package_path_dir_node_t *s_package_path_dirs;
+static size_t s_package_path_dir_count;
 static size_t s_module_count;
 static cap_lua_runtime_cleanup_node_t *s_runtime_cleanups;
 static size_t s_runtime_cleanup_count;
@@ -90,6 +97,61 @@ static esp_err_t cap_lua_build_simple_request(const char *string_key,
 const char *cap_lua_get_base_dir(void)
 {
     return g_cap_lua_base_dir;
+}
+
+size_t cap_lua_get_package_path_dir_count(void)
+{
+    return s_package_path_dir_count;
+}
+
+const char *cap_lua_get_package_path_dir(size_t index)
+{
+    cap_lua_package_path_dir_node_t *node = s_package_path_dirs;
+    size_t i = 0;
+
+    while (node) {
+        if (i == index) {
+            return node->dir;
+        }
+        node = node->next;
+        i++;
+    }
+
+    return NULL;
+}
+
+esp_err_t cap_lua_add_package_path_dir(const char *dir)
+{
+    cap_lua_package_path_dir_node_t *node = NULL;
+    cap_lua_package_path_dir_node_t **tail = &s_package_path_dirs;
+
+    if (!dir || dir[0] != '/' || strstr(dir, "..") != NULL) {
+        ESP_LOGE(TAG, "add_package_path_dir: bad dir=%s", dir ? dir : "(null)");
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strlen(dir) >= CAP_LUA_JOB_PATH_MAX) {
+        ESP_LOGE(TAG, "add_package_path_dir: dir too long");
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    while (*tail) {
+        if (strcmp((*tail)->dir, dir) == 0) {
+            return ESP_OK;
+        }
+        tail = &(*tail)->next;
+    }
+
+    node = calloc(1, sizeof(*node));
+    if (!node) {
+        ESP_LOGE(TAG, "add_package_path_dir: no memory for dir=%s", dir);
+        return ESP_ERR_NO_MEM;
+    }
+
+    /* Keep a private copy so callers can pass stack-backed path buffers safely. */
+    strlcpy(node->dir, dir, sizeof(node->dir));
+    *tail = node;
+    s_package_path_dir_count++;
+    return ESP_OK;
 }
 
 bool cap_lua_path_is_valid(const char *path)
@@ -1320,6 +1382,11 @@ esp_err_t cap_lua_register_module(const char *name, lua_CFunction open_fn)
     }
 
     if (s_module_count >= CAP_LUA_MAX_MODULES) {
+        ESP_LOGE(TAG,
+                 "Lua module registry full: tried to add '%s' with %u/%u slots used",
+                 name,
+                 (unsigned)s_module_count,
+                 (unsigned)CAP_LUA_MAX_MODULES);
         return ESP_ERR_NO_MEM;
     }
 

@@ -1,0 +1,12 @@
+{
+  "skills": [
+    {
+      "id": "lua_module_bq27220",
+      "file": "lua_module_bq27220.md",
+      "summary": "How to read battery fuel-gauge data from Lua.",
+      "cap_groups": [
+        "cap_lua"
+      ]
+    }
+  ]
+}

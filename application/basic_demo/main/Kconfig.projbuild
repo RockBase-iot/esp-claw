@@ -84,7 +84,7 @@ menu "Default LLM Settings"
         default BASIC_DEMO_LLM_PROVIDER_QWEN
         help
             Select the provider preset used to populate the shared LLM settings below.
-            OpenAI, Qwen Compatible, and Anthropic all reuse the same API key, model,
+            OpenAI, Qwen Compatible, DeepSeek, and Anthropic all reuse the same API key, model,
             backend, profile, base URL, and auth fields.
 
     config BASIC_DEMO_LLM_PROVIDER_OPENAI
@@ -92,6 +92,9 @@ menu "Default LLM Settings"
 
     config BASIC_DEMO_LLM_PROVIDER_QWEN
         bool "Qwen Compatible"
+
+    config BASIC_DEMO_LLM_PROVIDER_DEEPSEEK
+        bool "DeepSeek"
 
     config BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
         bool "Anthropic"
@@ -112,6 +115,7 @@ menu "Default LLM Settings"
         string "Default LLM backend type"
         default "openai_compatible" if BASIC_DEMO_LLM_PROVIDER_OPENAI
         default "openai_compatible" if BASIC_DEMO_LLM_PROVIDER_QWEN
+        default "openai_compatible" if BASIC_DEMO_LLM_PROVIDER_DEEPSEEK
         default "anthropic" if BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
         default "openai_compatible" if BASIC_DEMO_LLM_PROVIDER_CUSTOM
         help
@@ -122,6 +126,7 @@ menu "Default LLM Settings"
         string "Default LLM profile"
         default "openai" if BASIC_DEMO_LLM_PROVIDER_OPENAI
         default "qwen_compatible" if BASIC_DEMO_LLM_PROVIDER_QWEN
+        default "custom_openai_compatible" if BASIC_DEMO_LLM_PROVIDER_DEEPSEEK
         default "anthropic" if BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
         default "custom_openai_compatible" if BASIC_DEMO_LLM_PROVIDER_CUSTOM
         help
@@ -132,6 +137,7 @@ menu "Default LLM Settings"
         string "Default LLM model"
         default "" if BASIC_DEMO_LLM_PROVIDER_OPENAI
         default "qwen3-max-2026-01-23" if BASIC_DEMO_LLM_PROVIDER_QWEN
+        default "deepseek-v4-pro" if BASIC_DEMO_LLM_PROVIDER_DEEPSEEK
         default "" if BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
         default "" if BASIC_DEMO_LLM_PROVIDER_CUSTOM
         help
@@ -142,6 +148,7 @@ menu "Default LLM Settings"
         string "Default LLM base URL"
         default "https://api.openai.com/v1" if BASIC_DEMO_LLM_PROVIDER_OPENAI
         default "https://dashscope.aliyuncs.com/compatible-mode/v1" if BASIC_DEMO_LLM_PROVIDER_QWEN
+        default "https://api.deepseek.com" if BASIC_DEMO_LLM_PROVIDER_DEEPSEEK
         default "https://api.anthropic.com/v1" if BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
         default "" if BASIC_DEMO_LLM_PROVIDER_CUSTOM
         help
@@ -152,6 +159,7 @@ menu "Default LLM Settings"
         string "Default LLM auth type"
         default "bearer" if BASIC_DEMO_LLM_PROVIDER_OPENAI
         default "bearer" if BASIC_DEMO_LLM_PROVIDER_QWEN
+        default "bearer" if BASIC_DEMO_LLM_PROVIDER_DEEPSEEK
         default "none" if BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
         default "bearer" if BASIC_DEMO_LLM_PROVIDER_CUSTOM
         help

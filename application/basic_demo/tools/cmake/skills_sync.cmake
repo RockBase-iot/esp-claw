@@ -110,9 +110,9 @@ function(basic_demo_append_component_args out_var)
 endfunction()
 
 function(basic_demo_get_resource_generator_targets out_var resource_kind)
-    set(property_names "BASIC_DEMO_RESOURCE_GENERATOR_TARGETS_${resource_kind}")
+    set(property_names "APP_RESOURCE_GENERATOR_TARGETS_${resource_kind}")
     if(resource_kind STREQUAL "skills")
-        list(APPEND property_names "BASIC_DEMO_SKILL_GENERATOR_TARGETS")
+        list(APPEND property_names "APP_SKILL_GENERATOR_TARGETS")
     endif()
 
     set(generator_targets)

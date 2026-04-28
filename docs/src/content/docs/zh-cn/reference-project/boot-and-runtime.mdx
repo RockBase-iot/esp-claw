@@ -6,22 +6,22 @@ description: 从 app_main 到各子系统就绪的顺序
 import { Steps, FileTree, LinkCard } from '@astrojs/starlight/components';
 import LinkToSource from '@/components/LinkToSource.astro';
 
-下文以示例应用 `application/basic_demo` 为例，介绍入口 <LinkToSource relativePath="application/basic_demo/main/main.c" /> 与装配逻辑 <LinkToSource relativePath="application/basic_demo/main/app_claw.c" />。
+下文以示例应用 `application/edge_agent` 为例，介绍入口 <LinkToSource relativePath="application/edge_agent/main/main.c" /> 与装配逻辑 <LinkToSource relativePath="components/common/app_claw/app_claw.c" />。
 
 ## `main.c` 入口程序
 
-<LinkToSource relativePath="application/basic_demo/main/main.c" /> 会初始化系统必要组件及所需外设，为 ESP-Claw Agent 的运行做好准备。
+<LinkToSource relativePath="application/edge_agent/main/main.c" /> 会初始化系统必要组件及所需外设，为 ESP-Claw Agent 的运行做好准备。
 
 <Steps>
 1. **初始化 NVS 并载入配置**
 
-    上电后，`basic_demo` 会先尝试初始化 NVS 分区（`nvs_flash_init`）。
-    随后，通过 `basic_demo_settings_init` + `basic_demo_settings_load`，将Wi‑Fi、LLM、IM、搜索、时区等读入内存，完成基本配置初始化。
+    上电后，`edge_agent` 会先尝试初始化 NVS 分区（`nvs_flash_init`）。
+    随后，通过 `app_config_init` + `app_config_load`，将Wi‑Fi、LLM、IM、搜索、时区等读入内存，完成基本配置初始化。
 
 2. **初始化 Board Manager 与可选 Emote**
 
     调用 `esp_board_manager_init` 完成板级设备句柄装配。<br />
-    若启用 `CONFIG_BASIC_DEMO_ENABLE_EMOTE`，随后还会调用 `app_expression_emote_start` 启动表情显示组件，并将屏幕初始状态设为离线提示。
+    若启用 `CONFIG_APP_CLAW_ENABLE_EMOTE`，随后还会调用 `app_claw_ui_start` 启动表情显示组件，并将屏幕初始状态设为离线提示。
 
 3. **挂载 FATFS 文件系统**
 
@@ -30,13 +30,13 @@ import LinkToSource from '@/components/LinkToSource.astro';
 
 4. **初始化 Wi‑Fi 与状态回调**
 
-    尝试初始化 Wi‑Fi（`basic_demo_wifi_init` / `basic_demo_wifi_start`）：连接至配置的 SSID、启动 SoftAP 便于 Web 配置与离线操作。<br />
-    - 在 `basic_demo_wifi_init` 之后会注册 `basic_demo_wifi_register_state_callback`：若启用了 emote，会在 Wi‑Fi 连接/断开时更新表情与文案状态，并可显示当前 AP SSID 等中间态信息。<br />
+    尝试初始化 Wi‑Fi（`wifi_manager_init` / `wifi_manager_start`）：连接至配置的 SSID、启动 SoftAP 便于 Web 配置与离线操作。<br />
+    - 在 `wifi_manager_init` 之后会注册 `wifi_manager_register_state_callback`：若启用了 emote，会在 Wi‑Fi 连接/断开时更新表情与文案状态，并可显示当前 AP SSID 等中间态信息。<br />
     - 如果初始化失败，则打印错误日志，并继续启动过程。即使未连接 Wi-Fi，ESP-Claw 也可以正常使用离线规则、运行 Lua 脚本等。
 
 5. **启动 HTTP 服务器**
 
-    启动 HTTP 服务器（`config_http_server_init` / `config_http_server_start`），供用户通过 Web 配置页面调整系统配置。
+    启动 HTTP 服务器（`http_server_init` / `http_server_start`），供用户通过 Web 配置页面调整系统配置。
     同时会启动 captive DNS（`captive_dns_start`），便于 SoftAP 配网场景下自动跳转到门户页。
 
 6. **启动 ESP-Claw Agent 子系统**
@@ -47,7 +47,7 @@ import LinkToSource from '@/components/LinkToSource.astro';
 
 ## `app_claw.c` Agent 装配程序
 
-<LinkToSource relativePath="application/basic_demo/main/app_claw.c" /> 会初始化 ESP-Claw Agent 子系统，按顺序启动各子组件并设置参数，最终启动 Console REPL。
+<LinkToSource relativePath="components/common/app_claw/app_claw.c" /> 会初始化 ESP-Claw Agent 子系统，按顺序启动各子组件并设置参数，最终启动 Console REPL。
 
 <Steps>
 1. **初始化 Session Manager 与 Event Router**
@@ -63,7 +63,7 @@ import LinkToSource from '@/components/LinkToSource.astro';
 
 3. **初始化 Memory**
 
-    调用 `claw_memory_init`，设置会话历史目录（`/fatfs/sessions/`）、长期记忆目录（`/fatfs/memory`）及单条消息最大字符数等参数（`basic_demo` 默认 1024 字符/条）。
+    调用 `claw_memory_init`，设置会话历史目录（`/fatfs/sessions/`）、长期记忆目录（`/fatfs/memory`）及单条消息最大字符数等参数（`edge_agent` 默认 1024 字符/条）。
     如果记录结构所需文件不存在，则会自动创建。
 
 4. **初始化 Skills**
@@ -101,7 +101,7 @@ import LinkToSource from '@/components/LinkToSource.astro';
 
 8. **启动 Event Router、时间同步、调度器与 Console REPL**
 
-    调用 `claw_event_router_start` 开始处理入站事件，随后调用 `cap_time_sync_service_start` 启动 SNTP 时间同步服务（首次同步成功时会触发 `cap_scheduler_handle_time_sync` 对调度器进行时间校准），再调用 `cap_scheduler_start` 启动调度器任务，最后调用 `basic_demo_cli_start` 启动 Console REPL，装配完成。
+    调用 `claw_event_router_start` 开始处理入站事件，随后调用 `cap_time_sync_service_start` 启动 SNTP 时间同步服务（首次同步成功时会触发 `cap_scheduler_handle_time_sync` 对调度器进行时间校准），再调用 `cap_scheduler_start` 启动调度器任务，最后调用 `app_claw_cli_start` 启动 Console REPL，装配完成。
 
 </Steps>
 

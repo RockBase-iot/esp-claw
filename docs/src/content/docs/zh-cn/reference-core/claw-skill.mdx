@@ -49,10 +49,10 @@ import { Aside, LinkCard, FileTree } from '@astrojs/starlight/components';
 
 运行时读取的 `/fatfs/skills/skills_list.json` 由两个来源合并而来：
 
-1. **`application/basic_demo/fatfs_image/skills/`**：demo 工程自带的 Skills 文件，通过 FATFS 镜像直接打包进固件。
+1. **`application/edge_agent/main/skills/`**：demo 工程自带的 Skills 文件，由 `tools/cmake/skills_sync.cmake` 在构建阶段同步到 `fatfs_image/skills/` 后打包进固件。
 2. **组件自带 Skills**：各 `cap_*` / `lua_module_*` 组件目录下的 `skills/` 子目录，由 `tools/sync_component_skills.py` 在构建阶段自动同步合并到 `fatfs_image/skills/`，再一并打包。
 
-注意：`application/basic_demo/main/skills/` 目录下的文件**不**参与上述同步流程，不会出现在运行时 FATFS 上，请勿将 Skill 文件放在此处。
+注意：放入 `application/edge_agent/main/skills/` 中的文件须经构建流程同步，直接修改 `fatfs_image/skills/` 下的同名文件会在下次构建时被覆盖。
 
 ## 用户侧交互
 

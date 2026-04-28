@@ -31,6 +31,7 @@ const strings = {
     llmProvider: "LLM Provider",
     llmProviderOpenai: "OpenAI",
     llmProviderQwen: "Qwen Compatible",
+    llmProviderDeepSeek: "DeepSeek",
     llmProviderAnthropic: "Anthropic",
     llmProviderCustom: "Custom",
     llmApiKey: "API Key",
@@ -41,7 +42,7 @@ const strings = {
     llmBackend: "Backend Type",
     llmBackendPlaceholder: "openai_compatible / anthropic / custom",
     llmProfile: "Profile",
-    llmProfilePlaceholder: "openai / qwen_compatible / anthropic",
+    llmProfilePlaceholder: "openai / qwen_compatible / custom_openai_compatible / anthropic",
     llmBaseUrl: "Base URL",
     llmBaseUrlPlaceholder: "https://api.openai.com/v1",
     llmAuthType: "Auth Type",
@@ -162,6 +163,7 @@ const strings = {
     llmProvider: "LLM 提供商",
     llmProviderOpenai: "OpenAI",
     llmProviderQwen: "Qwen 兼容",
+    llmProviderDeepSeek: "DeepSeek",
     llmProviderAnthropic: "Anthropic",
     llmProviderCustom: "自定义",
     llmApiKey: "API 密钥",
@@ -172,7 +174,7 @@ const strings = {
     llmBackend: "后端类型",
     llmBackendPlaceholder: "openai_compatible / anthropic / custom",
     llmProfile: "配置文件",
-    llmProfilePlaceholder: "openai / qwen_compatible / anthropic",
+    llmProfilePlaceholder: "openai / qwen_compatible / custom_openai_compatible / anthropic",
     llmBaseUrl: "Base URL",
     llmBaseUrlPlaceholder: "https://api.openai.com/v1",
     llmAuthType: "认证类型",
@@ -421,6 +423,12 @@ const llmProviderPresets = {
     llm_base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     llm_auth_type: "bearer",
   },
+  deepseek: {
+    llm_backend_type: "openai_compatible",
+    llm_profile: "custom_openai_compatible",
+    llm_base_url: "https://api.deepseek.com",
+    llm_auth_type: "bearer",
+  },
   anthropic: {
     llm_backend_type: "anthropic",
     llm_profile: "anthropic",
@@ -432,6 +440,7 @@ const llmProviderPresets = {
 const llmProviderDefaultModels = {
   openai: "gpt-5.4",
   qwen: "qwen3.6-plus",
+  deepseek: "deepseek-v4-pro",
   anthropic: "claude-sonnet-4-6",
 };
 

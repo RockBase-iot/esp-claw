@@ -18,7 +18,7 @@ ESP-Claw's memory module provides two modes:
 | `Structured memory management` (full mode) | Uses structured records + a summary-tag catalog; recalls details via `memory_recall` when needed | Default mode, suitable for continuous use and auto-extraction |
 | `Lightweight memory` (lightweight mode) | Keeps profile and session history; long-term memory mainly injects `MEMORY.md` text | Resource-constrained setups or simpler pipelines |
 
-`basic_demo` uses full mode by default. You can switch in menuconfig at <kbd>(Top)</kbd> → <kbd>Basic Demo Config</kbd> → <kbd>Memory management mode</kbd>.
+`edge_agent` uses full mode by default. You can switch in menuconfig at <kbd>(Top)</kbd> → <kbd>App Claw Config</kbd> → <kbd>App Claw memory management mode</kbd>.
 
 ## Session history: coherence within a conversation
 
@@ -79,7 +79,6 @@ Note that current auto-extraction is mainly based on user messages; whether devi
 
 <Aside type="caution" title="Mind the source of truth">
   In full mode, `MEMORY.md` is not the retrieval source of truth. Retrieval and updates are based on structured files (`memory_records.jsonl`, `memory_index.json`).
-  If the user explicitly asks "what do you remember" or asks to update/delete a remembered item, recall first, then answer.
 </Aside>
 
 ## What to store where

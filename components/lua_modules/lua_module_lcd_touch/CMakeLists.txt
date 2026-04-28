@@ -6,4 +6,5 @@ idf_component_register(
     REQUIRES
         cap_lua
         esp_lcd_touch
+        esp_timer
 )

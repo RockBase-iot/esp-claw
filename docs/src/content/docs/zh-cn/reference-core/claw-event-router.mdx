@@ -43,10 +43,10 @@ import { LinkCard, Aside } from '@astrojs/starlight/components';
 - `session_builder`：可选回调，覆盖默认的 `claw_event_build_session_id` 逻辑。
 - `outbound_resolver`：可选回调，在出站绑定表之前解析 `target_channel` 到 cap 名。
 
-`basic_demo` 中，`default_route_messages_to_agent` 取值取决于大语言模型是否已完整配置：如大语言模型 API 未正确配置，此处将为 `false`。
+`edge_agent` 中，`default_route_messages_to_agent` 取值取决于大语言模型是否已完整配置：如大语言模型 API 未正确配置，此处将为 `false`。
 
 <Aside type="caution" title="LLM 未配置时 claw_core 不会启动">
-  若 LLM 的 API Key、profile、model 三项任一为空，`basic_demo` 会跳过 `claw_core_init` 与 `claw_core_start`，整个推理核心不启动。
+  若 LLM 的 API Key、profile、model 三项任一为空，`edge_agent` 会跳过 `claw_core_init` 与 `claw_core_start`，整个推理核心不启动。
   此时 `run_agent` 动作、`ask` 命令、图片 inspect 等依赖 core 的功能完全不可用，直到 LLM 配置补全并重启设备。Event Router、自动化规则、本地 Capability 和 Console REPL 仍可正常使用。
 </Aside>
 
@@ -72,7 +72,7 @@ import { LinkCard, Aside } from '@astrojs/starlight/components';
 提供用户交互的「组件」在 ESP-Claw 中也是一种 Capability。它将用户消息包装为 Event 时会添加 `channel` 字段，标示消息来源，并充当由该 Event 触发的一系列 Event 的默认目标 `channel`。
 当 Event Router 接收到最终发送消息的 Event 时，会根据目标 `channel` 字段找到对应的 Capability 并调用其 `send_message` 动作。若配置了 `outbound_resolver`，则先调用自定义解析器，未命中再查表。
 
-`basic_demo` 中，QQ、飞书、Telegram、微信分别绑定了其发送消息的函数与 `channel` 名称。
+`edge_agent` 中，QQ、飞书、Telegram、微信分别绑定了其发送消息的函数与 `channel` 名称。
 
 ## 会话策略
 
@@ -87,5 +87,7 @@ import { LinkCard, Aside } from '@astrojs/starlight/components';
 | `NOSAVE` | 生成空 session id（长度为 0），不保存会话历史 |
 
 <Aside type="tip">
+
   调用自动化或 IM 时，若发现「记忆杂糅」或「Skill 激活态异常」，可检查规则中 `session_policy` 与事件字段是否一致。
+
 </Aside>

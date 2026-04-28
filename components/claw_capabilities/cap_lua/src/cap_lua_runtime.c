@@ -192,6 +192,93 @@ static void cap_lua_run_runtime_cleanups(void)
     }
 }
 
+static void cap_lua_add_script_dir_to_package_path(lua_State *L, const char *script_path)
+{
+    const char *current_path = NULL;
+    const char *last_slash = NULL;
+    char script_dir[CAP_LUA_JOB_PATH_MAX] = {0};
+    char package_path[2048] = {0};
+    size_t offset = 0;
+    size_t dir_count;
+    size_t i;
+    int written;
+
+    if (!L || !script_path || !script_path[0]) {
+        return;
+    }
+
+    last_slash = strrchr(script_path, '/');
+    if (!last_slash) {
+        return;
+    }
+
+    written = snprintf(script_dir, sizeof(script_dir), "%.*s", (int)(last_slash - script_path), script_path);
+    if (written < 0 || (size_t)written >= sizeof(script_dir)) {
+        ESP_LOGW(TAG, "Script directory path is too long: %s", script_path);
+        return;
+    }
+
+    lua_getglobal(L, "package");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        return;
+    }
+
+    lua_getfield(L, -1, "path");
+    current_path = lua_tostring(L, -1);
+
+    /* The running script's own directory has priority over configured shared Lua library directories. */
+    written = snprintf(package_path,
+                       sizeof(package_path),
+                       "%s/?.lua;%s/?/init.lua",
+                       script_dir,
+                       script_dir);
+    if (written < 0 || (size_t)written >= sizeof(package_path)) {
+        ESP_LOGW(TAG, "Lua package.path is too long for script: %s", script_path);
+        lua_pop(L, 1);
+        lua_pop(L, 1);
+        return;
+    }
+    offset = (size_t)written;
+
+    dir_count = cap_lua_get_package_path_dir_count();
+    for (i = 0; i < dir_count; i++) {
+        const char *dir = cap_lua_get_package_path_dir(i);
+
+        if (!dir || !dir[0]) {
+            continue;
+        }
+        written = snprintf(package_path + offset,
+                           sizeof(package_path) - offset,
+                           ";%s/?.lua;%s/?/init.lua",
+                           dir,
+                           dir);
+        if (written < 0 || (size_t)written >= sizeof(package_path) - offset) {
+            ESP_LOGW(TAG, "Lua package.path is too long after adding shared dir: %s", dir);
+            lua_pop(L, 1);
+            lua_pop(L, 1);
+            return;
+        }
+        offset += (size_t)written;
+    }
+
+    written = snprintf(package_path + offset,
+                       sizeof(package_path) - offset,
+                       "%s%s",
+                       current_path && current_path[0] ? ";" : "",
+                       current_path ? current_path : "");
+    lua_pop(L, 1);
+    if (written < 0 || (size_t)written >= sizeof(package_path) - offset) {
+        ESP_LOGW(TAG, "Lua package.path is too long for script: %s", script_path);
+        lua_pop(L, 1);
+        return;
+    }
+
+    lua_pushstring(L, package_path);
+    lua_setfield(L, -2, "path");
+    lua_pop(L, 1);
+}
+
 esp_err_t cap_lua_runtime_init(void)
 {
     ESP_LOGI(TAG,
@@ -247,6 +334,7 @@ esp_err_t cap_lua_runtime_execute_file(const char *path,
 
     luaL_openlibs(L);
     cap_lua_load_registered_modules(L);
+    cap_lua_add_script_dir_to_package_path(L, path);
     lua_pushlightuserdata(L, &ctx);
     lua_setglobal(L, "__cap_lua_exec_ctx");
     cap_lua_set_args_global(L, args_json);

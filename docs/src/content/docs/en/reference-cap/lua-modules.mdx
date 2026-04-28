@@ -33,7 +33,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | `uart` | `lua_module_uart` | UART serial I/O (polling read/write) |
 
 <Aside type="note" title="Board-gated modules">
-    In `basic_demo`, `audio`, `camera`, and `lcd_touch` are compiled in only when the board Kconfig says the hardware exists (`CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT`, `CONFIG_ESP_BOARD_DEV_CAMERA_SUPPORT`, `CONFIG_ESP_BOARD_DEV_LCD_TOUCH_I2C_SUPPORT`); `basic_demo_lua_modules_register()` registers them only in that case.
+    In `edge_agent`, `audio`, `camera`, and `lcd_touch` are compiled in only when the board Kconfig says the hardware exists (`CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT`, `CONFIG_ESP_BOARD_DEV_CAMERA_SUPPORT`, `CONFIG_ESP_BOARD_DEV_LCD_TOUCH_I2C_SUPPORT`); `app_lua_modules_register()` registers them only in that case.
     On boards without the matching hardware, `require("audio")` and similar calls fail with **module not found**.
 </Aside>
 
@@ -326,7 +326,7 @@ In addition to file-based image drawing, `lua_module_display` supports drawing R
 | `draw_rgb565_scaled` | Scale an RGB565 buffer to a specified size and display it |
 | `draw_rgb565_fit` | Adapt an RGB565 buffer proportionally to the target area and display it |
 
-The `data` parameter can be a Lua `string` or `lightuserdata` (e.g., `camera.frame:ptr()`). The number of bytes must be `src_width * src_height * 2`. For a typical usage, see the camera preview example at <LinkToSource relativePath="application/basic_demo/fatfs_image/scripts/camera_preview_demo.lua" />.
+The `data` parameter can be a Lua `string` or `lightuserdata` (e.g., `camera.frame:ptr()`). The number of bytes must be `src_width * src_height * 2`. For a typical usage, see the camera preview example at <LinkToSource relativePath="application/edge_agent/main/lua_scripts/advance_camera_preview.lua" />.
 
 ### Frame lifecycle
 

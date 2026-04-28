@@ -106,7 +106,7 @@ Add a corresponding rule in `router_rules.json` to send this schedule event to I
 
 ### Time rebase after first time sync
 
-After the first successful SNTP sync in `basic_demo` (`had_valid_time == false` → valid time), `cap_scheduler_handle_time_sync()` **rebases** the scheduler: if the device had already been counting from a wrong clock since boot, the first accurate system time adjusts each task’s reference points so triggers are not duplicated or skipped.
+After the first successful SNTP sync in `edge_agent` (`had_valid_time == false` → valid time), `cap_scheduler_handle_time_sync()` **rebases** the scheduler: if the device had already been counting from a wrong clock since boot, the first accurate system time adjusts each task’s reference points so triggers are not duplicated or skipped.
 
 ## Configuration and Initialization
 

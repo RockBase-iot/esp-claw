@@ -8,8 +8,8 @@ import { LinkCard, Steps, Aside, LinkButton } from '@astrojs/starlight/component
 ## Prerequisites
 
 At this point, you should already have assembled the ESP-Claw breadboard hardware, or prepared other ESP-Claw compatible hardware.
-You can view the list of ESP-Claw compatible development boards in the [GitHub repository](https://github.com/espressif/esp-claw/tree/main/application).
-ESP-Claw requires at least 8 MB Flash and 8 MB PSRAM, currently supports ESP32-S3, and is adapting to ESP32-P4.
+You can view the list of ESP-Claw compatible development boards in the [GitHub repository](https://github.com/espressif/esp-claw/tree/master/application/edge_agent/boards).
+ESP-Claw requires at least 8 MB Flash and 8 MB PSRAM, currently supports ESP32-S3 and ESP32-P4.
 
 Before flashing, prepare a computer with Chrome or Edge installed. Web flashing is not available in Firefox for now.
 
@@ -35,10 +35,10 @@ Before flashing, prepare a computer with Chrome or Edge installed. Web flashing 
 
    - Pick the firmware image for your board.
    - Configure Wi-Fi SSID and password (required).
-   - Configure LLM: Supports GPT (OpenAI), Qwen (Alibaba Bailian), and Claude (Anthropic). Generate an API Key as prompted and enter it.
+   - Configure LLM: Supports GPT (OpenAI), Qwen (Alibaba Bailian), Claude (Anthropic), and DeepSeek (DeepSeek API). Generate an API Key as prompted and enter it.
       <Aside type="note" title="Please select a model with strong reasoning ability">
          ESP-Claw's self-programming, complex tool combination, and other advanced features rely on the ability of strong reasoning models.
-         We recommend using GPT-5.4, Qwen3.6-plus, Claude3.5-sonnet, or similar performance models to get the best experience.
+         We recommend using GPT-5.4, Qwen3.6-plus, Claude4.6-sonnet, DeepSeek v4 Pro, or similar performance models to get the best experience.
       </Aside>
    - Configure chat apps to connect: currently supports Telegram, QQ Bot (OpenClaw), Feishu, and WeChat ClawBot. You can fill several at once.
      | Chat app | Setting | Help |

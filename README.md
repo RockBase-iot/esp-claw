@@ -1,185 +1,195 @@
-# ESP-Claw: An AI Agent Framework for IoT Devices
-
 <div align="center">
-  <a href="./README.md">English</a> |
-  <a href="./README_CN.md">中文</a>
-</div>
 
-![LOGO](./docs/static/ESP-CLAW-LOGO.jpg)
+  <a href="https://esp-claw.com/en/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./docs/src/assets/logos/logo-f.svg" />
+      <source media="(prefers-color-scheme: light)" srcset="./docs/src/assets/logos/logo.svg" />
+      <img alt="ESP-Claw logo" src="./docs/src/assets/logos/logo.svg" width="50%" />
+    </picture>
+  </a>
 
-<div align="center">
-  <a href="https://esp-claw.com/en/">Home</a> |
+  <h1>ESP-Claw 🦞 AI Agent Framework for IoT Devices</h1>
+
+  <h3>💬 Chat as Creation · 🚀 Millisecond Response · 🧩 Smart and Extensible · 😋 Grows with You</h3>
+
+  <p>
+    <a href="https://www.espressif.com">
+      <img src="https://img.shields.io/badge/runs_on-ESP32_Series-red?style=flat-square" alt="Runs on ESP32 Series" />
+    </a>
+    <a href="./LICENSE">
+      <img src="https://img.shields.io/github/license/espressif/esp-claw?style=flat-square" alt="License" />
+    </a>
+  </p>
+
+  <a href="https://esp-claw.com/en/">Home</a>
+  |
   <a href="https://esp-claw.com/en/tutorial/">Docs</a>
+  |
+  <a href="https://esp-claw.com/en/flash/">Online Flashing</a>
+  |
+  <a href="https://esp-claw.com/en/reference-project/build-from-source/">Build from Source</a>
+  |
+  <a href="./README_CN.md">简体中文</a>
+
 </div>
 
-**ESP-Claw** is a **Chat Coding** AI agent framework for IoT devices. It defines device behavior through conversation and completes the full loop of sensing, reasoning, decision-making, and execution locally on Espressif chips. Built on the OpenClaw concept, ESP-Claw adds the following features:
+**ESP-Claw** is Espressif's **Chat Coding** AI agent framework for IoT devices. It defines device behavior through conversation and completes the full loop of sensing, decision-making, and execution locally on Espressif chips. Inspired by the OpenClaw concept and reimplemented in C, ESP-Claw is lightweight, intelligent, and continuously evolving. With just an ESP32-series chip that costs only a few dollars, you can experience what makes ESP-Claw so nimble.
 
-- **Chat Coding:** Ordinary users can define device behavior through IM chat + dynamic Lua loading, without traditional programming
-- **Event-driven:** Any event can trigger the Agent Loop and other actions, not just user messages
-- **Structured memory management:** Organizes memories so they can accumulate and stay useful over time, with privacy kept local
-- **MCP communication:** Supports both standard MCP devices and traditional IoT hardware, with dual Server/Client identities
-- **Ready out of the box:** Fast configuration through Board Manager with one-click flashing
-- **Modularized:** Every module can be included or trimmed on demand
+<div align="center">
+  <img alt="From traditional IoT to Edge Agent" src="./docs/static/from-traditional-iot-to-edge-agent.webp" width="90%" />
+</div>
 
-![breadboard-photo](docs/src/assets/images/claw-breadboard-photo.jpg)
+## 🌟 Key Features
 
-## Why ESP-Claw: From Cloud-Centric to Edge AI
+Traditional IoT usually stops at connectivity: devices can connect to the network, but they cannot think; they can execute commands, but they cannot make decisions. ESP-Claw brings the Agent Runtime down onto Espressif chips, turning them from passive executors into active decision-making centers.
 
-Traditional IoT stays at the connectivity layer: devices can connect, but cannot think; can execute, but cannot decide; can log, but cannot learn. ESP-Claw brings the Agent Runtime down from PC environments to Espressif chips, turning chips from passive executors into active decision centers.
+<table align="center">
+  <tr>
+    <th><div align="center"> 💬 Chat as Creation </div></th>
+    <th><div align="center"> ⚙️ Event Driven </div></th>
+  </tr>
+  <tr>
+    <th>
+      <div align="center">
+        IM chat + dynamic Lua loading
+        <br />
+        Ordinary users can define device behavior without programming
+      </div>
+    </th>
+    <th>
+      <div align="center">
+        Any event can trigger the Agent Loop and more
+        <br />
+        Response can be as fast as milliseconds
+      </div>
+    </th>
+  </tr>
+  <tr>
+    <th width="45%">
+      <video src="https://github.com/user-attachments/assets/717a4dae-fbd3-4364-afca-2d45432f156e" />
+    </th>
+    <th width="45%">
+      <video src="https://github.com/user-attachments/assets/5a274a4a-e1dc-4c13-81aa-fb1c22d470bf" />
+    </th>
+  </tr>
 
-- **Decentralized:** from an instruction receiver to an edge-side decision maker
-- **Standardized protocols:** eliminate protocol silos through MCP
-- **Localized data:** build a physical barrier for privacy
-- **Autonomous logic:** move from hard-coded behavior to a dynamic canvas
+  <tr>
+    <td colspan="2"><!-- spacer row --></td>
+  </tr>
 
-| **Dimension** | **Traditional IoT (Cloud-Centric)** | **ESP-Claw (Edge AI)** |
-| --- | --- | --- |
-| **Core scenario** | Device connectivity and remote control | Physical-world sensing, decision-making, and control |
-| **Processing logic** | Preset static rules (If-This-Then-That) | LLM dynamic decision-making + Lua deterministic rules |
-| **Execution engine** | Rule engine | LLM + Lua + Router (three-tier event handling) |
-| **Control center** | Cloud server | Edge node (ESP chip) |
-| **Device protocol** | MQTT / Matter / proprietary SDK | MCP as a unified language + multi-protocol bridging |
-| **Inter-device communication** | Strong dependence on cloud relay | Direct local links + MCP abstraction |
-| **Memory management** | Cloud data storage | Local structured memory (JSONL + tags) |
-| **Interaction model** | App / control panel | IM chat (Telegram / WeChat / Feishu) |
-| **Extensibility** | Closed ecosystem, high development barrier | Plug-and-play MCP Tools |
-| **Intelligence** | Preset automation | LLM + local rules for physical closed loops |
+  <tr>
+    <th><div align="center"> 🧬 Structured Memory </div></th>
+    <th><div align="center"> 📤 MCP Communication </div></th>
+  </tr>
+  <tr>
+    <th>
+      <div align="center">
+        Organize memories in a structured way
+        <br />
+        Privacy stays off the cloud
+      </div>
+    </th>
+    <th>
+      <div align="center">
+        Supports standard MCP devices
+        <br />
+        Works as both Server and Client
+      </div>
+    </th>
+  </tr>
+  <tr>
+    <th width="45%">
+      <video src="https://github.com/user-attachments/assets/2c8bcaa4-3606-49d3-9b70-86ad3234d48f" />
+    </th>
+    <th width="45%">
+      <video src="https://github.com/user-attachments/assets/b1f71cee-e428-4b92-ad7e-d7816839f866" />
+    </th>
+  </tr>
 
-### Chat to Build: LLM Dynamic Decisions + Lua Deterministic Rules
+  <tr>
+    <td colspan="2"><!-- spacer row --></td>
+  </tr>
 
-With a single sentence sent through Feishu, WeChat, or Telegram, ESP-Claw can generate and run Lua scripts to drive peripherals like LED strips, screens, and cameras, or implement custom mini games and control algorithms. Once verified, generated logic can be persisted as local Lua rules, ensuring stable execution even when LLM services are unavailable or models change.
+  <tr>
+    <th><div align="center"> 🧰 Ready Out of the Box </div></th>
+    <th><div align="center"> 🧩 Component Extensibility </div></th>
+  </tr>
+  <tr>
+    <th>
+      <div align="center">
+        Quick setup with Board Manager
+        <br />
+        Supports one-click flashing
+      </div>
+    </th>
+    <th>
+      <div align="center">
+        Every module can be trimmed as needed
+        <br />
+        You can also add your own component integrations
+      </div>
+    </th>
+  </tr>
+</table>
 
-Try ideas like these:
+## 📦 Quick Start
 
-- Connect an LED strip and let it generate dynamic lighting effects or weather lights
-- Ask the Agent to generate a pixel-art mini game
-- Let your balancing robot iteratively improve its own algorithm so it runs faster and more steadily
-- Build a debugger that collects logs and controls devices for you
+<div align="center">
+  <img src="docs/src/assets/images/claw-breadboard-photo.jpg" width="80%" alt="ESP-Claw on ESP32-S3 Breadboard" />
+</div>
 
-### Millisecond-Level Response: Event-Driven and Proactive
+ESP-Claw already supports multiple ESP32-S3-based development boards, including breadboards, M5Stack CoreS3, and more. Supported boards in [`./application/edge_agent/boards/`](./application/edge_agent/boards/) can be flashed online directly: configuration and flashing are done entirely in the browser, with no need to compile firmware locally or install a development environment first.
 
-Unlike OpenClaw, which primarily reacts to user messages, ESP-Claw uses an **event-driven architecture**: devices actively report events, and local event buses trigger processing logic.
+<div align="center">
+  <a href="https://esp-claw.com/en/flash/">
+    <img src="./docs/static/flash-via-browser-button.svg" width="200" />
+  </a>
+</div>
 
-**Capabilities** can both emit events and execute actions. For example:
+You can also build ESP-Claw locally. Please refer to the [local build documentation](https://esp-claw.com/en/tutorial/) for board adaptation, building, and flashing. Boards not listed above, as well as chips like the ESP32-P4, can also be supported through local builds and flashing.
 
-- IM can deliver user commands, call the Agent, and notify users with results
-- MCP can receive sensor data, call the Agent for analysis, and then call MCP again to control actuators
-- Lua scripts can call the Agent for analysis and store results locally
+You can find practical examples in our [documentation](https://esp-claw.com/en/tutorial/).
 
-For high real-time requirements, **local rules execute directly** for millisecond-level response and can run independently even offline. If no local rule matches, the Agent automatically calls an LLM. For tasks beyond local compute (such as image recognition), it automatically uploads to the cloud and returns results, achieving **cloud-edge collaboration**.
+### Supported Platforms
 
-![event router](docs/src/assets/images/router_block.svg)
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/static/claw-providers-white.webp" />
+    <source media="(prefers-color-scheme: light)" srcset="./docs/static/claw-providers-black.webp" />
+    <img alt="Supported Platforms" src="./docs/static/claw-providers-black.webp" width="90%" />
+  </picture>
+</div>
 
-## Local Memory System: Learns More About You Over Time
+**LLM**: ESP-Claw now supports both OpenAI-style APIs and Anthropic-style APIs. It natively supports GPT models from OpenAI, Qwen models from Alibaba Cloud Bailian, Claude models from Anthropic, DeepSeek models from DeepSeek API, and also supports custom endpoints.
 
-Traditional AI agents usually keep memory only inside the conversation window, which means context is easily lost once the session ends. ESP-Claw implements a complete **structured long-term memory system** directly on the device:
+> [!TIP]
+>
+> ESP-Claw's self-programming capability depends on models with strong tool use and instruction-following ability. We recommend `gpt-5.4`, `qwen3.6-plus`, `claude4.6-sonnet`, `deepseek-v4-pro` or models with comparable capability.
 
-**Five memory types:** user profile (`profile`), user preference (`preference`), factual knowledge (`fact`), device event (`event`), and behavior rule (`rule`)
+**IM**: ESP-Claw supports Telegram, QQ, Feishu, and WeChat, and can be extended further.
 
-**Lightweight retrieval:** instead of relying on a vector database, ESP-Claw uses a **summary tag** mechanism. Each memory entry carries 1 to 3 keyword tags. At request time, the system injects the tag pool so the LLM can selectively recall full memory content, enabling efficient retrieval under MCU resource constraints.
+> [!NOTE]
+>
+> This project is still under active development. If you run into any issues, feel free to open an issue.
 
-**Automatic evolution:** memories keep accumulating through three paths: dialogue extraction, event archiving, and behavior rule consolidation. More importantly, the LLM can discover patterns from those memories and **proactively suggest automations**.
+## 📷 Follow Us
 
-It also supports editable and persistent Agent core roles (such as soul and identity), giving devices customizable personality and behavior style.
-
-### MCP as a Unified Protocol: Make Devices AI-Native Objects
-
-ESP-Claw devices have dual identities as both **MCP Server** and **MCP Client**:
-
-- **As an MCP Server:** hardware capabilities such as sensor reads and actuator control are packaged as standard MCP Tools that any MCP-compatible Agent (such as OpenClaw, Claude, or Codex) can call directly
-- **As an MCP Client:** actively call any service exposed by MCP Servers on the network, including other IoT devices, PC-side services, and cloud software capabilities (such as querying Gaode Maps traffic or sending Feishu reminders)
-
-**AI-native semantic interface:** tool naming follows a verb-noun pattern such as `turn_on` and `get_temperature`, while return values include units and freshness metadata. This lets AI understand and invoke tools without external documentation.
-
-### Rich Peripheral Access: Built for Information Processing
-
-ESP-Claw supports cameras, microphones, and many other sensors. Most drivers can be obtained through the ESP-IDF Component Registry. Built-in Lua modules include:
-
-- **Display and interaction:** `lua_module_display`, `lua_module_lcd_touch`, `lua_module_button`
-- **Multimedia:** `lua_module_camera`, `lua_module_audio`
-- **Actuators:** `lua_module_led_strip`, `lua_module_gpio`, `lua_module_mcpwm`
-- **System tools:** `lua_module_storage`, `lua_module_delay`, `lua_module_event_publisher`
-
-
-## How to Deploy and Use
-
-### Online Flashing
-
-Configuration and firmware retrieval can be completed directly in the browser. No extra firmware compilation or software installation is required before flashing and use.
-[Try Online Flashing](https://esp-claw.com/en/flash)
-
-### Build from Source
-
-[`basic_demo`](./application/basic_demo) provides a foundational example. For detailed build and flashing instructions, please refer to the [docs](https://esp-claw.com/en/tutorial/)
-
-## Code Architecture
-
-The project follows an **"application example + reusable components"** structure. `application/basic_demo` is a ready-to-build ESP-IDF sample project. `components` contains reusable runtime cores, capability plugins, and hardware/script extension modules.
-
-The current codebase is divided into four layers:
-
-- **Application assembly layer:** `application/basic_demo/main`, responsible for startup entry, network connection, parameter configuration, HTTP config pages, and demo-level module registration
-- **Capability layer:** `components/claw_capabilities`, including IM communication, MCP Client/Server, Lua runtime, scheduling, files, time, web search, and more
-- **Runtime core layer:** `components/claw_modules`, including core context, capability registration, event routing, memory management, and skill management
-- **Device and script extension layer:** `components/lua_modules`, exposing displays, cameras, audio, buttons, GPIO, storage, and other peripherals to Lua and upper-layer Agents
-
-```text
-esp-claw/
-├── application/
-│   └── basic_demo/
-│       ├── main/
-│       │   ├── main.c                    # Firmware entry
-│       │   ├── app_claw.c                # App bootstrap and assembly
-│       │   ├── basic_demo_wifi.*         # Wi-Fi connection and network setup
-│       │   ├── basic_demo_settings.*     # Local settings persistence
-│       │   ├── config_http_server.*      # Web configuration service
-│       │   ├── basic_demo_lua_modules.*  # Lua module registration
-│       │   └── web/                      # Frontend assets for device config
-│       └── README.md
-├── components/
-│   ├── claw_modules/
-│   │   ├── claw_core/          # Core runtime context
-│   │   ├── claw_cap/           # Capability abstraction and registration
-│   │   ├── claw_event_router/  # Deterministic event routing
-│   │   ├── claw_memory/        # Structured memory management
-│   │   └── claw_skill/         # Skill metadata and loading
-│   ├── claw_capabilities/
-│   │   ├── cap_im_feishu / cap_im_qq / cap_im_tg / cap_im_wechat
-│   │   ├── cap_mcp_client / cap_mcp_server
-│   │   ├── cap_lua / cap_skill_mgr / cap_scheduler / cap_router_mgr
-│   │   ├── cap_files / cap_time / cap_web_search / cap_cli
-│   │   └── ...
-│   └── lua_modules/
-│       ├── lua_module_display / lua_module_camera / lua_module_audio
-│       ├── lua_module_button / lua_module_gpio / lua_module_led_strip
-│       ├── lua_module_storage / lua_module_delay / lua_module_event_publisher
-│       └── esp_painter
-├── docs/
-├── README.md
-└── README_CN.md
-```
-
-### Notes
-
-- The project is still under active development. If you run into issues, feel free to open an issue at any time.
-- Features such as self-programming depend on strong reasoning models. GPT-5.4, Qwen3.5-plus, or a model with similar capability is recommended for the best experience.
-
-## Follow Us
-
-If this project inspires or helps you, please consider giving it a star. ⭐⭐⭐⭐⭐
+If this project helps you, please consider giving it a star. ⭐⭐⭐⭐⭐
 
 ### Star History
 
-<a href="https://www.star-history.com/?repos=espressif%2Fesp-claw&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=espressif/esp-claw&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=espressif/esp-claw&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=espressif/esp-claw&type=date&legend=top-left" />
- </picture>
-</a>
+<div align="center">
+  <a href="https://www.star-history.com/?repos=espressif%2Fesp-claw&type=date&legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=espressif/esp-claw&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=espressif/esp-claw&type=date&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=espressif/esp-claw&type=date&legend=top-left" />
+  </picture>
+  </a>
+</div>
 
 ## Acknowledgements
 
-ESP-Claw is inspired by [OpenClaw](https://github.com/openclaw/openclaw).
+Inspired by [OpenClaw](https://github.com/openclaw/openclaw).
 
-Its implementation of Agent Loop and IM communication on ESP32 was also informed by [MimiClaw](https://github.com/memovai/mimiclaw).
+The implementation of Agent Loop, IM communication, and related capabilities on ESP32 also draws on [MimiClaw](https://github.com/memovai/mimiclaw).

@@ -571,12 +571,14 @@ llmBaseUrlInput?.addEventListener("input", () => {
 
 const LLM_DEFAULT_MODELS: Record<string, string> = {
   qwen: "qwen3.6-plus",
+  deepseek: "deepseek-v4-pro",
   openai: "gpt-5.4",
   anthropic: "claude-sonnet-4-6",
 };
 
 const LLM_DEFAULT_BASE_URLS: Record<string, string> = {
   qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  deepseek: "https://api.deepseek.com",
   openai: "https://api.openai.com/v1",
   anthropic: "https://api.anthropic.com/v1",
   openai_compat: "https://api.openai.com/v1",
@@ -587,6 +589,10 @@ const LLM_VENDOR_LINKS = {
   qwen: {
     apiKey: "https://bailian.console.aliyun.com/?tab=model#/api-key",
     docs: "https://bailian.console.aliyun.com/cn-beijing?tab=doc#/doc/?type=model&url=2840915",
+  },
+  deepseek: {
+    apiKey: "https://platform.deepseek.com/api_keys",
+    docs: "https://api-docs.deepseek.com/",
   },
   openai: {
     apiKey: "https://platform.openai.com/api-keys",
@@ -1104,7 +1110,10 @@ function syncLlmPanels(): void {
       mode === "anthropic_compat" ? s.llmBaseUrlLabelAnthropicCompat : s.llmBaseUrlLabel;
   }
 
-  const vendorLinks = mode === "qwen" || mode === "openai" || mode === "anthropic" ? LLM_VENDOR_LINKS[mode] : null;
+  const vendorLinks =
+    mode === "qwen" || mode === "deepseek" || mode === "openai" || mode === "anthropic"
+      ? LLM_VENDOR_LINKS[mode]
+      : null;
   if (llmVendorActions) {
     llmVendorActions.classList.toggle("hidden", !vendorLinks);
   }
@@ -1172,6 +1181,9 @@ function getConfig(): NvsConfig {
   const llm_base_url = get("llm_base_url");
   if (mode === "openai") {
     llm_profile = "openai";
+    llm_backend_type = "openai_compatible";
+  } else if (mode === "deepseek") {
+    llm_profile = "custom_openai_compatible";
     llm_backend_type = "openai_compatible";
   } else if (mode === "openai_compat") {
     llm_profile = "custom_openai_compatible";

@@ -6,11 +6,11 @@ description: Build-time defaults, NVS persistence, Web changes, precedence, and 
 import { Aside } from '@astrojs/starlight/components';
 import LinkToSource from '@/components/LinkToSource.astro';
 
-ESP-Claw `basic_demo` stores boot defaults in menuconfig (`sdkconfig`) and runtime overrides in NVS.
+ESP-Claw `edge_agent` stores boot defaults in menuconfig (`sdkconfig`) and runtime overrides in NVS.
 
-`basic_demo` uses the NVS namespace `basic_demo`.
+`edge_agent` uses the NVS namespace `app`.
 On boot, menuconfig defaults load first, then keys present in NVS override them.
-Field list and read/write logic live in `application/basic_demo/main/basic_demo_settings.c`.
+Field list and read/write logic live in <LinkToSource relativePath="application/edge_agent/components/app_config/app_config.c" />.
 
 <Aside title="How precedence works">
   **Effective value = NVS if present, else compile-time default.**
@@ -18,7 +18,7 @@ Field list and read/write logic live in `application/basic_demo/main/basic_demo_
   After you save once from Web or serial tools, NVS wins; “factory reset” means clearing those NVS keys.
 </Aside>
 
-## basic_demo settings
+## edge_agent settings
 
 Unless marked optional, fields are required.
 
@@ -41,7 +41,7 @@ Fields:
 - **`llm_profile`: vendor/scenario preset**
   - Empty string falls back to `claw_llm_profile_default()` (currently `openai`).
   - Mapping of preset names to concrete settings is in
-    <LinkToSource relativePath="application/basic_demo/main/basic_demo_settings.c" line={24} />.
+    <LinkToSource relativePath="application/edge_agent/components/app_config/app_config.c" />.
 - **`llm_backend_type`: backend type** [optional]
   - Must match the real wire protocol or be empty: use `anthropic` for official Anthropic or Messages-compatible gateways; use `openai_compatible` for OpenAI or “OpenAI-compatible” gateways.
   - Non-empty overrides the profile’s default backend; empty keeps the profile default.
@@ -84,12 +84,12 @@ Search API keys are optional. If both are empty, ESP-Claw cannot fetch online re
 
 Besides the NVS settings above, some behavior is controlled at **build time** via **Kconfig** (`menuconfig`) with no runtime toggle—change requires rebuilding and reflashing:
 
-- **`BASIC_DEMO_MEMORY_MODE`**: long-term memory mode.
+- **`APP_CLAW_MEMORY_MODE`**: long-term memory mode.
   - **Structured (full structured memory, default)**: enables structured memory extraction; the LLM-visible groups additionally include `claw_memory`; the summary-tag catalog is injected instead of the full `MEMORY.md` text.
   - **Lightweight**: skips structured extraction and injects `MEMORY.md` text directly—useful when RAM or context window is tight.
-- **`BASIC_DEMO_ENABLE_EMOTE`**: whether to start the LCD emote/status UI (`app_expression_emote`) at boot. Only meaningful on boards with an LCD; disabling saves a little heap.
+- **`APP_CLAW_ENABLE_EMOTE`**: whether to start the LCD emote/status UI at boot. Only meaningful on boards with an LCD; disabling saves a little heap.
 
-Use `idf.py menuconfig` → `(Top)` → `Basic Demo Config` to view or change these options.
+Use `idf.py menuconfig` → `(Top)` → `App Claw Config` to view or change these options.
 
 ## Where to edit
 

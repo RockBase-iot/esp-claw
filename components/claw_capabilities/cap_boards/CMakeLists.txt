@@ -25,5 +25,5 @@ add_custom_command(
 
 add_custom_target(cap_boards_generate_skill DEPENDS "${CAP_BOARDS_OUTPUT_MD}")
 add_dependencies(${COMPONENT_LIB} cap_boards_generate_skill)
-set_property(GLOBAL APPEND PROPERTY BASIC_DEMO_SKILL_GENERATOR_TARGETS cap_boards_generate_skill)
-set_property(GLOBAL APPEND PROPERTY BASIC_DEMO_RESOURCE_GENERATOR_TARGETS_skills cap_boards_generate_skill)
+set_property(GLOBAL APPEND PROPERTY APP_SKILL_GENERATOR_TARGETS cap_boards_generate_skill)
+set_property(GLOBAL APPEND PROPERTY APP_RESOURCE_GENERATOR_TARGETS_skills cap_boards_generate_skill)

@@ -8,11 +8,11 @@ import ClawRunDiagram from "@/assets/images/claw_run.svg?url";
 
 ## System overview
 
-The repo follows an **“example app + shared components”** layout: `application/basic_demo` is a buildable ESP-IDF sample that wires Wi-Fi, the config UI, Lua modules, and capabilities into a full device; `components` holds reusable runtime core, capability plugins, and hardware/script extensions for other boards and scenarios.
+The repo follows an **“example app + shared components”** layout: `application/edge_agent` is a buildable ESP-IDF sample that wires Wi-Fi, the config UI, Lua modules, and capabilities into a full device; `components` holds reusable runtime core, capability plugins, and hardware/script extensions for other boards and scenarios.
 
 Today the code falls into four areas:
 
-- **App assembly:** `application/basic_demo/main` — boot, networking, settings, the HTTP provisioning UI, and demo-level module registration.
+- **App assembly:** `application/edge_agent/main` and `components/common` — boot, networking, settings, the HTTP provisioning UI, and app-level module registration.
 - **Capabilities:** `components/claw_capabilities` — outward-facing capabilities such as IM, MCP client/server, Lua runtime, scheduling, files, time, web search, and more.
 - **Runtime core:** `components/claw_modules` — Agent infrastructure: core context, capability registration, event routing, memory, and skills.
 - **Device & script extensions:** `components/lua_modules` — exposes displays, cameras, audio, buttons, GPIO, PWM, storage, and other peripherals to Lua and the Agent.
@@ -20,18 +20,20 @@ Today the code falls into four areas:
 ## Project directory layout
 
 <FileTree>
-- application/basic_demo/ **Demo app** — wires the framework and caps into flashable firmware
-  - main/ Boot, Wi‑Fi, HTTP config UI, `app_claw_start`
+- application/edge_agent/ **Demo app** — wires the framework and caps into flashable firmware
+  - main/ Boot entry (`app_main`) and Lua script examples
     - main.c Firmware entry
-    - app_claw.c App bootstrapping and wiring
-    - app_expression_emote.* Emote display and network-state linkage
-    - basic_demo_wifi.* Wi-Fi and network setup
-    - basic_demo_settings.* Local settings persistence
-    - config_http_server.* Web configuration service
-    - basic_demo_lua_modules.* Lua module registration
-    - web/ Device configuration frontend assets
-  - components/display_arbiter/ Display ownership arbitration [\[details\]](@lang/reference-cap/lua-modules#display-module)
-  - fatfs_image/ Factory FATFS: skills, router_rules, memory, scripts samples
+  - components/ App-level components
+    - app_config/ Configuration persistence (NVS read/write)
+    - http_server/ Web management UI and JSON API
+  - fatfs_image/ Factory FATFS: router_rules, memory, scheduler samples
+- components/common/ **Shared app components** — reusable wiring across apps
+  - app_claw/ App startup and wiring (`app_claw_start`, CLI, Lua module registration)
+  - wifi_manager/ Wi-Fi and network setup
+  - settings/ Base library for local settings persistence
+  - captive_dns/ Captive DNS for SoftAP provisioning
+  - display_arbiter/ Display ownership arbitration [\[details\]](@lang/reference-cap/lua-modules#display-module)
+  - emote/ Emote display and network-state linkage
 - components/
   - claw_modules/ **Runtime core**
     - claw_core/ Agent core — Agent loop, context assembly, tool calls

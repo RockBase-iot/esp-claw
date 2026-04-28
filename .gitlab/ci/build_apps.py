@@ -35,6 +35,11 @@ logger = logging.getLogger('idf_build_apps')
 IDF_PATH = os.getenv('IDF_PATH', '')
 BOARD_NAME = 'default'
 
+# Virtual board variants -> (real board for gen-bmgr-config, extra sdkconfig.defaults snippet)
+BOARD_VARIANTS: t.Dict[str, t.Tuple[str, str]] = {
+    'esp32_p4x_function_ev': ('esp32_p4_function_ev', '# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set\n'),
+}
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent.absolute()
 APPS_BUILD_PER_JOB = 30
 IGNORE_WARNINGS = [
@@ -55,6 +60,7 @@ IGNORE_WARNINGS = [
     r'.+MultiCommand.+',
     r'warning: \'ISP_AWB_SAMPLE_POINT_BEFORE_CCM\' is deprecated: Use ISP_AWB_SAMPLE_POINT_0 instead \[-Wdeprecated-declarations\]',
     r'warning: \'ISP_AE_SAMPLE_POINT_AFTER_DEMOSAIC\' is deprecated: Use ISP_AE_SAMPLE_POINT_0 instead \[-Wdeprecated-declarations\]',
+    r'warning: \'touch_cst816s_read_id\' declared \'static\' but never defined \[-Wunused-function\]',
 ]
 
 class CustomApp(CMakeApp):
@@ -76,8 +82,14 @@ class CustomApp(CMakeApp):
             os.remove(os.path.join(self.work_dir, 'dependencies.lock'))
         board_name = BOARD_NAME.strip()
         if board_name != 'default':
+            actual_board, extra_defaults = BOARD_VARIANTS.get(board_name, (board_name, ''))
             if self.is_board_manager_project():
-                self._pre_hook(board_name)
+                self._pre_hook(actual_board)
+                if extra_defaults:
+                    defaults = Path(self.work_dir) / 'components' / 'gen_bmgr_codes' / 'board_manager.defaults'
+                    if defaults.is_file():
+                        with open(defaults, 'a', encoding='utf-8') as f:
+                            f.write('\n' + extra_defaults)
             else:
                 logger.warning(
                     "Board '%s' specified but app '%s' has no esp_board_manager dependency; building as normal.",

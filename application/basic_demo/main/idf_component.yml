@@ -8,7 +8,7 @@ dependencies:
     rules:
       - if: "target in [esp32p4]"
   espressif/esp_hosted:
-    version: "~2"
+    version: "2.12.3"
     rules:
       - if: "target in [esp32p4]"
 
@@ -91,7 +91,7 @@ dependencies:
     path: ../../../components/claw_modules/claw_skill
 
   esp_painter:
-    path: ../../../components/lua_modules/esp_painter
+    path: ../../../components/common/esp_painter
 
   lua_module_adc:
     path: ../../../components/lua_modules/lua_module_adc

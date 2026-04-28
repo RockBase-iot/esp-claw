@@ -38,6 +38,15 @@ examples_and_unit_tests:
   - Unlicense
   license_for_new_files: Apache-2.0
 
+edge_agent_boards:
+  include:
+    - 'application/edge_agent/boards/**/*'
+  allowed_licenses:
+  - Apache-2.0
+  - CC0-1.0
+  - LicenseRef-Espressif-Modified-MIT
+  license_for_new_files: Apache-2.0
+
 ignore:  # You can also select ignoring files here
   perform_check: no  # Don't check files from that block
   include:

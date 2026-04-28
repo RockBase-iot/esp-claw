@@ -5,7 +5,6 @@ idf_component_register(
     INCLUDE_DIRS
         "include"
     REQUIRES
-        cap_im_attachment
         claw_cap
         claw_event_router
         esp_event

@@ -5,10 +5,10 @@ description: "Serial REPL: session, Q&A, cap, skills, and automation debug comma
 
 import { Aside, LinkCard } from '@astrojs/starlight/components';
 
-Connect the board over USB, use `idf.py monitor`, `minicom`, or the [web flasher](@lang/flash) Console to reach the `basic_demo` prompt (default `basic_demo> `).
+Connect the board over USB, use `idf.py monitor`, `minicom`, or the [web flasher](@lang/flash) Console to reach the `edge_agent` prompt (default `app> `).
 
 <Aside type="tip">
-  Logs scroll but you cannot type commands?  
+  Logs scroll but you cannot type commands?
   - Boards with both UART and USB-JTAG: try the other port.
   - Single-USB devices: try a firmware build with `JTAG` in the name, or [build from source](@lang/reference-project/build-from-source) and adjust `Channel for console output` in menuconfig.
 </Aside>
@@ -69,7 +69,7 @@ cap unload <group_id>
 ## skill
 
 <Aside type="note" title="skill console command is not registered by default">
-  `basic_demo` does **not** call `register_cap_skill()` by default, so the `skill` command does not appear on the serial console. To enable it, call `register_cap_skill()` inside `basic_demo_cli_start` in `basic_demo_cli.c` and rebuild.
+  `edge_agent` does **not** call `register_cap_skill()` by default, so the `skill` command does not appear on the serial console. To enable it, call `register_cap_skill()` inside `app_claw_cli_start` in `components/common/app_claw/app_claw_cli.c` and rebuild.
 
   Alternatively, use `cap call activate_skill '{"skill_id":"your_skill"}'` from the console to manage Skills.
 </Aside>
@@ -95,7 +95,7 @@ auto last
 ...
 ```
 
-<LinkCard 
+<LinkCard
   href="@lang/reference-project/dataflow-and-automation#event-router-console-commands"
   title="Dataflow and automation"
   description="More commands and details in this doc"
@@ -104,7 +104,7 @@ auto last
 
 ## Other registered cap commands
 
-`basic_demo` registers `help`, `cap`, `auto`, `time`, `web_search`, `mcp_client`, `mcp_server`, `llm_inspect`, `event_router`, etc.
+`edge_agent` registers `help`, `cap`, `auto`, `time`, `web_search`, `mcp_client`, `mcp_server`, `llm_inspect`, `event_router`, etc.
 Type `help` in the Console for the full list.
 
 Besides the usual `cap` subcommands (`list`, `call`, `groups`, `enable`, `disable`, `unload`), `cap load qq` dynamically loads the `cap_im_qq` group.

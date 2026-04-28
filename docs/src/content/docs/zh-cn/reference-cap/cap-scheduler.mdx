@@ -106,7 +106,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 ### 首次时间同步后的时间校准
 
-`basic_demo` 在首次 SNTP 同步成功（`had_valid_time == false`）后，会调用 `cap_scheduler_handle_time_sync()` 对调度器进行时间校准（rebase）：设备上电后可能基于不准确的时钟提前开始计时，首次获得有效系统时间后，调度器会修正各任务的参考时间点，避免重复触发或遗漏触发。
+`edge_agent` 在首次 SNTP 同步成功（`had_valid_time == false`）后，会调用 `cap_scheduler_handle_time_sync()` 对调度器进行时间校准（rebase）：设备上电后可能基于不准确的时钟提前开始计时，首次获得有效系统时间后，调度器会修正各任务的参考时间点，避免重复触发或遗漏触发。
 
 ## 配置与初始化
 

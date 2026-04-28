@@ -33,7 +33,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | `uart` | `lua_module_uart` | UART 串口收发（polling 读写） |
 
 <Aside type="note" title="板级条件模块">
-    `audio`、`camera`、`lcd_touch` 三个模块在 `basic_demo` 中受板级 Kconfig 条件编译控制：仅当开发板硬件支持对应外设（`CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT`、`CONFIG_ESP_BOARD_DEV_CAMERA_SUPPORT`、`CONFIG_ESP_BOARD_DEV_LCD_TOUCH_I2C_SUPPORT`）时，`basic_demo_lua_modules_register()` 才会注册这些模块。
+    `audio`、`camera`、`lcd_touch` 三个模块在 `edge_agent` 中受板级 Kconfig 条件编译控制：仅当开发板硬件支持对应外设（`CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT`、`CONFIG_ESP_BOARD_DEV_CAMERA_SUPPORT`、`CONFIG_ESP_BOARD_DEV_LCD_TOUCH_I2C_SUPPORT`）时，`app_lua_modules_register()` 才会注册这些模块。
     若使用不带对应硬件的开发板，Lua 脚本中 `require("audio")` 等调用会报错 **module not found**。
 </Aside>
 
@@ -326,7 +326,7 @@ uint8_t r = (uint8_t)((src[0] * alpha + 127) / 255);
 | `draw_rgb565_scaled` | 将 RGB565 缓冲区缩放到指定尺寸显示 |
 | `draw_rgb565_fit` | 将 RGB565 缓冲区按比例适配目标区域显示 |
 
-`data` 参数可以是 Lua `string` 或 `lightuserdata`（如 `camera.frame:ptr()`），字节数需为 `src_width * src_height * 2`。典型用法见摄像头预览示例 <LinkToSource relativePath="application/basic_demo/fatfs_image/scripts/camera_preview_demo.lua" />。
+`data` 参数可以是 Lua `string` 或 `lightuserdata`（如 `camera.frame:ptr()`），字节数需为 `src_width * src_height * 2`。典型用法见摄像头预览示例 <LinkToSource relativePath="application/edge_agent/main/lua_scripts/advance_camera_preview.lua" />。
 
 ### 帧管理
 

@@ -41,8 +41,8 @@ Typical call paths:
 `claw_cap_build_llm_tools_json` builds the tool list for the current context; `claw_cap_tools_provider` supplies it as `TOOLS` context to `claw_core`.
 
 `claw_cap_set_llm_visible_groups` applies a **group id allow-list**.
-`basic_demo` defaults to exposing `cap_files`, `cap_skill`, `cap_system`, and `cap_lua` to the LLM, and full structured-memory mode also exposes `claw_memory`;
-see `BASIC_DEMO_LLM_VISIBLE_GROUPS` in <LinkToSource relativePath="application/basic_demo/main/app_claw.c" />.
+`edge_agent` defaults to exposing `cap_files`, `cap_skill`, `cap_system`, and `cap_lua` to the LLM, and full structured-memory mode also exposes `claw_memory`;
+see the visible-group configuration in <LinkToSource relativePath="components/common/app_claw/app_capabilities.c" />.
 
 <Aside type="tip">
   Other registered groups (IM, search, MCP, Lua, …) still exist and can be called from Console or automation;

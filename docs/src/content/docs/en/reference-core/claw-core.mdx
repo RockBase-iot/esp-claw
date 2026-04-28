@@ -49,7 +49,7 @@ When assembling the **current-turn user prompt** sent to the LLM, `claw_core` al
 - `CLAW_CORE_CONTEXT_KIND_MESSAGES`
 - `CLAW_CORE_CONTEXT_KIND_TOOLS`
 
-`basic_demo` registers multiple providers in fixed order inside `app_claw_start`:
+`edge_agent` registers multiple providers in fixed order inside `app_claw_start`:
 
 1. Editable profile/persona: `claw_memory_profile_provider`
 2. Long-term memory: `claw_memory_long_term_provider` (full mode) or `claw_memory_long_term_lightweight_provider` (lightweight mode)
@@ -63,14 +63,14 @@ When assembling the **current-turn user prompt** sent to the LLM, `claw_core` al
 So the final tool list depends both on registered capabilities and on `claw_cap_set_llm_visible_groups`.
 
 <Aside type="tip">
-    `basic_demo` exposes `cap_files`, `cap_skill`, `cap_system`, and `cap_lua` to the LLM by default (full structured-memory mode also includes `claw_memory`). Other capabilities typically require activating the corresponding Skill first, so the model gets both "tool visibility + usage guidance" together. See [claw_cap](./claw-cap) and [cap_skill](@lang/reference-cap/cap-skill)
+    `edge_agent` exposes `cap_files`, `cap_skill`, `cap_system`, and `cap_lua` to the LLM by default (full structured-memory mode also includes `claw_memory`). Other capabilities typically require activating the corresponding Skill first, so the model gets both "tool visibility + usage guidance" together. See [claw_cap](./claw-cap) and [cap_skill](@lang/reference-cap/cap-skill)
 </Aside>
 
 ## Tool calls
 
 `claw_core` handles LLM tool calls through callbacks.
 
-In `basic_demo`, the `call_cap` callback targets `claw_cap_call_from_core` from `claw_cap`.
+In `edge_agent`, the `call_cap` callback targets `claw_cap_call_from_core` from `claw_cap`.
 `claw_core` only accepts “cap name + JSON args + current request context”; it does not resolve or execute the underlying capability implementation.
 Resolution and execution live in `claw_cap`.
 
@@ -80,7 +80,7 @@ Per-turn tool rounds are capped by `max_tool_iterations`.
 
 `claw_core` supports multiple ways to append session history via callbacks.
 
-In `basic_demo`, `append_session_turn` is `claw_memory_append_session_turn_callback` from `claw_memory`.
+In `edge_agent`, `append_session_turn` is `claw_memory_append_session_turn_callback` from `claw_memory`.
 `claw_core` invokes it at the right times so turns are persisted through `claw_memory`.
 
 ## Request cancellation
@@ -104,7 +104,7 @@ This is cooperative cancellation, mainly used to interrupt an in-progress LLM HT
 
 This is useful for audit, metrics, or result-consistency checks (for example, verifying whether specific claims were accompanied by the corresponding tool calls).
 
-`basic_demo` registers `cap_lua_honesty_observe_completion` as a completion observer to detect when the model’s reply claims Lua work ran without a matching tool call, and logs when that happens.
+`edge_agent` registers `cap_lua_honesty_observe_completion` as a completion observer to detect when the model’s reply claims Lua work ran without a matching tool call, and logs when that happens.
 
 ## Init error handling
 

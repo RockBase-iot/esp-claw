@@ -73,5 +73,44 @@ build_application_basic_demo:
       - IMAGE: espressif/idf:release-v5.5
         EXAMPLE_BOARD: esp32_S3_DevKitC_1_breadboard
         EXAMPLE_TARGET: esp32s3
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: esp32_p4_function_ev
+        EXAMPLE_TARGET: esp32p4
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: m5stack_sticks3
+        EXAMPLE_TARGET: esp32s3
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: m5stack_cores3
+        EXAMPLE_TARGET: esp32s3
   variables:
     EXAMPLE_DIR: application/basic_demo
+
+build_application_edge_agent:
+  extends:
+    - .build_examples_template
+    - .rules:build:application_edge_agent
+  parallel:
+    matrix:
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: esp32_S3_DevKitC_1
+        EXAMPLE_TARGET: esp32s3
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: esp32_S3_DevKitC_1_breadboard
+        EXAMPLE_TARGET: esp32s3
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: esp32_p4_function_ev
+        EXAMPLE_TARGET: esp32p4
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: esp32_p4x_function_ev
+        EXAMPLE_TARGET: esp32p4
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: m5stack_sticks3
+        EXAMPLE_TARGET: esp32s3
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: m5stack_cores3
+        EXAMPLE_TARGET: esp32s3
+      - IMAGE: espressif/idf:release-v5.5
+        EXAMPLE_BOARD: esp_vocat_board_v1_2
+        EXAMPLE_TARGET: esp32s3
+  variables:
+    EXAMPLE_DIR: application/edge_agent

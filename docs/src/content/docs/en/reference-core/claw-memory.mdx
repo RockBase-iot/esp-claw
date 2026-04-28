@@ -12,7 +12,7 @@ Header: <LinkToSource relativePath="components/claw_modules/claw_memory/include/
 
 Common fields in `claw_memory_config_t`:
 
-| Field | Meaning | `basic_demo` default |
+| Field | Meaning | `edge_agent` default |
 |------|------|------|
 | `session_root_dir` | Root for session history files | `/fatfs/sessions` |
 | `memory_root_dir` | Long-term memory directory (`claw_memory` manages `MEMORY.md` and all structured memory files under this directory) | `/fatfs/memory` |
@@ -40,7 +40,7 @@ Common fields in `claw_memory_config_t`:
 
 ## Long-term memory file layout
 
-`basic_demo` uses `claw_memory_init` to create required memory files under `/fatfs/memory/`:
+`edge_agent` uses `claw_memory_init` to create required memory files under `/fatfs/memory/`:
 
 <FileTree>
 - fatfs/

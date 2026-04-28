@@ -49,7 +49,7 @@ Event Router 的 `run_agent` 动作会同时设置这两个标志，实现异步
 - `CLAW_CORE_CONTEXT_KIND_MESSAGES`
 - `CLAW_CORE_CONTEXT_KIND_TOOLS`
 
-`basic_demo` 在 `app_claw_start` 里按固定顺序挂了多个 provider：
+`edge_agent` 在 `app_claw_start` 里按固定顺序挂了多个 provider：
 
 1. 可编辑人设与画像：`claw_memory_profile_provider`
 2. 长期记忆：`claw_memory_long_term_provider`（完整模式）或 `claw_memory_long_term_lightweight_provider`（轻量模式）
@@ -63,14 +63,14 @@ Event Router 的 `run_agent` 动作会同时设置这两个标志，实现异步
 因此：大语言模型最终接收的工具列表，不仅取决于注册了哪些 Capability，还取决于 `claw_cap_set_llm_visible_groups`。
 
 <Aside type="tip">
-    `basic_demo` 默认只对大语言模型暴露 `cap_files`、`cap_skill`、`cap_system`、`cap_lua`（完整结构化记忆模式还包含 `claw_memory`）。其余能力通常需要先激活对应 Skill，模型才能同时获得「工具可见性 + 使用说明」——详见 [claw_cap](./claw-cap) 与 [cap_skill](@lang/reference-cap/cap-skill)
+    `edge_agent` 默认只对大语言模型暴露 `cap_files`、`cap_skill`、`cap_system`、`cap_lua`（完整结构化记忆模式还包含 `claw_memory`）。其余能力通常需要先激活对应 Skill，模型才能同时获得「工具可见性 + 使用说明」——详见 [claw_cap](./claw-cap) 与 [cap_skill](@lang/reference-cap/cap-skill)
 </Aside>
 
 ## 工具调用
 
 `claw_core` 通过回调处理大语言模型发出的工具调用请求。
 
-`basic_demo` 的 `call_cap` 回调指向 `claw_cap_call_from_core`，该函数由 `claw_cap` 提供。
+`edge_agent` 的 `call_cap` 回调指向 `claw_cap_call_from_core`，该函数由 `claw_cap` 提供。
 `claw_core` 只基于「能力名 + JSON 参数 + 当前请求上下文」接受调用工具的指令，但不负责查找对应的 Capability 实现与执行。
 Capability 的解析与执行工作由 `claw_cap` 负责。
 
@@ -80,7 +80,7 @@ Capability 的解析与执行工作由 `claw_cap` 负责。
 
 `claw_core` 通过回调机制支持多种会话历史写入方式。
 
-`basic_demo` 中，`append_session_turn` 设为 `claw_memory_append_session_turn_callback`，该函数由 `claw_memory` 提供。
+`edge_agent` 中，`append_session_turn` 设为 `claw_memory_append_session_turn_callback`，该函数由 `claw_memory` 提供。
 `claw_core` 会在合适时机触发回调函数，将会话历史交由 `claw_memory` 处理。
 
 ## 请求取消
@@ -104,7 +104,7 @@ Capability 的解析与执行工作由 `claw_cap` 负责。
 
 该机制适合做审计、统计或“结果一致性”检查（例如检测某些声明是否伴随了对应工具调用）。
 
-`basic_demo` 注册了 `cap_lua_honesty_observe_completion` 作为 completion observer，用于检测模型回复中声称执行了 Lua 操作但实际未产生工具调用的情况，并在发现不一致时记录日志。
+`edge_agent` 注册了 `cap_lua_honesty_observe_completion` 作为 completion observer，用于检测模型回复中声称执行了 Lua 操作但实际未产生工具调用的情况，并在发现不一致时记录日志。
 
 ## 初始化错误处理
 

@@ -8,11 +8,11 @@ import ClawRunDiagram from "@/assets/images/claw_run.svg?url";
 
 ## 整体架构
 
-项目采用 **"应用示例 + 通用组件"** 的组织方式：`application/basic_demo` 是可直接编译运行的 ESP-IDF 示例工程，负责把 Wi-Fi、配置页面、Lua 模块和各类能力组装成一个完整设备；`components` 则沉淀可复用的运行时核心、能力插件和硬件/脚本扩展模块，便于后续在不同板型和场景下复用。
+项目采用 **"应用示例 + 通用组件"** 的组织方式：`application/edge_agent` 是可直接编译运行的 ESP-IDF 示例工程，负责把 Wi-Fi、配置页面、Lua 模块和各类能力组装成一个完整设备；`components` 则沉淀可复用的运行时核心、能力插件和硬件/脚本扩展模块，便于后续在不同板型和场景下复用。
 
 当前代码可以分为四个部分：
 
-- **应用装配部分：** `application/basic_demo/main`，负责启动入口、网络连接、参数配置、HTTP 配网页面以及 Demo 级模块注册。
+- **应用装配部分：** `application/edge_agent/main` 与 `components/common`，负责启动入口、网络连接、参数配置、HTTP 配网页面以及 Demo 级模块注册。
 - **能力部分：** `components/claw_capabilities`，负责对外能力封装，包括 IM 通讯、MCP Client/Server、Lua 运行时、调度、文件、时间、Web 搜索等能力。
 - **运行时核心部分：** `components/claw_modules`，负责 Agent 基础设施，包括核心上下文、能力注册、事件路由、记忆管理与技能管理等。
 - **设备与脚本扩展部分：** `components/lua_modules`，负责把显示屏、摄像头、音频、按键、GPIO、PWM、存储等外设能力暴露给 Lua 和上层 Agent 使用。
@@ -20,18 +20,20 @@ import ClawRunDiagram from "@/assets/images/claw_run.svg?url";
 ## 项目目录结构
 
 <FileTree>
-- application/basic_demo/ **示例应用** — 把框架与 cap 装配成可烧录固件
-  - main/ 启动、Wi‑Fi、HTTP 配置页、`app_claw_start`
+- application/edge_agent/ **示例应用** — 把框架与 cap 装配成可烧录固件
+  - main/ 启动入口（`app_main`）与 Lua 脚本示例
     - main.c 固件入口
-    - app_claw.c 应用启动与装配
-    - app_expression_emote.* 表情显示与网络状态联动
-    - basic_demo_wifi.* Wi-Fi 连接与网络配置
-    - basic_demo_settings.* 本地设置持久化
-    - config_http_server.* Web 配置服务
-    - basic_demo_lua_modules.* Lua 模块注册
-    - web/ 设备配置前端资源
-  - components/display_arbiter/ 显示所有权仲裁 [\[详情\]](@lang/reference-cap/lua-modules#显示模块)
-  - fatfs_image/ 出厂 FATFS：skills、router_rules、memory、scripts 样例
+  - components/ 应用级组件
+    - app_config/ 配置持久化（NVS 读写）
+    - http_server/ Web 管理界面与 JSON API
+  - fatfs_image/ 出厂 FATFS：router_rules、memory、scheduler 样例
+- components/common/ **共享应用组件** — 多示例复用的装配逻辑
+  - app_claw/ 应用启动与装配（`app_claw_start`、CLI、Lua 模块注册）
+  - wifi_manager/ Wi-Fi 连接与网络配置
+  - settings/ 本地设置持久化基础库
+  - captive_dns/ Captive DNS（SoftAP 配网）
+  - display_arbiter/ 显示所有权仲裁 [\[详情\]](@lang/reference-cap/lua-modules#显示模块)
+  - emote/ 表情显示与网络状态联动
 - components/
   - claw_modules/ **运行时核心**
     - claw_core/ Agent 核心 — Agent Loop、上下文组装管理、工具调用

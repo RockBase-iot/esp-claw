@@ -46,7 +46,7 @@ The **order** of rules in `router_rules.json` is evaluation order. Each rule typ
   For actions such as `run_script`, `send_message`, and `emit_event`, put parameters under `actions[*].input` (for example, `{"type":"run_script","input":{"path":"demo.lua"}}`) instead of at the action object's top level.
 </Aside>
 
-`basic_demo` ships a starter `router_rules.json` for basic IM flows. See <LinkToSource relativePath="application/basic_demo/fatfs_image/router_rules/router_rules.json" />.
+`edge_agent` ships a starter `router_rules.json` for basic IM flows. See <LinkToSource relativePath="application/edge_agent/fatfs_image/router_rules/router_rules.json" />.
 
 Full syntax is captured in the JSON Schema.
 
@@ -56,7 +56,7 @@ Full syntax is captured in the JSON Schema.
 </details>
 
 <Aside type="tip" title="Editing router_rules.json by hand">
-    In `basic_demo`, the file lives at `/fatfs/router_rules/router_rules.json`.
+    In `edge_agent`, the file lives at `/fatfs/router_rules/router_rules.json`.
     Prefer Console commands to edit rules, but you can also edit via the Web file manager.
 
     **Run `auto reload` after changes.**
@@ -175,7 +175,7 @@ To auto-publish `agent_stage` events, adjust this menuconfig option: <kbd>(Top)<
 - With <kbd>Simple</kbd>, `agent_stage` events are not published at the routing layer.
 
 `agent_stage` events can be routed to channels such as IM to provide real-time progress updates.
-For example, `basic_demo` includes rule `agent_stage_im_notify` in <LinkToSource relativePath="application/basic_demo/fatfs_image/router_rules/router_rules.json" />. When Verbose is enabled and this rule matches, it sends `{{event.text}}` from `agent_stage` back to the source IM conversation.
+For example, `edge_agent` includes rule `agent_stage_im_notify` in <LinkToSource relativePath="application/edge_agent/fatfs_image/router_rules/router_rules.json" />. When Verbose is enabled and this rule matches, it sends `{{event.text}}` from `agent_stage` back to the source IM conversation.
 
 ## Scheduled Dispatch
 
@@ -215,10 +215,10 @@ scheduler --trigger <id>             # trigger once immediately
 
 <LinkCard href="@lang/reference-project/console-usage" title="Console usage" description="Basic Console command usage" />
 
-Event Router provides two sets of Console commands. The `auto` command comes from `basic_demo`, and the `event_router` command comes from `cap_router_mgr`. Both are functionally equivalent and operate on the same set of rules.
+Event Router provides two sets of Console commands. The `auto` command comes from `edge_agent`, and the `event_router` command comes from `cap_router_mgr`. Both are functionally equivalent and operate on the same set of rules.
 
 ```sh
-# auto command (provided by basic_demo)
+# auto command (provided by edge_agent)
 auto reload                  # reload router_rules.json
 auto rules                   # dump current rules JSON
 auto rule <id>               # show one rule JSON

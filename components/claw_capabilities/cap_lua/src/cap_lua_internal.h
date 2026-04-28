@@ -19,7 +19,7 @@
 #define CAP_LUA_ASYNC_DEFAULT_TIMEOUT_MS 0
 #define CAP_LUA_ASYNC_MAX_JOBS          16
 #define CAP_LUA_ASYNC_MAX_CONCURRENT    4
-#define CAP_LUA_MAX_MODULES             18
+#define CAP_LUA_MAX_MODULES             32
 
 #define CAP_LUA_JOB_NAME_MAX            32
 #define CAP_LUA_JOB_EXCLUSIVE_MAX       16
@@ -58,6 +58,8 @@ typedef struct {
 } cap_lua_async_job_snapshot_t;
 
 const char *cap_lua_get_base_dir(void);
+size_t cap_lua_get_package_path_dir_count(void);
+const char *cap_lua_get_package_path_dir(size_t index);
 bool cap_lua_path_is_valid(const char *path);
 esp_err_t cap_lua_resolve_path(const char *path, char *resolved, size_t resolved_size);
 esp_err_t cap_lua_ensure_base_dir(void);

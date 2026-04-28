@@ -11,8 +11,12 @@
 #include "cap_lua.h"
 #include "esp_err.h"
 #include "esp_lcd_touch.h"
+#include "esp_log.h"
 #include "esp_timer.h"
 #include "lauxlib.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 
 static const char *LUA_LCD_TOUCH_STATE_KEY = "esp-claw.lcd_touch_state";
 
@@ -21,6 +25,78 @@ static esp_lcd_touch_handle_t lua_lcd_touch_check_handle(lua_State *L, int index
     void *handle = lua_touserdata(L, index);
     luaL_argcheck(L, handle != NULL, index, "lcd_touch handle expected");
     return (esp_lcd_touch_handle_t)handle;
+}
+
+/*
+ * 与 setup_device 的契约 (board 通用):
+ *   - touch_handle->config.interrupt_callback != NULL  =>  中断驱动模式
+ *   - touch_handle->config.user_data                   =>  SemaphoreHandle_t (二值)
+ *
+ * 中断驱动模式下,本模块在首次见到该 handle 时启动一个后台 task,阻塞在
+ * 信号量上;ISR give 一次即完成一次 esp_lcd_touch_read_data 把数据写入
+ * tp->data 缓存。Lua 端的 read/poll/sync 只消费缓存 (esp_lcd_touch_get_data),
+ * 不再亲自发 I2C —— "收到中断就读,用不用是 lua 的事"。
+ *
+ * 没挂 interrupt_callback 的板子 (例如 CST816S 走轮询) 维持原有行为不变。
+ */
+#define LUA_LCD_TOUCH_MAX_INT_HANDLES   2
+#define LUA_LCD_TOUCH_INT_TASK_STACK    4096
+#define LUA_LCD_TOUCH_INT_TASK_PRIO     5
+
+static const char *LUA_LCD_TOUCH_TAG = "lua_lcd_touch";
+
+static esp_lcd_touch_handle_t s_int_handles[LUA_LCD_TOUCH_MAX_INT_HANDLES];
+static portMUX_TYPE s_int_handles_mux = portMUX_INITIALIZER_UNLOCKED;
+
+static void lua_lcd_touch_int_task(void *arg)
+{
+    esp_lcd_touch_handle_t tp = (esp_lcd_touch_handle_t)arg;
+    SemaphoreHandle_t sem = (SemaphoreHandle_t)tp->config.user_data;
+    while (1) {
+        if (xSemaphoreTake(sem, portMAX_DELAY) == pdTRUE) {
+            (void)esp_lcd_touch_read_data(tp);
+        }
+    }
+}
+
+static void lua_lcd_touch_ensure_int_task(esp_lcd_touch_handle_t tp)
+{
+    if (tp->config.interrupt_callback == NULL || tp->config.user_data == NULL) {
+        return;
+    }
+
+    bool already_started = false;
+    int free_slot = -1;
+    portENTER_CRITICAL(&s_int_handles_mux);
+    for (int i = 0; i < LUA_LCD_TOUCH_MAX_INT_HANDLES; i++) {
+        if (s_int_handles[i] == tp) {
+            already_started = true;
+            break;
+        }
+        if (s_int_handles[i] == NULL && free_slot < 0) {
+            free_slot = i;
+        }
+    }
+    if (!already_started && free_slot >= 0) {
+        s_int_handles[free_slot] = tp;
+    }
+    portEXIT_CRITICAL(&s_int_handles_mux);
+
+    if (already_started) {
+        return;
+    }
+    if (free_slot < 0) {
+        ESP_LOGE(LUA_LCD_TOUCH_TAG, "no slot for interrupt-driven touch handle %p", tp);
+        return;
+    }
+
+    if (xTaskCreate(lua_lcd_touch_int_task, "lcd_touch_int", LUA_LCD_TOUCH_INT_TASK_STACK,
+                    tp, LUA_LCD_TOUCH_INT_TASK_PRIO, NULL) != pdPASS) {
+        ESP_LOGE(LUA_LCD_TOUCH_TAG, "failed to start interrupt task for handle %p", tp);
+        portENTER_CRITICAL(&s_int_handles_mux);
+        s_int_handles[free_slot] = NULL;
+        portEXIT_CRITICAL(&s_int_handles_mux);
+    }
 }
 
 static esp_err_t lua_lcd_touch_read_raw(esp_lcd_touch_handle_t touch_handle,
@@ -34,7 +110,12 @@ static esp_err_t lua_lcd_touch_read_raw(esp_lcd_touch_handle_t touch_handle,
         return ESP_ERR_INVALID_ARG;
     }
 
-    esp_lcd_touch_read_data(touch_handle);
+    if (touch_handle->config.interrupt_callback != NULL) {
+        lua_lcd_touch_ensure_int_task(touch_handle);
+    } else {
+        (void)esp_lcd_touch_read_data(touch_handle);
+    }
+
     err = esp_lcd_touch_get_data(touch_handle, points, &point_count, 1);
     if (err != ESP_OK) {
         return err;

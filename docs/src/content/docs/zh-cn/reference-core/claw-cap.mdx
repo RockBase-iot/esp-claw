@@ -41,8 +41,8 @@ import { LinkCard, Aside } from '@astrojs/starlight/components';
 `claw_cap_build_llm_tools_json` 会根据当前上下文生成工具列表；`claw_cap_tools_provider` 把它作为 `TOOLS` 类上下文交给 `claw_core`。
 
 `claw_cap_set_llm_visible_groups` 用 **group_id 白名单** 限制暴露范围。
-`basic_demo` 里默认对大语言模型暴露 `cap_files`、`cap_skill`、`cap_system`、`cap_lua`，完整结构化记忆模式还会暴露 `claw_memory`，
-见 <LinkToSource relativePath="application/basic_demo/main/app_claw.c" /> 中的 `BASIC_DEMO_LLM_VISIBLE_GROUPS`。
+`edge_agent` 里默认对大语言模型暴露 `cap_files`、`cap_skill`、`cap_system`、`cap_lua`，完整结构化记忆模式还会暴露 `claw_memory`，
+见 <LinkToSource relativePath="components/common/app_claw/app_capabilities.c" /> 中的可见组配置。
 
 <Aside type="tip">
   其余已注册的 Group（IM、搜索、MCP、Lua……）仍然存在，Console 和自动化可直接调用；

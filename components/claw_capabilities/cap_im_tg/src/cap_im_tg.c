@@ -41,10 +41,6 @@ static const char *TAG = "cap_im_tg";
 #define CAP_IM_TG_NAME_BUF_SIZE       96
 #define CAP_IM_TG_MULTIPART_BOUNDARY  "----cap_im_tg_boundary"
 
-#ifndef BASIC_DEMO_TG_BOT_TOKEN
-#define BASIC_DEMO_TG_BOT_TOKEN ""
-#endif
-
 typedef struct {
     char *buf;
     size_t len;
@@ -85,7 +81,6 @@ typedef struct {
 } cap_im_tg_state_t;
 
 static cap_im_tg_state_t s_tg = {
-    .bot_token = BASIC_DEMO_TG_BOT_TOKEN,
     .max_inbound_file_bytes = 2 * 1024 * 1024,
     .enable_inbound_attachments = false,
     .next_update_id = 0,
@@ -1443,6 +1438,11 @@ esp_err_t cap_im_tg_set_attachment_config(
 
 esp_err_t cap_im_tg_start(void)
 {
+    if (s_tg.bot_token[0] == '\0') {
+        ESP_LOGE(TAG, "Telegram bot token is not configured");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     return cap_im_tg_gateway_start();
 }
 

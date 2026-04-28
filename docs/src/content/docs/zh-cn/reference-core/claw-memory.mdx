@@ -12,7 +12,7 @@ import { LinkCard, Aside, FileTree } from '@astrojs/starlight/components';
 
 `claw_memory_config_t` 的常见字段：
 
-| 字段 | 说明 | `basic_demo` 默认值 |
+| 字段 | 说明 | `edge_agent` 默认值 |
 |------|------|------|
 | `session_root_dir` | 会话历史文件的根目录 | `/fatfs/sessions` |
 | `memory_root_dir` | 长期记忆目录路径（`claw_memory` 在此目录下管理 `MEMORY.md` 及结构化记忆文件） | `/fatfs/memory` |
@@ -40,7 +40,7 @@ import { LinkCard, Aside, FileTree } from '@astrojs/starlight/components';
 
 ## 长期记忆文件布局
 
-`basic_demo` 会通过 `claw_memory_init` 在 `/fatfs/memory/` 目录下创建记忆功能所需的文件：
+`edge_agent` 会通过 `claw_memory_init` 在 `/fatfs/memory/` 目录下创建记忆功能所需的文件：
 
 <FileTree>
 - fatfs/

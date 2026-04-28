@@ -4,6 +4,12 @@
 
 ### Feature:
 
+* Added the `edge_agent` demo application with Wi-Fi setup, HTTP management UI, FATFS image content, Lua script examples, skill assets, router rules, scheduler rules, and partition defaults.
+
+* Added shared application components for Claw capability wiring, CLI support, Lua module registration, captive DNS, display arbitration, emote rendering, settings storage, and Wi-Fi management.
+
+* Added Edge Agent web APIs and frontend pages for configuration, status, file access, capabilities, Lua modules, and WeChat integration.
+
 * Added I2C Lua module: Introduced support for hardware I2C bus initialization, device scanning, and standard register read/write operations.
 
 * Added UART Lua module: Introduced UART port open/close, polling-based read/write and line reads, with a basic demo script.
@@ -13,6 +19,10 @@
 * Added file copy and move operations to `cap_files`, including automatic parent directory creation and rename fallback when direct moves are not available.
 
 * Reworked `cap_time` to use SNTP-based synchronization, added on-demand current time retrieval, and injected a time context provider for relative date reasoning in `claw_core`.
+
+### Change:
+
+* Migrated selected Basic Demo updates into Edge Agent, including app configuration handling, HTTP UI updates, Lua module wiring, and default SDK configuration changes.
 
 ### Fix:
 

@@ -44,7 +44,7 @@ ESP-Claw 使用 Lua 解释器，通过 `cap_lua_runtime_*` 系列函数初始化
 
 ### 脚本路径管理
 
-`cap_lua` 的运行时文件需位于 Script 基目录（Script Base Dir）下。`basic_demo` 中 Script Base Dir 默认为 `/fatfs/scripts/`（应用可通过 `cap_lua_set_base_dir` 修改）。
+`cap_lua` 的运行时文件需位于 Script 基目录（Script Base Dir）下。`edge_agent` 中 Script Base Dir 默认为 `/fatfs/scripts/`（应用可通过 `cap_lua_set_base_dir` 修改）。
 
 - `path` 必须是 `.lua` 文件，且位于 Script Base Dir 下。
 - `path` 可用两种形式：
@@ -188,7 +188,7 @@ running -> stopped
 
 ## 与 Skill 停用守卫的协同
 
-在 `basic_demo` 中，`cap_lua_run` Skill 已注册停用守卫：当仍有 Lua 异步任务在运行时，`deactivate_skill` 会被拒绝，并返回结构化原因（提示先调用 `lua_stop_async_job` 或 `lua_stop_all_async_jobs`）。
+在 `edge_agent` 中，`cap_lua_run` Skill 已注册停用守卫：当仍有 Lua 异步任务在运行时，`deactivate_skill` 会被拒绝，并返回结构化原因（提示先调用 `lua_stop_async_job` 或 `lua_stop_all_async_jobs`）。
 
 该守卫在 `main.c` 的 `app_main` 中、`app_claw_start()` **返回之后**注册（`claw_skill_register_deactivate_guard("cap_lua_run", cap_lua_run_deactivate_guard)`），确保在 Skill 子系统完全就绪后再挂载守卫逻辑。
 

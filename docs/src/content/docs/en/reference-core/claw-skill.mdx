@@ -49,10 +49,10 @@ Activation is **isolated per session**:
 
 The `/fatfs/skills/skills_list.json` read at runtime is merged from:
 
-1. **`application/basic_demo/fatfs_image/skills/`**: demo-bundled Skill files packaged into the FATFS image in firmware.
+1. **`application/edge_agent/main/skills/`**: app-bundled Skill files, synced into `fatfs_image/skills/` by `tools/cmake/skills_sync.cmake` during build before being packaged into firmware.
 2. **Component Skills**: each `cap_*` / `lua_module_*` component may ship a `skills/` subtree; `tools/sync_component_skills.py` merges them into `fatfs_image/skills/` at build time before packaging.
 
-Note: files under `application/basic_demo/main/skills/` **do not** participate in that sync and never appear on runtime FATFS—do not put Skill files there.
+Note: files placed under `application/edge_agent/main/skills/` go through the build sync flow; directly editing same-named files under `fatfs_image/skills/` will be overwritten by the next build.
 
 ## User-facing interaction
 

@@ -59,14 +59,6 @@ static const char *TAG = "cap_im_qq";
 #define CAP_IM_QQ_FILE_TYPE_IMAGE 1
 #define CAP_IM_QQ_FILE_TYPE_FILE  4
 
-#ifndef BASIC_DEMO_QQ_APP_ID
-#define BASIC_DEMO_QQ_APP_ID ""
-#endif
-
-#ifndef BASIC_DEMO_QQ_APP_SECRET
-#define BASIC_DEMO_QQ_APP_SECRET ""
-#endif
-
 typedef struct {
     char *buf;
     size_t len;
@@ -117,8 +109,6 @@ typedef struct {
 } cap_im_qq_state_t;
 
 static cap_im_qq_state_t s_qq = {
-    .app_id = BASIC_DEMO_QQ_APP_ID,
-    .app_secret = BASIC_DEMO_QQ_APP_SECRET,
     .max_inbound_file_bytes = 2 * 1024 * 1024,
     .heartbeat_interval_ms = 30000,
     .last_seq = -1,
@@ -1995,6 +1985,11 @@ esp_err_t cap_im_qq_set_attachment_config(
 
 esp_err_t cap_im_qq_start(void)
 {
+    if (s_qq.app_id[0] == '\0' || s_qq.app_secret[0] == '\0') {
+        ESP_LOGE(TAG, "QQ credentials are not configured");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     return cap_im_qq_gateway_start();
 }
 

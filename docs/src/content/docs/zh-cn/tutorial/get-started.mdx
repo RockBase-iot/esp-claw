@@ -8,8 +8,8 @@ import { LinkCard, Steps, Aside, LinkButton } from '@astrojs/starlight/component
 ## 准备工作
 
 进行到这里，你应当已经组装好 ESP-Claw 面包板，或已经准备好 ESP-Claw 适配的其他硬件。
-你可以在[GitHub 仓库](https://github.com/espressif/esp-claw/tree/master/application/basic_demo/boards)中查看 ESP-Claw 适配的开发板列表。
-ESP-Claw 需要至少 8 MB Flash 和 8 MB PSRAM，目前支持 ESP32-S3，正在适配 ESP32-P4。
+你可以在[GitHub 仓库](https://github.com/espressif/esp-claw/tree/master/application/edge_agent/boards)中查看 ESP-Claw 适配的开发板列表。
+ESP-Claw 需要至少 8 MB Flash 和 8 MB PSRAM，目前支持 ESP32-S3、ESP32-P4。
 
 在烧录之前，你还需要准备一台电脑，并安装 Chrome 或 Edge 浏览器。在线烧录暂时无法使用 Firefox 浏览器完成。
 
@@ -35,10 +35,10 @@ ESP-Claw 需要至少 8 MB Flash 和 8 MB PSRAM，目前支持 ESP32-S3，正在
 
    - 选择你的开发板对应的固件。
    - 配置 Wi-Fi SSID 及密码，必填。
-   - 配置 LLM：可选 GPT (OpenAI), Qwen (阿里云百炼), Claude (Anthropic)，请按提示生成 API Key 并填入。
+   - 配置 LLM：可选 GPT (OpenAI), Qwen (阿里云百炼), Claude (Anthropic), DeepSeek (DeepSeek API)，请按提示生成 API Key 并填入。
       <Aside type="note" title="请选择推理能力较强的模型">
          ESP-Claw 的自编程、复杂工具组合等功能依赖强推理模型的能力。
-         推荐选用 GPT-5.4、Qwen3.6-plus、Claude3.5-sonnet 或类似性能的模型以取得最佳体验。
+         推荐选用 GPT-5.4、Qwen3.6-plus、Claude4.6-sonnet、DeepSeek v4 Pro 或类似性能的模型以取得最佳体验。
       </Aside>
    - 配置需要连接到的聊天软件：目前支持 Telegram、QQ Bot（OpenClaw）、飞书与微信 ClawBot 等，可同时填写多个。
      | 聊天软件 | 配置项 | 帮助文档 |

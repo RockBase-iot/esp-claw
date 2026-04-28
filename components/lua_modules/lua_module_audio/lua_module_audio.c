@@ -525,7 +525,7 @@ static int lua_audio_play_tone(lua_State *L)
     uint32_t duration_ms = lua_audio_check_u32_arg(L, 3, "duration_ms");
     int volume_pct = (int)luaL_optinteger(L, 4, 90);
     bool wait_done = false;
-    int16_t *buf = NULL;
+    void *buf = NULL;
     uint32_t total_frames;
     uint32_t frames_written = 0;
     uint32_t chunk_frames;
@@ -542,8 +542,9 @@ static int lua_audio_play_tone(lua_State *L)
     if (!lua_isnoneornil(L, 5)) {
         wait_done = lua_toboolean(L, 5);
     }
-    if (dac->bits_per_sample != 16 || dac->bytes_per_sample != sizeof(int16_t)) {
-        return luaL_error(L, "audio play_tone: only 16-bit PCM output is supported");
+    /* 32-bit outputs are produced by left-shifting the 16-bit sine into the upper half (MSB-justified). */
+    if (dac->bits_per_sample != 16 && dac->bits_per_sample != 32) {
+        return luaL_error(L, "audio play_tone: only 16-bit or 32-bit PCM output is supported");
     }
     if (freq_hz >= dac->sample_rate / 2) {
         return luaL_error(L, "audio play_tone: freq_hz must be less than half of sample_rate");
@@ -570,7 +571,7 @@ static int lua_audio_play_tone(lua_State *L)
     amplitude = 32767.0f * gain_scale;
     phase_step = 2.0f * (float)M_PI * (float)freq_hz / (float)dac->sample_rate;
 
-    buf = (int16_t *)malloc(chunk_frames * dac->channels * sizeof(int16_t));
+    buf = malloc(chunk_frames * dac->channels * dac->bytes_per_sample);
     if (!buf) {
         return luaL_error(L, "audio play_tone: out of memory");
     }
@@ -583,9 +584,18 @@ static int lua_audio_play_tone(lua_State *L)
         }
 
         for (uint32_t i = 0; i < frames_this_chunk; i++) {
-            int16_t sample = (int16_t)(sinf(phase) * amplitude);
-            for (uint8_t ch = 0; ch < dac->channels; ch++) {
-                buf[i * dac->channels + ch] = sample;
+            int16_t sample16 = (int16_t)(sinf(phase) * amplitude);
+            if (dac->bits_per_sample == 16) {
+                int16_t *p = (int16_t *)buf + (size_t)i * dac->channels;
+                for (uint8_t ch = 0; ch < dac->channels; ch++) {
+                    p[ch] = sample16;
+                }
+            } else {
+                int32_t sample32 = (int32_t)sample16 << 16;
+                int32_t *p = (int32_t *)buf + (size_t)i * dac->channels;
+                for (uint8_t ch = 0; ch < dac->channels; ch++) {
+                    p[ch] = sample32;
+                }
             }
             phase += phase_step;
             if (phase >= 2.0f * (float)M_PI) {
@@ -593,7 +603,8 @@ static int lua_audio_play_tone(lua_State *L)
             }
         }
 
-        if (esp_codec_dev_write(dac->codec_dev, buf, (int)(frames_this_chunk * dac->channels * sizeof(int16_t))) != ESP_CODEC_DEV_OK) {
+        int bytes_to_write = (int)(frames_this_chunk * dac->channels * dac->bytes_per_sample);
+        if (esp_codec_dev_write(dac->codec_dev, buf, bytes_to_write) != ESP_CODEC_DEV_OK) {
             free(buf);
             return luaL_error(L, "audio play_tone: write failed");
         }
@@ -828,8 +839,9 @@ static int lua_audio_mic_read_level(lua_State *L)
     if (duration_ms == 0) {
         return luaL_error(L, "audio mic_read_level: duration_ms must be positive");
     }
-    if (adc->bits_per_sample != 16) {
-        return luaL_error(L, "audio mic_read_level: only 16-bit PCM input is supported");
+    /* 32-bit inputs are treated as MSB-justified: fold back to int16 range before stats. */
+    if (adc->bits_per_sample != 16 && adc->bits_per_sample != 32) {
+        return luaL_error(L, "audio mic_read_level: only 16-bit or 32-bit PCM input is supported");
     }
 
     total_bytes =
@@ -854,19 +866,35 @@ static int lua_audio_mic_read_level(lua_State *L)
             goto cleanup;
         }
 
-        const int16_t *samples = (const int16_t *)buf;
-        uint32_t n = chunk / sizeof(int16_t);
-        for (uint32_t i = 0; i < n; i++) {
-            int32_t s = samples[i];
-            sum_sq += (int64_t)s * s;
-            if (s < 0) {
-                s = -s;
+        if (adc->bits_per_sample == 16) {
+            const int16_t *samples = (const int16_t *)buf;
+            uint32_t n = chunk / sizeof(int16_t);
+            for (uint32_t i = 0; i < n; i++) {
+                int32_t s = samples[i];
+                sum_sq += (int64_t)s * s;
+                if (s < 0) {
+                    s = -s;
+                }
+                if (s > peak) {
+                    peak = s;
+                }
             }
-            if (s > peak) {
-                peak = s;
+            n_samples += n;
+        } else {
+            const int32_t *samples = (const int32_t *)buf;
+            uint32_t n = chunk / sizeof(int32_t);
+            for (uint32_t i = 0; i < n; i++) {
+                int32_t s = samples[i] >> 16;
+                sum_sq += (int64_t)s * s;
+                if (s < 0) {
+                    s = -s;
+                }
+                if (s > peak) {
+                    peak = s;
+                }
             }
+            n_samples += n;
         }
-        n_samples += n;
         captured += chunk;
     }
 
@@ -906,8 +934,9 @@ static int lua_audio_read_spectrum(lua_State *L)
     uint32_t peak_bin = 0;
     float peak_mag = 0.0f;
 
-    if (adc->bits_per_sample != 16) {
-        return luaL_error(L, "audio read_spectrum: only 16-bit PCM input is supported");
+    /* 32-bit inputs are treated as MSB-justified: fold back to int16 range before FFT. */
+    if (adc->bits_per_sample != 16 && adc->bits_per_sample != 32) {
+        return luaL_error(L, "audio read_spectrum: only 16-bit or 32-bit PCM input is supported");
     }
     if (fft_size < AUDIO_SPECTRUM_MIN_FFT || fft_size > AUDIO_SPECTRUM_MAX_FFT || !audio_is_power_of_two(fft_size)) {
         return luaL_error(L, "audio read_spectrum: fft_size must be a power of two in range 64..4096");
@@ -955,11 +984,18 @@ static int lua_audio_read_spectrum(lua_State *L)
     }
 
     for (uint32_t i = 0; i < fft_size; i++) {
-        const int16_t *frame = (const int16_t *)(pcm_buf + i * bytes_per_frame);
         int32_t mixed = 0;
 
-        for (uint32_t ch = 0; ch < adc->channels; ch++) {
-            mixed += frame[ch];
+        if (adc->bits_per_sample == 16) {
+            const int16_t *frame = (const int16_t *)(pcm_buf + i * bytes_per_frame);
+            for (uint32_t ch = 0; ch < adc->channels; ch++) {
+                mixed += frame[ch];
+            }
+        } else {
+            const int32_t *frame = (const int32_t *)(pcm_buf + i * bytes_per_frame);
+            for (uint32_t ch = 0; ch < adc->channels; ch++) {
+                mixed += frame[ch] >> 16;
+            }
         }
         mixed /= adc->channels;
 

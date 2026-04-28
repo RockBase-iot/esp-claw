@@ -139,6 +139,8 @@ esp_err_t basic_demo_settings_load(basic_demo_settings_t *settings)
                 settings->llm_profile[0] == '\0') {
             if (strcmp(legacy_provider, "qwen") == 0) {
                 settings_safe_copy(settings->llm_profile, sizeof(settings->llm_profile), "qwen_compatible");
+            } else if (strcmp(legacy_provider, "deepseek") == 0) {
+                settings_safe_copy(settings->llm_profile, sizeof(settings->llm_profile), "custom_openai_compatible");
             } else if (strcmp(legacy_provider, "openai") == 0) {
                 settings_safe_copy(settings->llm_profile, sizeof(settings->llm_profile), "openai");
             } else {

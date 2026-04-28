@@ -44,7 +44,7 @@ ESP-Claw runs Lua via `cap_lua_runtime_*` helpers. The runtime initializes in `c
 
 ### Script path management
 
-`cap_lua` runtime files must live under the Script Base Dir. In `basic_demo`, the default Script Base Dir is `/fatfs/scripts/` (apps can override it via `cap_lua_set_base_dir`).
+`cap_lua` runtime files must live under the Script Base Dir. In `edge_agent`, the default Script Base Dir is `/fatfs/scripts/` (apps can override it via `cap_lua_set_base_dir`).
 
 - `path` must target a `.lua` file under Script Base Dir.
 - `path` supports two forms:
@@ -188,7 +188,7 @@ running -> stopped
 
 ## Coordination with Skill deactivation guards
 
-In `basic_demo`, the `cap_lua_run` Skill has a deactivation guard: if Lua async jobs are still running, `deactivate_skill` is rejected with a structured reason (prompting you to stop jobs first via `lua_stop_async_job` or `lua_stop_all_async_jobs`).
+In `edge_agent`, the `cap_lua_run` Skill has a deactivation guard: if Lua async jobs are still running, `deactivate_skill` is rejected with a structured reason (prompting you to stop jobs first via `lua_stop_async_job` or `lua_stop_all_async_jobs`).
 
 That guard is registered in `main.c`’s `app_main`, **after** `app_claw_start()` returns (`claw_skill_register_deactivate_guard("cap_lua_run", cap_lua_run_deactivate_guard)`), so the guard attaches only after the Skill subsystem is fully ready.
 

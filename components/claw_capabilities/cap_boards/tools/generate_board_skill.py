@@ -44,7 +44,7 @@ PIN_KEY_NAMES = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Generate current board skill markdown.')
-    parser.add_argument('--gen-bmgr-dir', required=True, help='Path to application/basic_demo/components/gen_bmgr_codes')
+    parser.add_argument('--gen-bmgr-dir', required=True, help='Path to application/edge_agent/components/gen_bmgr_codes')
     parser.add_argument('--output-md', required=True, help='Generated markdown output path')
     return parser.parse_args()
 

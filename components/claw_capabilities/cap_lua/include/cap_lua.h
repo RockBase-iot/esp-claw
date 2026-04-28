@@ -25,6 +25,7 @@ typedef struct {
 typedef void (*cap_lua_runtime_cleanup_fn_t)(void);
 
 esp_err_t cap_lua_register_group(const char *base_dir);
+esp_err_t cap_lua_add_package_path_dir(const char *dir);
 esp_err_t cap_lua_register_module(const char *name, lua_CFunction open_fn);
 esp_err_t cap_lua_register_modules(const cap_lua_module_t *modules, size_t count);
 esp_err_t cap_lua_register_runtime_cleanup(cap_lua_runtime_cleanup_fn_t cleanup_fn);

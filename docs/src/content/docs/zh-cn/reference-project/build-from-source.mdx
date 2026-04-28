@@ -29,7 +29,7 @@ import { Steps, Aside, Badge } from '@astrojs/starlight/components';
     ESP-Claw 使用 ESP Board Manager 适配多种开发板。
 
     如需添加其他开发板，请参考 [ESP Board Manager 文档](https://github.com/espressif/esp-gmf/blob/main/packages/esp_board_manager/docs/how_to_customize_board_cn.md)，
-    将开发板适配文件存放到 [`application/basic_demo/boards`](https://github.com/espressif/esp-claw/tree/master/application/basic_demo/boards)
+    将开发板适配文件存放到 [`application/edge_agent/boards`](https://github.com/espressif/esp-claw/tree/master/application/edge_agent/boards)
 
     欢迎将开发板适配代码通过 Pull Request 提交到 ESP-Claw 仓库。
    </Aside>
@@ -38,7 +38,7 @@ import { Steps, Aside, Badge } from '@astrojs/starlight/components';
 
    ```bash
    git clone https://github.com/espressif/esp-claw.git
-   cd esp-claw/application/basic_demo
+   cd esp-claw/application/edge_agent
    ```
 
 3. **选择开发板**
@@ -54,7 +54,7 @@ import { Steps, Aside, Badge } from '@astrojs/starlight/components';
       idf.py gen-bmgr-config -c ./boards -l
       ```
 
-      也可以在 `application/basic_demo/boards` 目录下查阅支持的开发板列表。
+      也可以在 `application/edge_agent/boards` 目录下查阅支持的开发板列表。
    </Aside>
 
    <Aside type="note" title="为什么不需要 set-target">
@@ -67,7 +67,7 @@ import { Steps, Aside, Badge } from '@astrojs/starlight/components';
    idf.py menuconfig
    ```
    推荐修改以下配置：
-   - <kbd>(Top)</kbd> → <kbd>Basic Demo Config</kbd>
+   - <kbd>(Top)</kbd> → <kbd>App Claw Config</kbd>
      - 参考 [配置说明](@lang/reference-project/configuration#basic-config) 配置基础设置。
    - <kbd>(Top)</kbd> → <kbd>Component config</kbd> → <kbd>ESP-Claw Core</kbd> → <kbd>Agent stage notification verbosity</kbd>
      - 默认 Simple；

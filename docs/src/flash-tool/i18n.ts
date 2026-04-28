@@ -34,6 +34,7 @@ export interface Strings {
   sectionLlm: string;
   llmModeLabel: string;
   llmOptionQwen: string;
+  llmOptionDeepSeek: string;
   llmOptionOpenai: string;
   llmOptionAnthropic: string;
   llmOptionOpenaiCompat: string;
@@ -132,6 +133,7 @@ const en: Strings = {
   sectionLlm: "LLM Configuration",
   llmModeLabel: "LLM service",
   llmOptionQwen: "Qwen (Aliyun Bailian)",
+  llmOptionDeepSeek: "DeepSeek",
   llmOptionOpenai: "OpenAI",
   llmOptionAnthropic: "Claude (Anthropic)",
   llmOptionOpenaiCompat: "OpenAI-compatible API",
@@ -229,6 +231,7 @@ const zhCn: Strings = {
   sectionLlm: "LLM 配置",
   llmModeLabel: "LLM 服务",
   llmOptionQwen: "Qwen (阿里云百炼)",
+  llmOptionDeepSeek: "DeepSeek",
   llmOptionOpenai: "OpenAI",
   llmOptionAnthropic: "Claude (Anthropic)",
   llmOptionOpenaiCompat: "OpenAI 兼容 API",
