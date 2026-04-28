@@ -45,6 +45,24 @@ typedef struct {
 
 typedef void (*app_touch_xpt2046_cb_t)(int x, int y, int pressure, void *user_ctx);
 
+typedef enum {
+    APP_TOUCH_GESTURE_TAP = 0,
+    APP_TOUCH_GESTURE_SWIPE_UP,
+    APP_TOUCH_GESTURE_SWIPE_DOWN,
+    APP_TOUCH_GESTURE_SWIPE_LEFT,
+    APP_TOUCH_GESTURE_SWIPE_RIGHT,
+} app_touch_gesture_t;
+
+/**
+ * Gesture callback. Fired once per press->release cycle, after the user
+ * lifts the stylus/finger. `start_x/start_y` is where the press began,
+ * `end_x/end_y` is where it ended.
+ */
+typedef void (*app_touch_xpt2046_gesture_cb_t)(app_touch_gesture_t gesture,
+                                               int start_x, int start_y,
+                                               int end_x, int end_y,
+                                               void *user_ctx);
+
 /**
  * Bring up an XPT2046 polling driver. The chip shares the LCD's SPI bus; the
  * driver attaches a new device at 1 MHz with mode 0. A low-priority polling
@@ -54,6 +72,15 @@ typedef void (*app_touch_xpt2046_cb_t)(int x, int y, int pressure, void *user_ct
 esp_err_t app_touch_xpt2046_init(const app_touch_xpt2046_config_t *config,
                                  app_touch_xpt2046_cb_t cb,
                                  void *user_ctx);
+
+/**
+ * Optionally register a gesture callback (tap / swipe up / down / left /
+ * right). The legacy press-only `cb` registered via init() still fires for
+ * the press transition, but for higher-level UI handling prefer this hook,
+ * which only fires once per press->release cycle and classifies the motion.
+ */
+esp_err_t app_touch_xpt2046_set_gesture_callback(app_touch_xpt2046_gesture_cb_t cb,
+                                                 void *user_ctx);
 
 #ifdef __cplusplus
 }

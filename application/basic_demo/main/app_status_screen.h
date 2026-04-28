@@ -37,6 +37,13 @@ esp_err_t app_status_screen_next_page(void);
 /** Repaint the active page if currently visible (e.g. inbox changed). */
 void app_status_screen_request_refresh(void);
 
+/**
+ * Scroll the message list (only effective on APP_STATUS_PAGE_MESSAGES).
+ * Positive `delta` scrolls down (toward older messages), negative scrolls up
+ * (toward newer messages). Triggers a repaint if the page is visible.
+ */
+void app_status_screen_scroll_messages(int delta);
+
 /** Backwards-compat shortcut: show the status page for hold_ms. */
 esp_err_t app_status_screen_request_status(uint32_t hold_ms);
 

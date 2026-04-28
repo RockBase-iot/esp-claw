@@ -27,13 +27,18 @@ static const char *TAG = "touch_xpt2046";
 #define TOUCH_POLL_INTERVAL_MS   30
 #define TOUCH_PRESSURE_THRESH    400
 #define TOUCH_SAMPLE_COUNT       3   /* median filter samples         */
+#define TOUCH_SWIPE_MIN_DELTA    30  /* min |dx|/|dy| in px to count as swipe */
 
 typedef struct {
     spi_device_handle_t spi;
     app_touch_xpt2046_config_t cfg;
     app_touch_xpt2046_cb_t cb;
     void *cb_ctx;
+    app_touch_xpt2046_gesture_cb_t gesture_cb;
+    void *gesture_ctx;
     bool pressed;
+    int  start_x;
+    int  start_y;
     int  last_x;
     int  last_y;
     int  last_z;
@@ -138,6 +143,25 @@ static void touch_map_to_screen(uint16_t raw_x, uint16_t raw_y,
     *out_y = my;
 }
 
+static void touch_emit_gesture_on_release(void)
+{
+    if (!s_touch.gesture_cb) {
+        return;
+    }
+    int dx = s_touch.last_x - s_touch.start_x;
+    int dy = s_touch.last_y - s_touch.start_y;
+    int abs_dx = dx < 0 ? -dx : dx;
+    int abs_dy = dy < 0 ? -dy : dy;
+    app_touch_gesture_t g = APP_TOUCH_GESTURE_TAP;
+    if (abs_dy >= TOUCH_SWIPE_MIN_DELTA && abs_dy >= abs_dx) {
+        g = (dy < 0) ? APP_TOUCH_GESTURE_SWIPE_UP : APP_TOUCH_GESTURE_SWIPE_DOWN;
+    } else if (abs_dx >= TOUCH_SWIPE_MIN_DELTA && abs_dx > abs_dy) {
+        g = (dx < 0) ? APP_TOUCH_GESTURE_SWIPE_LEFT : APP_TOUCH_GESTURE_SWIPE_RIGHT;
+    }
+    s_touch.gesture_cb(g, s_touch.start_x, s_touch.start_y,
+                       s_touch.last_x, s_touch.last_y, s_touch.gesture_ctx);
+}
+
 static void touch_task(void *arg)
 {
     (void)arg;
@@ -153,6 +177,7 @@ static void touch_task(void *arg)
             if (s_touch.pressed) {
                 s_touch.pressed = false;
                 ESP_LOGI(TAG, "release at (%d,%d)", s_touch.last_x, s_touch.last_y);
+                touch_emit_gesture_on_release();
             }
             continue;
         }
@@ -171,6 +196,7 @@ static void touch_task(void *arg)
             if (s_touch.pressed) {
                 s_touch.pressed = false;
                 ESP_LOGI(TAG, "release at (%d,%d)", s_touch.last_x, s_touch.last_y);
+                touch_emit_gesture_on_release();
             }
             continue;
         }
@@ -183,6 +209,8 @@ static void touch_task(void *arg)
 
         if (!s_touch.pressed) {
             s_touch.pressed = true;
+            s_touch.start_x = sx;
+            s_touch.start_y = sy;
             ESP_LOGI(TAG, "press   at (%d,%d) p=%d  raw=(%u,%u) z1=%u z2=%u",
                      sx, sy, pressure, x_raw, y_raw, z1, z2);
             if (s_touch.cb) {
@@ -239,5 +267,13 @@ esp_err_t app_touch_xpt2046_init(const app_touch_xpt2046_config_t *config,
              config->calibration.swap_xy,
              config->calibration.invert_x,
              config->calibration.invert_y);
+    return ESP_OK;
+}
+
+esp_err_t app_touch_xpt2046_set_gesture_callback(app_touch_xpt2046_gesture_cb_t cb,
+                                                 void *user_ctx)
+{
+    s_touch.gesture_cb = cb;
+    s_touch.gesture_ctx = user_ctx;
     return ESP_OK;
 }

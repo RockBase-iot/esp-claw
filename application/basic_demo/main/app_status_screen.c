@@ -46,11 +46,17 @@ typedef struct {
 typedef struct {
     bool inited;
     esp_lcd_panel_handle_t panel;
+    esp_lcd_panel_io_handle_t io;
     int width;
     int height;
     bool swap_rgb565;
     uint16_t *fb;             /* RGB565 framebuffer (canvas-sized) */
     size_t fb_bytes;
+    /* Permanent DMA-capable bounce buffer for one stripe. Allocated once
+     * at init() while the internal heap is still fresh, so SPI transfers
+     * never have to fight a fragmented internal heap at runtime. */
+    uint16_t *dma_stripe;
+    size_t   dma_stripe_rows;
     esp_painter_handle_t painter;
     SemaphoreHandle_t lock;   /* serialize paint operations         */
     basic_demo_settings_t settings;
@@ -59,6 +65,7 @@ typedef struct {
     TaskHandle_t  worker;
     app_status_page_t current_page;
     bool owner_held;
+    int  msg_scroll;          /* scroll offset for messages page (>=0) */
 } app_status_screen_state_t;
 
 static app_status_screen_state_t s_state = {
@@ -123,6 +130,7 @@ static esp_err_t ass_load_panel(void)
                         "panel_handle is NULL");
 
     s_state.panel = handles->panel_handle;
+    s_state.io = handles->io_handle;
     s_state.width = cfg->lcd_width;
     s_state.height = cfg->lcd_height;
     s_state.swap_rgb565 = ass_should_swap_color(cfg);
@@ -224,31 +232,99 @@ static void ass_push_to_panel(void)
         return;
     }
     /*
-     * The framebuffer lives in PSRAM (not DMA-capable), so the SPI panel
-     * driver must allocate an internal-RAM bounce buffer for every transfer.
-     * Pushing the whole 320*240*2 = 150 KiB frame at once would require a
-     * 150 KiB DMA-capable allocation that easily fails once the system has
-     * been running for a while. Slice the push into horizontal stripes so
-     * each transfer only needs ~15 KiB of internal RAM.
+     * The framebuffer lives in PSRAM (not DMA-capable). If we hand a PSRAM
+     * pointer to esp_lcd_panel_draw_bitmap, the SPI master tries to allocate
+     * an internal-RAM bounce buffer the size of the transfer -- which fails
+     * once the internal heap is fragmented (largest free block < 16 KiB
+     * once Wi-Fi/TLS/JSON have warmed up).
+     *
+     * Solution: copy each stripe into the permanent dma_stripe buffer (which
+     * was allocated in DMA-capable internal RAM at init time, while the heap
+     * was still fresh) and submit that. SPI then has nothing to allocate.
      */
-    const int stripe_rows = 24;
+    int stripe_rows = (int)s_state.dma_stripe_rows;
+    if (stripe_rows < 1) {
+        stripe_rows = 8;
+    }
     int y = 0;
     while (y < s_state.height) {
         int rows = stripe_rows;
         if (y + rows > s_state.height) {
             rows = s_state.height - y;
         }
-        const uint16_t *src = s_state.fb + (size_t)y * s_state.width;
+        size_t row_pixels = (size_t)s_state.width;
+        size_t chunk_pixels = row_pixels * (size_t)rows;
+        const uint16_t *src = s_state.fb + (size_t)y * row_pixels;
+        const uint16_t *submit;
+
+        if (s_state.dma_stripe) {
+            memcpy(s_state.dma_stripe, src, chunk_pixels * sizeof(uint16_t));
+            submit = s_state.dma_stripe;
+        } else {
+            /* Fallback to PSRAM source if the bounce buffer wasn't
+             * available at init -- SPI driver will try (and may fail) to
+             * allocate one itself. */
+            submit = src;
+        }
+
         esp_err_t err = esp_lcd_panel_draw_bitmap(s_state.panel, 0, y,
                                                   s_state.width, y + rows,
-                                                  src);
+                                                  submit);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "draw_bitmap stripe y=%d rows=%d failed: %s",
                      y, rows, esp_err_to_name(err));
             /* Stop on first failure to avoid cascading log spam. */
             return;
         }
+        /*
+         * draw_bitmap queues the color transfer asynchronously and returns
+         * immediately. If we let the loop continue and overwrite
+         * dma_stripe before SPI has finished DMAing the previous stripe,
+         * the in-flight transfer reads the NEXT stripe's pixels -- which
+         * shows up as a vertical "echo"/doubling on the panel.
+         *
+         * esp_lcd_panel_io_tx_param() with lcd_cmd=-1 is documented to
+         * drain any pending queued color transactions before returning,
+         * without sending any actual command on the bus. That makes the
+         * stripe loop effectively synchronous and guarantees dma_stripe is
+         * safe to reuse on the next iteration.
+         */
+        if (s_state.io && submit == s_state.dma_stripe) {
+            (void)esp_lcd_panel_io_tx_param(s_state.io, -1, NULL, 0);
+        }
         y += rows;
+    }
+}
+
+/* Lazily allocate the panel-sized RGB565 framebuffer. Caller must hold
+ * s_state.lock. Returns ESP_OK if the buffer is ready, or ESP_ERR_NO_MEM
+ * if even the fallback DMA-capable allocation cannot be satisfied. */
+static esp_err_t ass_ensure_fb_locked(void)
+{
+    if (s_state.fb) {
+        return ESP_OK;
+    }
+    s_state.fb = heap_caps_aligned_alloc(64, s_state.fb_bytes,
+                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_state.fb) {
+        s_state.fb = heap_caps_aligned_alloc(64, s_state.fb_bytes,
+                                             MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    }
+    if (!s_state.fb) {
+        ESP_LOGW(TAG, "framebuffer alloc (%u B) failed - status overlay skipped",
+                 (unsigned)s_state.fb_bytes);
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
+}
+
+/* Free the framebuffer to return ~150 KiB of PSRAM to the heap when the
+ * status overlay is hidden. Caller must hold s_state.lock. */
+static void ass_release_fb_locked(void)
+{
+    if (s_state.fb) {
+        heap_caps_free(s_state.fb);
+        s_state.fb = NULL;
     }
 }
 
@@ -397,9 +473,9 @@ static void ass_paint_status(void)
     bool sta_conn = basic_demo_wifi_is_connected();
     const char *ip = basic_demo_wifi_get_ip();
 
-    ass_paint_status_kv(&y, "WiFi:", mode ? mode : "off",
-                        sta_conn ? ESP_PAINTER_COLOR_GREEN
-                                 : ESP_PAINTER_COLOR_YELLOW);
+    // ass_paint_status_kv(&y, "WiFi:", mode ? mode : "off",
+    //                     sta_conn ? ESP_PAINTER_COLOR_GREEN
+    //                              : ESP_PAINTER_COLOR_YELLOW);
 
     if (s_state.settings_valid && ass_present(s_state.settings.wifi_ssid)) {
         ass_paint_status_kv(&y, "SSID:", s_state.settings.wifi_ssid,
@@ -467,7 +543,7 @@ static void ass_paint_status(void)
     // ----- Footer -----
     const esp_app_desc_t *desc = esp_app_get_description();
     char foot[80];
-    snprintf(foot, sizeof(foot), "fw %s  *  uptime %lus  *  BOOT->next",
+    snprintf(foot, sizeof(foot), "fw %s * uptime %lus",
              desc ? desc->version : "?",
              (unsigned long)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000));
     ass_draw_text(ASS_FONT_BODY, ESP_PAINTER_COLOR_DARKGREY,
@@ -498,27 +574,68 @@ static esp_painter_color_t ass_channel_color(const char *channel)
     return ESP_PAINTER_COLOR_LIGHTGREY;
 }
 
-static void ass_format_time(int64_t ts_ms, char *out, size_t out_size)
+/* Truncate `src` so the rendered width fits in `max_px`. If truncated,
+ * the result ends with "..." (1 byte per dot in this ASCII font). The font
+ * used here is monospace (font->width per glyph), so width math is simple. */
+static void ass_clip_text_to_width(const esp_painter_basic_font_t *font,
+                                   const char *src, int max_px,
+                                   char *out, size_t out_size)
 {
     if (out_size == 0) {
         return;
     }
-    if (ts_ms <= 0) {
-        snprintf(out, out_size, "--:--");
+    out[0] = '\0';
+    if (!font || !src || max_px <= 0) {
         return;
     }
-    time_t t = (time_t)(ts_ms / 1000);
-    struct tm tm_local;
-    localtime_r(&t, &tm_local);
-    if (tm_local.tm_year < (1980 - 1900)) {
-        // Wall clock not yet set, show uptime-relative HH:MM:SS instead.
-        unsigned long sec = (unsigned long)(ts_ms / 1000);
-        snprintf(out, out_size, "+%02lu:%02lu:%02lu",
-                 sec / 3600, (sec / 60) % 60, sec % 60);
+    int glyph_w = (int)font->width;
+    if (glyph_w <= 0) {
+        glyph_w = 1;
+    }
+    int max_chars = max_px / glyph_w;
+    if (max_chars <= 0) {
         return;
     }
-    snprintf(out, out_size, "%02d:%02d:%02d",
-             tm_local.tm_hour, tm_local.tm_min, tm_local.tm_sec);
+    size_t src_len = strlen(src);
+    if ((int)src_len <= max_chars) {
+        strlcpy(out, src, out_size);
+        return;
+    }
+    if (max_chars <= 3 || out_size < 4) {
+        size_t n = (size_t)max_chars;
+        if (n >= out_size) {
+            n = out_size - 1;
+        }
+        memcpy(out, src, n);
+        out[n] = '\0';
+        return;
+    }
+    /* Keep some head and a small tail so a long opaque ID like
+     * "ou_6bac267caed7c1f8e016...e37" stays recognizable. */
+    int keep = max_chars - 3;
+    int tail = keep / 4;
+    if (tail < 3) {
+        tail = 3;
+    }
+    if (tail > 6) {
+        tail = 6;
+    }
+    int head = keep - tail;
+    if (head < 1) {
+        head = 1;
+    }
+    if (head + tail + 3 > (int)out_size - 1) {
+        size_t n = out_size - 1;
+        memcpy(out, src, n);
+        out[n] = '\0';
+        return;
+    }
+    memcpy(out, src, head);
+    out[head] = '.';
+    out[head + 1] = '.';
+    out[head + 2] = '.';
+    memcpy(out + head + 3, src + src_len - tail, tail);
+    out[head + 3 + tail] = '\0';
 }
 
 static void ass_paint_messages(void)
@@ -527,20 +644,42 @@ static void ass_paint_messages(void)
 
     // Header
     ass_fill_rect(ass_rgb565(0x1E, 0x4C, 0xA8), 0, 0, s_state.width, 30);
-    char header[48];
+    char header[64];
     size_t total = app_message_inbox_count();
     snprintf(header, sizeof(header), "Messages  (%u)", (unsigned)total);
     ass_draw_text(ASS_FONT_SUBTITLE, ESP_PAINTER_COLOR_WHITE, 8, 4, header);
 
     int y = 36;
-    const int row_h = 36;
-    const int max_rows = (s_state.height - 36 - 24) / row_h;
+    const int row_h = 36;          /* 16 (line1) + 16 (line2) + 4 (gap) */
+    const int footer_h = 22;
+    int rows_avail = (s_state.height - 36 - footer_h) / row_h;
+    if (rows_avail < 1) {
+        rows_avail = 1;
+    }
 
     if (total == 0) {
         ass_draw_text_centered(ASS_FONT_BODY, ESP_PAINTER_COLOR_DARKGREY,
                                s_state.height / 2 - 8, "(no messages yet)");
     } else {
-        for (int i = 0; i < max_rows; i++) {
+        /* Clamp scroll offset to a valid range. */
+        int max_scroll = (int)total - rows_avail;
+        if (max_scroll < 0) {
+            max_scroll = 0;
+        }
+        if (s_state.msg_scroll < 0) {
+            s_state.msg_scroll = 0;
+        }
+        if (s_state.msg_scroll > max_scroll) {
+            s_state.msg_scroll = max_scroll;
+        }
+
+        int first = s_state.msg_scroll;
+        int last  = first + rows_avail - 1;
+        if (last >= (int)total) {
+            last = (int)total - 1;
+        }
+
+        for (int i = first; i <= last; i++) {
             app_message_inbox_entry_t e;
             if (!app_message_inbox_get((size_t)i, &e)) {
                 break;
@@ -549,41 +688,51 @@ static void ass_paint_messages(void)
             ass_fill_rect(ass_rgb565(0x18, 0x24, 0x40),
                           0, y - 1, s_state.width, 1);
 
-            // channel tag
+            /* ---- Line 1: channel + sender (truncated with ellipsis) ----- */
             const char *ch = ass_pretty_channel(e.channel);
             ass_draw_text(ASS_FONT_BODY, ass_channel_color(e.channel), 8, y, ch);
             int ch_w = ass_text_width(ASS_FONT_BODY, ch);
 
-            // time stamp on right
-            char tbuf[16];
-            ass_format_time(e.timestamp_ms, tbuf, sizeof(tbuf));
-            int tw = ass_text_width(ASS_FONT_BODY, tbuf);
-            ass_draw_text(ASS_FONT_BODY, ESP_PAINTER_COLOR_LIGHTGREY,
-                          s_state.width - tw - 8, y, tbuf);
-
-            // sender id between channel tag and time
-            if (e.sender[0] != '\0') {
+            int sender_x = 8 + ch_w + 8;
+            int sender_max_px = s_state.width - sender_x - 8;
+            if (e.sender[0] != '\0' && sender_max_px > 0) {
+                char sender_clip[40];
+                ass_clip_text_to_width(ASS_FONT_BODY, e.sender,
+                                       sender_max_px,
+                                       sender_clip, sizeof(sender_clip));
                 ass_draw_text(ASS_FONT_BODY, ESP_PAINTER_COLOR_DARKGREY,
-                              8 + ch_w + 8, y, e.sender);
+                              sender_x, y, sender_clip);
             }
 
-            // message text on second line
+            /* ---- Line 2: message text (single-line, truncated) ----- */
+            int text_max_px = s_state.width - 16;
             char text_clip[64];
-            strlcpy(text_clip, e.text, sizeof(text_clip));
-            ass_draw_text(ASS_FONT_BODY, ESP_PAINTER_COLOR_WHITE, 8, y + 16, text_clip);
+            ass_clip_text_to_width(ASS_FONT_BODY, e.text, text_max_px,
+                                   text_clip, sizeof(text_clip));
+            ass_draw_text(ASS_FONT_BODY, ESP_PAINTER_COLOR_WHITE,
+                          8, y + 16, text_clip);
 
             y += row_h;
-            if (y + row_h > s_state.height - 24) {
-                break;
-            }
         }
     }
 
-    // Footer
-    char foot[64];
-    snprintf(foot, sizeof(foot),
-             "BOOT->next   unread:%u",
-             (unsigned)app_message_inbox_unread_count());
+    // Footer: scroll indicator + hint
+    char foot[80];
+    if (total > 0) {
+        int shown = (int)total - s_state.msg_scroll;
+        if (shown > rows_avail) {
+            shown = rows_avail;
+        }
+        int last_idx = s_state.msg_scroll + shown;
+        snprintf(foot, sizeof(foot),
+                 "%d-%d/%u  swipe up/down  unread:%u",
+                 s_state.msg_scroll + 1, last_idx, (unsigned)total,
+                 (unsigned)app_message_inbox_unread_count());
+    } else {
+        snprintf(foot, sizeof(foot),
+                 "BOOT->next   unread:%u",
+                 (unsigned)app_message_inbox_unread_count());
+    }
     ass_draw_text(ASS_FONT_BODY, ESP_PAINTER_COLOR_DARKGREY,
                   8, s_state.height - 20, foot);
 }
@@ -615,15 +764,25 @@ esp_err_t app_status_screen_init(void)
     }
 
     s_state.fb_bytes = (size_t)s_state.width * s_state.height * sizeof(uint16_t);
-    s_state.fb = heap_caps_aligned_alloc(64, s_state.fb_bytes,
-                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!s_state.fb) {
-        s_state.fb = heap_caps_aligned_alloc(64, s_state.fb_bytes,
-                                             MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    /* Defer framebuffer allocation: it's ~150 KiB and only needed while the
+     * status overlay is actually being drawn. We free it again as soon as the
+     * overlay is hidden (see ass_release_fb_locked) so Lua scripts and other
+     * components can reclaim that PSRAM. */
+    s_state.fb = NULL;
+
+    /* Allocate a permanent DMA-capable bounce buffer for one stripe so that
+     * SPI transfers never depend on the runtime state of the (heavily
+     * fragmented) internal heap. ~5 KiB at boot time is essentially free. */
+    s_state.dma_stripe_rows = 8;
+    {
+        size_t bytes = (size_t)s_state.width * s_state.dma_stripe_rows * sizeof(uint16_t);
+        s_state.dma_stripe = heap_caps_aligned_alloc(4, bytes,
+                                                     MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+        if (!s_state.dma_stripe) {
+            ESP_LOGW(TAG, "DMA stripe alloc (%u B) failed; falling back to PSRAM source",
+                     (unsigned)bytes);
+        }
     }
-    ESP_RETURN_ON_FALSE(s_state.fb, ESP_ERR_NO_MEM, TAG,
-                        "failed to allocate %u-byte framebuffer",
-                        (unsigned)s_state.fb_bytes);
 
     esp_painter_config_t pcfg = {
         .canvas = { .width = (uint16_t)s_state.width, .height = (uint16_t)s_state.height },
@@ -678,14 +837,21 @@ esp_err_t app_status_screen_show_splash(uint32_t hold_ms)
         return ESP_ERR_INVALID_STATE;
     }
     xSemaphoreTake(s_state.lock, portMAX_DELAY);
-    ass_paint_splash();
-    ass_push_to_panel();
+    esp_err_t err = ass_ensure_fb_locked();
+    if (err == ESP_OK) {
+        ass_paint_splash();
+        ass_push_to_panel();
+    }
+    /* Splash is one-shot: free the framebuffer right away so the ~150 KiB
+     * of PSRAM is available for the rest of boot (Lua scripts, JPEG decode,
+     * skill loading, ...). */
+    ass_release_fb_locked();
     xSemaphoreGive(s_state.lock);
 
     if (hold_ms > 0) {
         vTaskDelay(pdMS_TO_TICKS(hold_ms));
     }
-    return ESP_OK;
+    return err;
 }
 
 typedef struct {
@@ -724,6 +890,12 @@ static void ass_release_owner(void)
     if (!s_state.owner_held) {
         return;
     }
+    /* Free the framebuffer first so the PSRAM is available the moment the
+     * other display owner (emote / Lua scripts) takes over. */
+    xSemaphoreTake(s_state.lock, portMAX_DELAY);
+    ass_release_fb_locked();
+    xSemaphoreGive(s_state.lock);
+
     display_arbiter_release(DISPLAY_ARBITER_OWNER_LUA);
     s_state.owner_held = false;
     /* Mark all currently shown messages as read once we hand the screen back. */
@@ -765,11 +937,17 @@ static void ass_page_worker(void *arg)
         switch (cmd.kind) {
         case ASS_CMD_SHOW_PAGE:
             if (cmd.page < APP_STATUS_PAGE_COUNT) {
+                /* Reset scroll when switching pages. */
+                if (s_state.current_page != cmd.page) {
+                    s_state.msg_scroll = 0;
+                }
                 s_state.current_page = cmd.page;
             }
             ass_acquire_owner();
             xSemaphoreTake(s_state.lock, portMAX_DELAY);
-            ass_paint_current_locked();
+            if (ass_ensure_fb_locked() == ESP_OK) {
+                ass_paint_current_locked();
+            }
             xSemaphoreGive(s_state.lock);
             visible = true;
             if (cmd.hold_ms == 0) {
@@ -781,7 +959,9 @@ static void ass_page_worker(void *arg)
         case ASS_CMD_REFRESH:
             if (visible) {
                 xSemaphoreTake(s_state.lock, portMAX_DELAY);
-                ass_paint_current_locked();
+                if (ass_ensure_fb_locked() == ESP_OK) {
+                    ass_paint_current_locked();
+                }
                 xSemaphoreGive(s_state.lock);
             }
             break;
@@ -823,6 +1003,19 @@ esp_err_t app_status_screen_next_page(void)
 void app_status_screen_request_refresh(void)
 {
     ass_post_cmd(ASS_CMD_REFRESH, s_state.current_page, 0);
+}
+
+void app_status_screen_scroll_messages(int delta)
+{
+    /* Only meaningful on the messages page; if not currently on it, just
+     * adjust the offset so the next switch lands on the right spot. */
+    s_state.msg_scroll += delta;
+    if (s_state.msg_scroll < 0) {
+        s_state.msg_scroll = 0;
+    }
+    if (s_state.current_page == APP_STATUS_PAGE_MESSAGES) {
+        ass_post_cmd(ASS_CMD_REFRESH, s_state.current_page, 0);
+    }
 }
 
 esp_err_t app_status_screen_request_status(uint32_t hold_ms)

@@ -48,6 +48,32 @@ static void on_touch_tap(int x, int y, int pressure, void *user_ctx)
     ESP_LOGI(TAG, "touch tap (%d, %d) pressure=%d", x, y, pressure);
 }
 
+static void on_touch_gesture(app_touch_gesture_t gesture,
+                             int sx, int sy, int ex, int ey, void *user_ctx)
+{
+    (void)user_ctx;
+    (void)sx; (void)sy; (void)ex; (void)ey;
+    switch (gesture) {
+    case APP_TOUCH_GESTURE_SWIPE_UP:
+        /* Swipe up -> show older messages (scroll list down by one row). */
+        ESP_LOGI(TAG, "swipe up -> messages scroll +1");
+        app_status_screen_show_page(APP_STATUS_PAGE_MESSAGES, 8000);
+        app_status_screen_scroll_messages(+1);
+        break;
+    case APP_TOUCH_GESTURE_SWIPE_DOWN:
+        /* Swipe down -> show newer messages. */
+        ESP_LOGI(TAG, "swipe down -> messages scroll -1");
+        app_status_screen_show_page(APP_STATUS_PAGE_MESSAGES, 8000);
+        app_status_screen_scroll_messages(-1);
+        break;
+    case APP_TOUCH_GESTURE_SWIPE_LEFT:
+    case APP_TOUCH_GESTURE_SWIPE_RIGHT:
+    case APP_TOUCH_GESTURE_TAP:
+    default:
+        break;
+    }
+}
+
 static void on_message_inbox_changed(void *user_ctx)
 {
     (void)user_ctx;
@@ -307,6 +333,8 @@ void app_main(void)
         esp_err_t touch_err = app_touch_xpt2046_init(&tcfg, on_touch_tap, NULL);
         if (touch_err != ESP_OK) {
             ESP_LOGW(TAG, "touch init failed: %s", esp_err_to_name(touch_err));
+        } else {
+            app_touch_xpt2046_set_gesture_callback(on_touch_gesture, NULL);
         }
     }
 

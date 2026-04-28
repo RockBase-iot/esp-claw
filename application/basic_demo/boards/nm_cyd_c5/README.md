@@ -13,7 +13,7 @@ on-board WS2812 RGB LED, micro-SD slot and an LP-UART GPS connector).
 | Touch (XPT2046) | shared SPI2, CS=1 | resistive touch screen |
 | SD card slot | shared SPI2, CS=10 | MicroSD |
 | WS2812 RGB LED | DIN=27 | single on-board pixel |
-| GPS LP-UART (P5) | ESP32 TX=4, ESP32 RX=5 | NMEA @ 9600 baud (e.g. NM-ATGM336H) |
+| GPS LP-UART (P5) | ESP32 RX=4, ESP32 TX=5 | NMEA @ 9600 baud (e.g. NM-ATGM336H) |
 | I2C (CN1 header) | SDA=9, SCL=8 | 3V3 on pin 1 |
 | Extension P1 | IO4, IO8, IO26 | |
 | Extension FPC2 | IO2/IO6/IO7/IO10/IO4/IO8/IO5/IO9 + USB D±, GND | |
@@ -58,6 +58,23 @@ idf.py -p <PORT> flash monitor
 
 ESP-IDF v5.5.4 (or newer) is required for stable ESP32-C5 support.
 
+## Basic-Demo User Guide
+
+### Status Screen
+
+The Status Screen show the status of the ESP-Claw (NM-CYD-C5), press BOOT to the Message Box List, or back to the Main Screen.
+
+### Message Box List
+
+Show the incoming message from different IM channel. Press BOOT to Status Screen.
+
+TODO: 
+
+ [ ] Store the messages to SD card.
+
+ [ ] Help to improve the ESP-Claw memory.
+
+
 ## Built-in Lua demos
 
 The build syncs scripts from `application/basic_demo/main/lua_scripts/` into
@@ -65,7 +82,7 @@ The build syncs scripts from `application/basic_demo/main/lua_scripts/` into
 project:
 
 - `nm_cyd_c5_rgb` – cycles the on-board WS2812 LED through a hue sweep.
-- `nm_cyd_c5_gps` – opens UART1 on (TX=4, RX=5) @ 9600 baud, reads NMEA
+- `nm_cyd_c5_gps` – opens UART2 on (RX=4, TX=5) @ 9600 baud, reads NMEA
   sentences for ~5 seconds and prints the parsed fix (latitude, longitude,
   satellites, time, altitude). Returns the parsed fix table when called via
   `dofile`, so other scripts / capabilities can pull the current location with
@@ -86,6 +103,33 @@ if gps.valid then
 end
 ```
 
+## To work with LLM
+
+```text
+# to work with ESP-Claw
+show me your status
+```
+
+```text
+# work with led
+led rainbow 5s
+set led to green blink 30s
+...
+
+```
+
+```text
+# work with screen
+
+show me "xxxx" message on screen [center] [30]s
+```
+
+```text
+# gps information
+try to get gps information/status
+```
+
+
 ## Connect to Other LLM
 
 ### For Kimi LLM Settings:
@@ -98,3 +142,26 @@ LLM Advanced Options:
  - Profile: openai
  - Base URL: https://api.moonshot.cn/v1
  - Auth Type: bearer
+
+### For MiniMax LLM Settings:
+
+LLM Provider: Custom
+API Key: ****
+Model: MiniMax-M2.7
+LLM Advanced Options: 
+ - Backend Type: anthropic
+ - Profile: anthropic
+ - Base URL: https://api.minimaxi.com/anthropic/v1
+ - Auth Type: none
+
+### NVIDIA free deepseek-v4-pro
+
+LLM Provider: Custom
+API Key: ****
+Model: deepseek-ai/deepseek-v4-pro
+LLM Advanced Options: 
+ - Backend Type: openai_compatible
+ - Profile: openai
+ - Base URL: https://integrate.api.nvidia.com/v1
+ - Auth Type: bearer
+ 

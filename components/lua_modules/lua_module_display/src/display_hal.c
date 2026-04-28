@@ -62,6 +62,11 @@ typedef struct {
     SemaphoreHandle_t display_flush_done;
     uint16_t *submit_swap_buffer;
     size_t submit_swap_buffer_pixels;
+    /* Permanent DMA-capable internal-RAM bounce buffer for one stripe.
+     * Allocated lazily on first present and kept around so SPI transfers
+     * never depend on the (heavily fragmented) internal heap at runtime. */
+    uint16_t *dma_bounce_buffer;
+    size_t dma_bounce_buffer_pixels;
 } display_hal_state_t;
 
 static display_hal_state_t s_state;
@@ -195,9 +200,23 @@ esp_err_t display_hal_create(esp_lcd_panel_handle_t panel_handle,
     s_state.flush_in_flight = false;
     s_state.framebuffer_initialized = false;
     if (display_hal_panel_requires_swap()) {
-        s_state.submit_swap_buffer = heap_caps_aligned_alloc(16, (size_t)lcd_width * (size_t)lcd_height * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        /* The swap scratch only needs to hold one stripe (~5 KiB) since
+         * display_hal_submit_bitmap_locked chunks the transfer. Allocating
+         * a full-frame buffer here used to waste ~145 KiB of PSRAM. */
+        const size_t kStripeBytesMax = 5U * 1024U;
+        size_t row_bytes = (size_t)lcd_width * sizeof(uint16_t);
+        size_t stripe_rows = kStripeBytesMax / (row_bytes ? row_bytes : 1);
+        if (stripe_rows < 1) {
+            stripe_rows = 1;
+        }
+        if ((int)stripe_rows > lcd_height) {
+            stripe_rows = (size_t)lcd_height;
+        }
+        size_t buf_pixels = (size_t)lcd_width * stripe_rows;
+        s_state.submit_swap_buffer = heap_caps_aligned_alloc(16, buf_pixels * sizeof(uint16_t),
+                                                             MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         ESP_GOTO_ON_FALSE(s_state.submit_swap_buffer != NULL, ESP_ERR_NO_MEM, fail, TAG, "alloc submit swap buffer failed");
-        s_state.submit_swap_buffer_pixels = (size_t)lcd_width * (size_t)lcd_height;
+        s_state.submit_swap_buffer_pixels = buf_pixels;
     }
     display_hal_clear_clip_locked();
 
@@ -281,6 +300,9 @@ esp_err_t display_hal_destroy(void)
     heap_caps_free(s_state.submit_swap_buffer);
     s_state.submit_swap_buffer = NULL;
     s_state.submit_swap_buffer_pixels = 0;
+    heap_caps_free(s_state.dma_bounce_buffer);
+    s_state.dma_bounce_buffer = NULL;
+    s_state.dma_bounce_buffer_pixels = 0;
     s_state.display_flush_done = NULL;
     s_state.lock = NULL;
 
@@ -727,9 +749,8 @@ static esp_err_t display_hal_submit_bitmap_locked(int x_start, int y_start,
                                                   int pending_framebuffer_index,
                                                   bool wait_for_done)
 {
-    const uint16_t *submit_pixels = pixels;
-    size_t pixel_count = 0;
-    uint16_t *swap_buffer = NULL;
+    (void)wait_for_done;     /* always synchronous now (see below) */
+
     esp_err_t ret = display_hal_wait_flush_done_locked(pdMS_TO_TICKS(DISPLAY_HAL_FLUSH_TIMEOUT_MS));
     if (ret != ESP_OK) {
         return ret;
@@ -749,27 +770,113 @@ static esp_err_t display_hal_submit_bitmap_locked(int x_start, int y_start,
         return ESP_OK;
     }
 
-    if (display_hal_panel_requires_swap()) {
-        pixel_count = (size_t)(x_end - x_start) * (size_t)(y_end - y_start);
+    int width = x_end - x_start;
+    int total_height = y_end - y_start;
+    if (width <= 0 || total_height <= 0) {
+        return ESP_OK;
+    }
+
+    /*
+     * The framebuffer (and the byte-swap scratch) live in PSRAM. When the
+     * SPI master pushes them through esp_lcd_panel_draw_bitmap, it has to
+     * allocate an internal-RAM bounce buffer the same size as the user
+     * payload. A full 320*240*2 = 150 KiB transfer easily exhausts the
+     * fragmented internal heap and fails as
+     *   spi_master: setup_dma_priv_buffer: Failed to allocate priv TX buffer
+     *
+     * Slice the transfer into very thin horizontal stripes capped at ~5 KiB
+     * so each SPI transaction only needs a small DMA bounce buffer. The
+     * tradeoff is more SPI transactions per present (~30 for a full frame),
+     * which is negligible compared to the actual pixel transfer time and
+     * keeps the driver alive even when the largest internal-heap free block
+     * has dropped below 16 KiB after Wi-Fi/TLS/Lua activity.
+     */
+    const size_t kStripeBytesMax = 5U * 1024U;
+    size_t row_bytes = (size_t)width * sizeof(uint16_t);
+    int stripe_rows = (int)(kStripeBytesMax / (row_bytes ? row_bytes : 1));
+    if (stripe_rows < 1) {
+        stripe_rows = 1;
+    }
+    if (stripe_rows > total_height) {
+        stripe_rows = total_height;
+    }
+
+    bool need_swap = display_hal_panel_requires_swap();
+    if (need_swap) {
         ESP_RETURN_ON_FALSE(s_state.submit_swap_buffer != NULL, ESP_ERR_INVALID_STATE, TAG,
                             "submit swap buffer missing");
-        swap_buffer = s_state.submit_swap_buffer;
-        display_hal_bswap16_into(swap_buffer, pixels, pixel_count);
-        submit_pixels = swap_buffer;
     }
 
-    ret = esp_lcd_panel_draw_bitmap(s_state.panel, x_start, y_start, x_end, y_end, submit_pixels);
-    if (ret != ESP_OK) {
-        return ret;
+    /* Lazily reserve a permanent DMA-capable internal-RAM bounce buffer for
+     * one stripe so that esp_lcd_panel_draw_bitmap never has to allocate
+     * setup_dma_priv_buffer() against the (heavily fragmented) internal heap
+     * at runtime. ~5 KiB. If the alloc fails we fall back to passing the
+     * PSRAM source directly and let the SPI driver try -- which is what we
+     * used to do unconditionally and is the path that was failing. */
+    if (!s_state.dma_bounce_buffer) {
+        size_t bounce_pixels = (size_t)width * (size_t)stripe_rows;
+        s_state.dma_bounce_buffer = heap_caps_aligned_alloc(
+            4, bounce_pixels * sizeof(uint16_t),
+            MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+        if (s_state.dma_bounce_buffer) {
+            s_state.dma_bounce_buffer_pixels = bounce_pixels;
+        } else {
+            ESP_LOGW(TAG, "DMA bounce alloc (%u px) failed; SPI may stall on fragmented heap",
+                     (unsigned)bounce_pixels);
+        }
     }
 
-    s_state.flush_in_flight = true;
-    s_state.pending_framebuffer_index = (int8_t)pending_framebuffer_index;
+    int y = y_start;
+    while (y < y_end) {
+        int rows = stripe_rows;
+        if (y + rows > y_end) {
+            rows = y_end - y;
+        }
+        size_t chunk_pixels = (size_t)width * (size_t)rows;
+        const uint16_t *src = pixels + ((size_t)(y - y_start) * (size_t)width);
+        const uint16_t *submit_pixels;
 
-    if (wait_for_done) {
+        if (need_swap) {
+            /* Byte-swap PSRAM source into the swap scratch (still PSRAM). */
+            display_hal_bswap16_into(s_state.submit_swap_buffer, src, chunk_pixels);
+            src = s_state.submit_swap_buffer;
+        }
+
+        if (s_state.dma_bounce_buffer && chunk_pixels <= s_state.dma_bounce_buffer_pixels) {
+            /* Copy stripe into the DMA-capable internal-RAM bounce buffer
+             * so the SPI master can DMA from it directly without having to
+             * carve out an internal-RAM bounce buffer of its own. */
+            memcpy(s_state.dma_bounce_buffer, src, chunk_pixels * sizeof(uint16_t));
+            submit_pixels = s_state.dma_bounce_buffer;
+        } else {
+            submit_pixels = src;
+        }
+
+        ret = esp_lcd_panel_draw_bitmap(s_state.panel, x_start, y, x_end, y + rows, submit_pixels);
+        if (ret != ESP_OK) {
+            return ret;
+        }
+
+        /* Wait for this stripe to finish before reusing the swap scratch
+         * and before issuing the next transaction (keeps the per-call DMA
+         * bounce buffer requirement bounded to one stripe). */
+        s_state.flush_in_flight = true;
+        s_state.pending_framebuffer_index = -1;
         ret = display_hal_wait_flush_done_locked(pdMS_TO_TICKS(DISPLAY_HAL_FLUSH_TIMEOUT_MS));
+        if (ret != ESP_OK) {
+            return ret;
+        }
+
+        y += rows;
     }
-    return ret;
+
+    /* Whole bitmap is on screen now; promote the pending framebuffer if any. */
+    s_state.flush_in_flight = false;
+    if (pending_framebuffer_index >= 0) {
+        s_state.visible_framebuffer_index = (uint8_t)pending_framebuffer_index;
+    }
+    s_state.pending_framebuffer_index = -1;
+    return ESP_OK;
 }
 
 static const esp_painter_basic_font_t *display_hal_get_font(uint8_t font_size)
