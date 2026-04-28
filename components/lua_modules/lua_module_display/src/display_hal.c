@@ -5,11 +5,14 @@
  */
 #include "display_hal.h"
 
+#include <inttypes.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include "display_arbiter.h"
 #include "esp_attr.h"
+#include "esp_board_manager_includes.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_lcd_panel_io.h"
@@ -1669,17 +1672,111 @@ esp_err_t display_hal_draw_pixel(int x, int y, uint16_t color565)
 
 esp_err_t display_hal_set_backlight(bool on)
 {
-    esp_err_t ret = display_hal_lock();
+    return display_hal_set_backlight_percent(on ? 100 : 0);
+}
 
+esp_err_t display_hal_set_backlight_percent(uint8_t percent)
+{
+    if (percent > 100) {
+        percent = 100;
+    }
+
+    esp_err_t ret = display_hal_lock();
     if (ret != ESP_OK) {
         return ret;
     }
-    if (ret == ESP_OK) {
-        ret = display_hal_ensure_display_locked();
+
+    /* Backlight control deliberately does NOT require display_hal_create() to
+     * have been called: the LEDC peripheral is owned by the board manager and
+     * is independent of the LCD panel object. This lets a chat / Lua snippet
+     * dim the screen even when the emote app owns the framebuffer.
+     *
+     * It also deliberately does NOT call esp_lcd_panel_disp_on_off(): that
+     * sends ST7789 DISPON/DISPOFF commands over the shared SPI bus and would
+     * race with the emote app's draw_bitmap traffic. Pure PWM duty change is
+     * sufficient and atomic at the LEDC peripheral level.
+     */
+
+    bool ledc_attempted = false;
+
+#if CONFIG_ESP_BOARD_PERIPH_LEDC_SUPPORT
+    {
+        periph_ledc_handle_t *ledc_handle = NULL;
+        periph_ledc_config_t *ledc_cfg = NULL;
+        esp_err_t ledc_ret = esp_board_manager_get_periph_handle(
+                                 ESP_BOARD_PERIPH_NAME_LEDC_BACKLIGHT,
+                                 (void **)&ledc_handle);
+        if (ledc_ret == ESP_OK && ledc_handle != NULL) {
+            ledc_ret = esp_board_manager_get_periph_config(
+                           ESP_BOARD_PERIPH_NAME_LEDC_BACKLIGHT,
+                           (void **)&ledc_cfg);
+        }
+
+        if (ledc_ret == ESP_OK && ledc_cfg != NULL) {
+            ledc_attempted = true;
+            uint32_t max_duty;
+            uint32_t duty;
+            uint32_t resolution = (uint32_t)ledc_cfg->duty_resolution;
+            if (resolution >= 31) {
+                max_duty = UINT32_MAX;
+            } else {
+                max_duty = (1U << resolution) - 1U;
+            }
+
+            duty = (uint32_t)(((uint64_t)percent * (uint64_t)max_duty + 50ULL) / 100ULL);
+            if (ledc_cfg->output_invert) {
+                duty = max_duty - duty;
+            }
+
+            esp_err_t set_ret = ledc_set_duty(ledc_handle->speed_mode,
+                                              ledc_handle->channel, duty);
+            esp_err_t upd_ret = ESP_OK;
+            if (set_ret == ESP_OK) {
+                upd_ret = ledc_update_duty(ledc_handle->speed_mode,
+                                           ledc_handle->channel);
+            }
+            if (set_ret != ESP_OK || upd_ret != ESP_OK) {
+                ESP_LOGW(TAG,
+                         "LEDC backlight duty=%" PRIu32 " (sm=%d ch=%d) failed: set=%s upd=%s",
+                         duty, (int)ledc_handle->speed_mode,
+                         (int)ledc_handle->channel,
+                         esp_err_to_name(set_ret), esp_err_to_name(upd_ret));
+                ret = (set_ret != ESP_OK) ? set_ret : upd_ret;
+            } else {
+                ESP_LOGI(TAG, "LEDC backlight set to %u%% (duty=%" PRIu32
+                         "/%" PRIu32 ", sm=%d ch=%d, gpio=%d, invert=%d)",
+                         (unsigned)percent, duty, max_duty,
+                         (int)ledc_handle->speed_mode,
+                         (int)ledc_handle->channel,
+                         ledc_cfg->gpio_num,
+                         (int)ledc_cfg->output_invert);
+            }
+        } else {
+            ESP_LOGW(TAG, "LEDC backlight periph not available: %s",
+                     esp_err_to_name(ledc_ret));
+        }
     }
-    if (ret == ESP_OK) {
-        ret = esp_lcd_panel_disp_on_off(s_state.panel, on);
+#endif
+
+    if (!ledc_attempted && ret == ESP_OK) {
+        /* No LEDC backlight peripheral. Fall back to the panel on/off
+         * command so percent>0 keeps the display visible -- this is best
+         * effort only; boards without LEDC cannot do real dimming.
+         */
+        if (s_state.panel != NULL) {
+            esp_err_t panel_ret = esp_lcd_panel_disp_on_off(s_state.panel,
+                                                            percent > 0);
+            if (panel_ret != ESP_OK && panel_ret != ESP_ERR_NOT_SUPPORTED) {
+                ESP_LOGW(TAG, "panel disp_on_off(%d) failed: %s",
+                         percent > 0, esp_err_to_name(panel_ret));
+                ret = panel_ret;
+            }
+        } else {
+            ret = ESP_ERR_INVALID_STATE;
+            ESP_LOGW(TAG, "no backlight control available (no LEDC, no panel)");
+        }
     }
+
     display_hal_unlock();
     return ret;
 }

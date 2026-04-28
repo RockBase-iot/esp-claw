@@ -58,19 +58,46 @@ idf.py -p <PORT> flash monitor
 
 ESP-IDF v5.5.4 (or newer) is required for stable ESP32-C5 support.
 
+| Offset | file|
+|---|---|
+|   0x2000 | bootloader.bin |
+|   0x8000 | partition-table.bin |
+|   0xf000 | ota_data_initial.bin |
+|  0x20000 | basic_demo.bin |
+| 0x820000 | emote_assets.bin |
+| 0xb20000 | storage.bin |
+
+## How to deploy and Use
+
+You can flash the esp-claw version for NM-CYD-C5 from [NM Webflasher](https://flash.nmiot.net) before espressif support the NM-CYD-C5 board.
+
+Choose the ESP Claw project, and choose the nm-cyd-c5 device.
+
 ## Basic-Demo User Guide
+
+After you flashed the ESP Claw firmware, the ESP Claw on offline mode, you should use your phone or PC to connect the `Setup WiFi: esp-claw-XXXXXX`, then enter `192.168.4.1` from the browser.
+
+![ESP-Claw-Config](../../../../docs/src/assets/images/esp-claw-config.png)
+
+As the picture show, you can config the WiFi Setting (At least), LLM Settings, INSTANT Messaging(IM) just as the normal OpenClaw Settings.
+
+Then, you can save the parameters and restart the device.
 
 ### Status Screen
 
 The Status Screen show the status of the ESP-Claw (NM-CYD-C5), press BOOT to the Message Box List, or back to the Main Screen.
 
+![ESP Claw Status](../../../../docs/src/assets/images/esp-claw-status.jpg)
+
 ### Message Box List
 
 Show the incoming message from different IM channel. Press BOOT to Status Screen.
 
+![ESP Claw MessageBox](../../../../docs/src/assets/images/esp-claw-msg.jpg)
+
 TODO: 
 
- [ ] Store the messages to SD card.
+ [ ] Store the messages on SD card or file system.
 
  [ ] Help to improve the ESP-Claw memory.
 
@@ -122,6 +149,9 @@ set led to green blink 30s
 # work with screen
 
 show me "xxxx" message on screen [center] [30]s
+set screen backlight to 20%
+backlight off/on
+
 ```
 
 ```text
@@ -164,4 +194,5 @@ LLM Advanced Options:
  - Profile: openai
  - Base URL: https://integrate.api.nvidia.com/v1
  - Auth Type: bearer
- 
+
+*Notes: nvidia API limit: HTTP 429: {"status":429,"title":"Too Many Requests"}*

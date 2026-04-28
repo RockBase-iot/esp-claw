@@ -8,7 +8,7 @@ version: 1.0.0
 #   Touch (XPT2046)    : SCK=6  MISO=2  MOSI=7  CS=1   (shares SPI2 with display)
 #   SD card slot       : SCK=6  MISO=2  MOSI=7  CS=10  (shares SPI2 with display)
 #   WS2812 RGB LED     : DIN=27
-#   GPS (LP-UART, P5)  : ESP32 TX -> GPIO4 (GPS RX), ESP32 RX <- GPIO5 (GPS TX)
+#   GPS (LP-UART, P5)  : ESP32 RX -> GPIO4 (GPS TX), ESP32 TX <- GPIO5 (GPS RX)
 #   I2C (CN1 header)   : SDA=9   SCL=8
 peripherals:
   # I2C bus exposed on the CN1 extension header (3.3V | IO9 | IO8 | GND)

@@ -24,6 +24,14 @@
       "cap_groups": [
         "cap_lua"
       ]
+    },
+    {
+      "id": "nm_cyd_c5_backlight",
+      "file": "nm_cyd_c5_backlight.md",
+      "summary": "Adjust the NM-CYD-C5 LCD backlight brightness (0..100%) via the LEDC PWM on GPIO25. Use the single canonical script `nm_cyd_c5_backlight` with `percent` or `mode=on/off`; never hand-write ledc/gpio code.",
+      "cap_groups": [
+        "cap_lua"
+      ]
     }
   ]
 }

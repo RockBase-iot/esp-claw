@@ -201,7 +201,7 @@ static void ass_draw_text(const esp_painter_basic_font_t *font,
                                             (uint32_t)s_state.fb_bytes,
                                             (uint16_t)x, (uint16_t)y,
                                             font, color, text);
-    if (err != ESP_OK && err != ESP_OK) {
+    if (err != ESP_OK && err != ESP_ERR_NOT_FOUND) {
         ESP_LOGD(TAG, "draw_string failed at (%d,%d): %s", x, y, esp_err_to_name(err));
     }
 }

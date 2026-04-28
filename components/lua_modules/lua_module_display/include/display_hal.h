@@ -80,6 +80,7 @@ esp_err_t display_hal_draw_line(int x0, int y0, int x1, int y1, uint16_t color56
 esp_err_t display_hal_draw_rect(int x, int y, int width, int height, uint16_t color565);
 esp_err_t display_hal_draw_pixel(int x, int y, uint16_t color565);
 esp_err_t display_hal_set_backlight(bool on);
+esp_err_t display_hal_set_backlight_percent(uint8_t percent);
 esp_err_t display_hal_fill_circle(int cx, int cy, int r, uint16_t color565);
 esp_err_t display_hal_draw_circle(int cx, int cy, int r, uint16_t color565);
 esp_err_t display_hal_draw_arc(int cx, int cy, int radius,

@@ -485,10 +485,35 @@ static int lua_display_draw_rect(lua_State *L)
     return 0;
 }
 
+static int lua_display_brightness(lua_State *L)
+{
+    int percent = lua_display_check_integer_arg(L, 1, "percent");
+    if (percent < 0 || percent > 100) {
+        return luaL_error(L, "display brightness percent must be 0..100");
+    }
+    ESP_LOGI(TAG, "lua display.brightness(%d)", percent);
+    esp_err_t err = display_hal_set_backlight_percent((uint8_t)percent);
+    if (err != ESP_OK) {
+        return luaL_error(L, "display brightness failed: %s", esp_err_to_name(err));
+    }
+    return 0;
+}
+
 static int lua_display_backlight(lua_State *L)
 {
-    int on = lua_toboolean(L, 1);
-    esp_err_t err = display_hal_set_backlight(on != 0);
+    esp_err_t err;
+    if (lua_isnumber(L, 1)) {
+        int percent = lua_display_check_integer_arg(L, 1, "percent");
+        if (percent < 0 || percent > 100) {
+            return luaL_error(L, "display backlight percent must be 0..100");
+        }
+        ESP_LOGI(TAG, "lua display.backlight(%d%%)", percent);
+        err = display_hal_set_backlight_percent((uint8_t)percent);
+    } else {
+        int on = lua_toboolean(L, 1);
+        ESP_LOGI(TAG, "lua display.backlight(%s)", on ? "true" : "false");
+        err = display_hal_set_backlight(on != 0);
+    }
     if (err != ESP_OK) {
         return luaL_error(L, "display backlight failed: %s", esp_err_to_name(err));
     }
@@ -1403,6 +1428,8 @@ int luaopen_display(lua_State *L)
 
     lua_pushcfunction(L, lua_display_backlight);
     lua_setfield(L, -2, "backlight");
+    lua_pushcfunction(L, lua_display_brightness);
+    lua_setfield(L, -2, "brightness");
 
     lua_pushcfunction(L, lua_display_begin_frame);
     lua_setfield(L, -2, "begin_frame");

@@ -3,7 +3,9 @@
 控制 NM-CYD-C5 板载 320×240 ST7789 LCD。**严禁自行编写 display Lua 脚本**，统一调用本脚本。脚本内部会正确接管屏幕、绘制、同步等待 `duration_ms`、再释放屏幕，让表情应用恢复显示。
 
 ## When to use
-当用户请求“屏幕显示 / 显示 X / 屏幕变红 / 屏幕变蓝 / 提示信息 / 提示消息 / 屏幕关闭 / show on screen / set the screen to ...”等任何指向板载 LCD 的请求时使用。
+当用户请求“屏幕显示 / 显示 X / 屏幕变红 / 屏幕变蓝 / 提示信息 / 提示消息 / show on screen / set the screen to ...”等任何指向板载 LCD **绘制内容** 的请求时使用。
+
+**不要**用本技能去“关屏 / 关背光 / 调暗 / set backlight off / screen off / 屏幕关闭”——那是亮度控制，必须使用 `nm_cyd_c5_backlight`（参数 `{"mode":"off"}` 或 `{"percent":0}`）。`mode=clear` 只是黑屏占位，**不会**真正关掉背光。
 
 ## How to use
 **必须**使用同步运行：

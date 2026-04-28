@@ -7,6 +7,8 @@ idf_component_register(
     REQUIRES
         cap_lua
         display_arbiter
+        espressif__esp_board_manager
+        esp_driver_ledc
         esp_lcd
         esp_painter
         libpng
