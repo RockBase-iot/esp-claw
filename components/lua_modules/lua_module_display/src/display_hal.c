@@ -21,6 +21,7 @@
 #include "esp_painter.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "spi_bus_arbiter.h"
 #if CONFIG_SOC_LCD_RGB_SUPPORTED
 #include "esp_lcd_panel_rgb.h"
 #endif
@@ -855,8 +856,18 @@ static esp_err_t display_hal_submit_bitmap_locked(int x_start, int y_start,
             submit_pixels = src;
         }
 
+        /* Take the shared SPI-bus arbiter for the whole queue+drain pair so
+         * an interleaving SDSPI poll on the same host cannot enter
+         * spi_hal_setup_trans while our stripe transaction is still in
+         * flight (the polling driver would assert because the HW `usr` bit
+         * has not yet cleared). The lock is recursive so callers above us
+         * may also hold it. */
+        bool spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
         ret = esp_lcd_panel_draw_bitmap(s_state.panel, x_start, y, x_end, y + rows, submit_pixels);
         if (ret != ESP_OK) {
+            if (spi_locked) {
+                spi_bus_arbiter_unlock();
+            }
             return ret;
         }
 
@@ -866,6 +877,9 @@ static esp_err_t display_hal_submit_bitmap_locked(int x_start, int y_start,
         s_state.flush_in_flight = true;
         s_state.pending_framebuffer_index = -1;
         ret = display_hal_wait_flush_done_locked(pdMS_TO_TICKS(DISPLAY_HAL_FLUSH_TIMEOUT_MS));
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
         if (ret != ESP_OK) {
             return ret;
         }

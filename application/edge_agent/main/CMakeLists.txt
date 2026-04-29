@@ -6,11 +6,13 @@ set(main_requires
     wifi_manager
     display_arbiter
     esp_painter
+    sdcard_mount
     claw_event_router
     driver
     esp_lcd
     esp_app_format
     freertos
+    spi_bus_arbiter
 )
 
 if(CONFIG_APP_CLAW_CAP_IM_WECHAT)

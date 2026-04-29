@@ -16,6 +16,7 @@
 #include "freertos/FreeRTOS.h"
 #include "gfx.h"
 #include "display_arbiter.h"
+#include "spi_bus_arbiter.h"
 
 #if defined(CONFIG_BASIC_DEMO_ENABLE_EMOTE)
 
@@ -75,7 +76,20 @@ static void app_emote_flush_callback(int x_start, int y_start, int x_end, int y_
         return;
     }
 
+    /* Serialize against other users of the shared SPI bus (e.g. SDSPI
+     * during /sdcard uploads) — see spi_bus_arbiter for rationale.
+     * draw_bitmap is asynchronous (queues DMA and returns), so we must
+     * drain the queued color transactions before releasing the lock,
+     * otherwise SDSPI polling can enter spi_hal_setup_trans while the
+     * HW USR bit is still set and trip its assert. */
+    bool spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
     err = esp_lcd_panel_draw_bitmap(s_panel_handle, x_start, y_start, x_end, y_end, data);
+    if (s_io_handle) {
+        (void)esp_lcd_panel_io_tx_param(s_io_handle, -1, NULL, 0);
+    }
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
+    }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_lcd_panel_draw_bitmap failed: %s", esp_err_to_name(err));
         if (handle) {

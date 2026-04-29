@@ -12,4 +12,5 @@ idf_component_register(
         esp_lcd
         esp_painter
         libpng
+        spi_bus_arbiter
 )

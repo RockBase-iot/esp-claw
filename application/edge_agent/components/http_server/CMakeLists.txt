@@ -23,6 +23,7 @@ idf_component_register(
         esp_http_server
         heap
         json
+        spi_bus_arbiter
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-missing-field-initializers)

@@ -8,6 +8,8 @@ idf_component_register(
         espressif2022__esp_emote_expression
         espressif2022__esp_emote_gfx
         freertos
+        spi_bus_arbiter
+        display_arbiter
 )
 
 if(CONFIG_APP_CLAW_ENABLE_EMOTE)

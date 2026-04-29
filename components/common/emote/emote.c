@@ -16,6 +16,7 @@
 #include "freertos/FreeRTOS.h"
 #include "gfx.h"
 #include "display_arbiter.h"
+#include "spi_bus_arbiter.h"
 
 static const char *TAG = "app_emote";
 
@@ -64,9 +65,25 @@ static void emote_flush_callback(int x_start, int y_start, int x_end, int y_end,
         return;
     }
 
+    /* Take the shared SPI-bus arbiter for the queue+drain pair so an
+     * interleaving SDSPI poll on the same host (e.g. an HTTP file upload
+     * to /sdcard) cannot enter spi_hal_setup_trans while our queued LCD
+     * DMA transaction is still in flight (the polling driver would assert
+     * because the HW `usr` bit has not yet cleared). */
+    bool spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
     esp_err_t err = esp_lcd_panel_draw_bitmap(s_panel_handle, x_start, y_start, x_end, y_end, data);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_lcd_panel_draw_bitmap failed: %s", esp_err_to_name(err));
+    }
+    /* esp_lcd_panel_io_tx_param() with lcd_cmd=-1 drains any pending queued
+     * color transactions before returning, without sending any actual
+     * command on the bus. This guarantees the SPI hardware is idle before
+     * we drop the arbiter. */
+    if (s_io_handle) {
+        (void)esp_lcd_panel_io_tx_param(s_io_handle, -1, NULL, 0);
+    }
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
     }
 
     if (handle) {
@@ -171,15 +188,20 @@ static esp_err_t emote_apply(const char *idle, const char *msg)
     return ESP_OK;
 }
 
-esp_err_t emote_set_network_status(bool sta_connected, const char *ap_ssid)
+esp_err_t emote_set_network_status(bool sta_connected, const char *ap_ssid, const char *sta_ip)
 {
     ESP_RETURN_ON_FALSE(s_emote_handle != NULL, ESP_ERR_INVALID_STATE, TAG, "emote handle is NULL");
 
     const bool ap_present = (ap_ssid != NULL && ap_ssid[0] != '\0');
+    const bool ip_present = (sta_ip != NULL && sta_ip[0] != '\0' && strcmp(sta_ip, "0.0.0.0") != 0);
     const char *idle = sta_connected ? "swim" : "offline";
 
     char msg[96];
-    if (sta_connected && ap_present) {
+    if (sta_connected && ip_present && ap_present) {
+        snprintf(msg, sizeof(msg), "IP: %s * AP: %s", sta_ip, ap_ssid);
+    } else if (sta_connected && ip_present) {
+        snprintf(msg, sizeof(msg), "IP: %s", sta_ip);
+    } else if (sta_connected && ap_present) {
         snprintf(msg, sizeof(msg), "Online * AP: %s", ap_ssid);
     } else if (sta_connected) {
         snprintf(msg, sizeof(msg), "Wi-Fi connected");
@@ -237,7 +259,7 @@ static esp_err_t emote_init_internal(void)
         return err;
     }
 
-    return emote_set_network_status(false, NULL);
+    return emote_set_network_status(false, NULL, NULL);
 }
 
 esp_err_t emote_start(void)

@@ -73,13 +73,14 @@ esp_err_t app_claw_ui_start(void)
 #endif
 }
 
-esp_err_t app_claw_set_network_status(bool sta_connected, const char *ap_ssid)
+esp_err_t app_claw_set_network_status(bool sta_connected, const char *ap_ssid, const char *sta_ip)
 {
 #if defined(CONFIG_APP_CLAW_ENABLE_EMOTE)
-    return emote_set_network_status(sta_connected, ap_ssid);
+    return emote_set_network_status(sta_connected, ap_ssid, sta_ip);
 #else
     (void)sta_connected;
     (void)ap_ssid;
+    (void)sta_ip;
     return ESP_OK;
 #endif
 }

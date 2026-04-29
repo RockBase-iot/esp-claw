@@ -93,6 +93,12 @@ dependencies:
   esp_painter:
     path: ../../../components/common/esp_painter
 
+  sdcard_mount:
+    path: ../../../components/common/sdcard_mount
+
+  spi_bus_arbiter:
+    path: ../../../components/common/spi_bus_arbiter
+
   lua_module_adc:
     path: ../../../components/lua_modules/lua_module_adc
 

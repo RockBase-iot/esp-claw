@@ -51,3 +51,9 @@ dependencies:
 
   esp_painter:
     path: ../../../components/common/esp_painter
+
+  sdcard_mount:
+    path: ../../../components/common/sdcard_mount
+
+  spi_bus_arbiter:
+    path: ../../../components/common/spi_bus_arbiter

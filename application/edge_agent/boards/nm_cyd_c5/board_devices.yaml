@@ -46,18 +46,25 @@ devices:
       max_leds: 1
 
   # SD-card slot wired on the shared SPI2 bus (CS=10).
-  # `init_skip: true` keeps the slot powered down until the user explicitly
-  # mounts it (e.g. via lua_module_storage on a custom mount point), to avoid
-  # SPI bus contention with the LCD when no card is inserted.
+  # `init_skip: true` keeps the slot probe deferred until application code
+  # explicitly calls `sdcard_mount_init()`. The mount succeeds only when a
+  # card is inserted; otherwise the call returns gracefully without claiming
+  # the SPI bus permanently. The web file manager surfaces the mount as a
+  # virtual `/sdcard` root when present.
   - name: fs_sdcard
     type: fs_fat
     sub_type: spi
     version: default
     init_skip: true
     config:
+      mount_point: "/sdcard"
+      frequency: SDMMC_FREQ_DEFAULT
+      vfs_config:
+        format_if_mount_failed: false
+        max_files: 5
+        allocation_unit_size: 16384
       sub_config:
         cs_gpio_num: 10
-        frequency: SDMMC_FREQ_DEFAULT
     peripherals:
       - name: spi_display
 

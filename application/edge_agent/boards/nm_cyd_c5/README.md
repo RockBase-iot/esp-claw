@@ -95,11 +95,17 @@ Show the incoming message from different IM channel. Press BOOT to Status Screen
 
 ![ESP Claw MessageBox](../../../../docs/src/assets/images/esp-claw-msg.jpg)
 
+TF Card Support by the `File Manager`.
+![ESP Claw SDCard](../../../../docs/src/assets/images/esp-claw-sd.png)
+
+ [ x ] FAT32 4GB/8GB/16GB/32GB.
+ [ x ] exFAT, NTFS not support.
+
 TODO: 
 
- [ ] Store the messages on SD card or file system.
-
+ [ x ] Store the incoming message to SD card `/sdcard/inbox`.
  [ ] Help to improve the ESP-Claw memory.
+ [ ] Known issues: when uploading a big file, test 50KB to SDCard, the device will reboot.
 
 
 ## Built-in Lua demos

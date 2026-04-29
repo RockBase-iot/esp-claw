@@ -22,6 +22,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "spi_bus_arbiter.h"
 
 #include "app_message_inbox.h"
 #include "basic_demo_wifi.h"
@@ -231,6 +232,11 @@ static void ass_push_to_panel(void)
     if (!s_state.panel || !s_state.fb) {
         return;
     }
+    /* Take the shared SPI-bus mutex around the entire flush so an SDSPI
+     * polling transaction on the same host (e.g. an HTTP file upload to
+     * /sdcard) cannot interleave with our queued LCD DMA bursts and trip
+     * the spi_hal_setup_trans assert (`spi_ll_get_running_cmd(hw) == 0`). */
+    bool spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
     /*
      * The framebuffer lives in PSRAM (not DMA-capable). If we hand a PSRAM
      * pointer to esp_lcd_panel_draw_bitmap, the SPI master tries to allocate
@@ -274,6 +280,9 @@ static void ass_push_to_panel(void)
             ESP_LOGW(TAG, "draw_bitmap stripe y=%d rows=%d failed: %s",
                      y, rows, esp_err_to_name(err));
             /* Stop on first failure to avoid cascading log spam. */
+            if (spi_locked) {
+                spi_bus_arbiter_unlock();
+            }
             return;
         }
         /*
@@ -293,6 +302,9 @@ static void ass_push_to_panel(void)
             (void)esp_lcd_panel_io_tx_param(s_state.io, -1, NULL, 0);
         }
         y += rows;
+    }
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
     }
 }
 
@@ -688,20 +700,28 @@ static void ass_paint_messages(void)
             ass_fill_rect(ass_rgb565(0x18, 0x24, 0x40),
                           0, y - 1, s_state.width, 1);
 
-            /* ---- Line 1: channel + sender (truncated with ellipsis) ----- */
+            /* ---- Line 1: channel + timestamp (right-aligned) ----- */
             const char *ch = ass_pretty_channel(e.channel);
             ass_draw_text(ASS_FONT_BODY, ass_channel_color(e.channel), 8, y, ch);
-            int ch_w = ass_text_width(ASS_FONT_BODY, ch);
 
-            int sender_x = 8 + ch_w + 8;
-            int sender_max_px = s_state.width - sender_x - 8;
-            if (e.sender[0] != '\0' && sender_max_px > 0) {
-                char sender_clip[40];
-                ass_clip_text_to_width(ASS_FONT_BODY, e.sender,
-                                       sender_max_px,
-                                       sender_clip, sizeof(sender_clip));
+            /* Format timestamp as MM-DD HH:MM:SS using local time. */
+            char ts_buf[24];
+            ts_buf[0] = '\0';
+            if (e.timestamp_ms > 0) {
+                time_t secs = (time_t)(e.timestamp_ms / 1000);
+                struct tm tm_info;
+                if (localtime_r(&secs, &tm_info)) {
+                    strftime(ts_buf, sizeof(ts_buf), "%m-%d %H:%M:%S", &tm_info);
+                }
+            }
+            if (ts_buf[0] != '\0') {
+                int ts_w = ass_text_width(ASS_FONT_BODY, ts_buf);
+                int ts_x = s_state.width - 8 - ts_w;
+                if (ts_x < 8 + ass_text_width(ASS_FONT_BODY, ch) + 8) {
+                    ts_x = 8 + ass_text_width(ASS_FONT_BODY, ch) + 8;
+                }
                 ass_draw_text(ASS_FONT_BODY, ESP_PAINTER_COLOR_DARKGREY,
-                              sender_x, y, sender_clip);
+                              ts_x, y, ts_buf);
             }
 
             /* ---- Line 2: message text (single-line, truncated) ----- */

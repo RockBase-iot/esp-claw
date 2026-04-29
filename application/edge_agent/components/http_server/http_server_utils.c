@@ -108,8 +108,44 @@ esp_err_t http_server_resolve_storage_path(const char *relative_path, char *full
         return ESP_ERR_INVALID_ARG;
     }
 
+    /* Check whether the request targets one of the registered virtual
+     * mounts (e.g. "/sdcard" or "/sdcard/sub/file.txt"). If so, swap the
+     * vroot prefix for the backing real path. */
+    const http_server_extra_mount_t *m = http_server_match_extra_mount(relative_path);
+    if (m) {
+        const char *tail = relative_path + strlen(m->vroot);
+        /* tail is either "" or starts with '/' */
+        int written = snprintf(full_path, full_path_size, "%s%s",
+                               m->real_path, tail);
+        return (written <= 0 || (size_t)written >= full_path_size)
+               ? ESP_ERR_INVALID_SIZE : ESP_OK;
+    }
+
     int written = snprintf(full_path, full_path_size, "%s%s", ctx->storage_base_path, relative_path);
     return (written <= 0 || (size_t)written >= full_path_size) ? ESP_ERR_INVALID_SIZE : ESP_OK;
+}
+
+const http_server_extra_mount_t *http_server_match_extra_mount(const char *relative_path)
+{
+    if (!relative_path || relative_path[0] != '/') {
+        return NULL;
+    }
+    http_server_ctx_t *ctx = http_server_ctx();
+    for (int i = 0; i < HTTP_SERVER_MAX_EXTRA_MOUNTS; ++i) {
+        const http_server_extra_mount_t *m = &ctx->extra_mounts[i];
+        if (m->vroot[0] == '\0') {
+            continue;
+        }
+        size_t vlen = strlen(m->vroot);
+        if (strncmp(relative_path, m->vroot, vlen) != 0) {
+            continue;
+        }
+        char next = relative_path[vlen];
+        if (next == '\0' || next == '/') {
+            return m;
+        }
+    }
+    return NULL;
 }
 
 bool http_server_build_child_relative_path(const char *base_path,

@@ -17,6 +17,7 @@
 #include "captive_dns.h"
 #include "claw_skill.h"
 #include "config_http_server.h"
+#include "sdcard_mount.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include <stdint.h>
@@ -44,8 +45,10 @@ static basic_demo_settings_t s_settings = {0};
 static void on_touch_tap(int x, int y, int pressure, void *user_ctx)
 {
     (void)user_ctx;
-    /* The user explicitly asked: only print, do NOT change the page. */
-    ESP_LOGI(TAG, "touch tap (%d, %d) pressure=%d", x, y, pressure);
+    /* Keep this hook as lightweight telemetry only. Page switching is
+     * handled on TAP gesture (press->release) to avoid accidental toggles
+     * during drags and to trigger exactly once per touch sequence. */
+    ESP_LOGI(TAG, "touch press (%d, %d) pressure=%d", x, y, pressure);
 }
 
 static void on_touch_gesture(app_touch_gesture_t gesture,
@@ -68,7 +71,11 @@ static void on_touch_gesture(app_touch_gesture_t gesture,
         break;
     case APP_TOUCH_GESTURE_SWIPE_LEFT:
     case APP_TOUCH_GESTURE_SWIPE_RIGHT:
+        break;
     case APP_TOUCH_GESTURE_TAP:
+        ESP_LOGI(TAG, "tap -> next page");
+        app_status_screen_next_page();
+        break;
     default:
         break;
     }
@@ -308,7 +315,8 @@ void app_main(void)
         ESP_LOGW(TAG, "BOOT button init failed: %s", esp_err_to_name(btn_err));
     }
 
-    /* XPT2046 resistive touch -> just log the screen-mapped coordinates. */
+    /* XPT2046 resistive touch: tap toggles status/messages page,
+     * swipe up/down scrolls the messages page. */
     {
         app_touch_xpt2046_config_t tcfg = {
             .host          = SPI2_HOST,
@@ -342,8 +350,52 @@ void app_main(void)
     ESP_ERROR_CHECK(app_expression_emote_start());
 #endif
     ESP_ERROR_CHECK(init_fatfs());
+
+    /* Try to mount an SD card if the board exposes one. Best-effort: failure
+     * (no card / no slot) is not fatal. */
+    bool sd_available = (sdcard_mount_init() == ESP_OK);
+    ESP_LOGI(TAG, "SD card status: %s%s%s",
+             sd_available ? "mounted at " : "unavailable",
+             sd_available ? sdcard_mount_get_mount_point() : "",
+             sd_available ? "" : " (no card / no fs_sdcard device / mount failed)");
+
+    /* Persist incoming IM messages as JSONL: prefer SD card if mounted,
+     * otherwise fall back to the on-board FATFS partition. */
+    {
+        char inbox_dir[160];
+        const char *root = sd_available ? sdcard_mount_get_mount_point()
+                                        : basic_demo_fatfs_base_path;
+        snprintf(inbox_dir, sizeof(inbox_dir), "%s/inbox", root);
+        app_message_inbox_set_persist_dir(inbox_dir);
+        /* Restore the most recent persisted messages so the queue survives
+         * reboots. 0 means "use the ring buffer's full capacity". */
+        app_message_inbox_load_persisted(0);
+    }
+
     ESP_ERROR_CHECK(basic_demo_wifi_init());
     ESP_ERROR_CHECK(config_http_server_init(basic_demo_fatfs_base_path));
+    /* Always register the /sdcard virtual mount, even if no card is currently
+     * present. The alive_cb (sdcard_mount_alive_or_remount) hides the row
+     * when no card is mounted and transparently mounts a freshly inserted
+     * card on the next web refresh. The actual mount point string used at
+     * registration time is the one from the board YAML — we resolve it
+     * lazily via sdcard_mount_get_mount_point() at use sites only when the
+     * card is mounted. For the registration we just use the conventional
+     * "/sdcard". */
+    {
+        const char *mp = sd_available ? sdcard_mount_get_mount_point() : "/sdcard";
+        if (!mp) {
+            mp = "/sdcard";
+        }
+        ESP_LOGI(TAG, "registering /sdcard -> %s as virtual mount (sd_available=%d)",
+                 mp, sd_available);
+        esp_err_t mount_err = config_http_server_register_mount("/sdcard", mp, "sd",
+                                                                sdcard_mount_alive_or_remount);
+        if (mount_err != ESP_OK) {
+            ESP_LOGW(TAG, "register sdcard virtual mount failed: %s",
+                     esp_err_to_name(mount_err));
+        }
+    }
     ESP_ERROR_CHECK(basic_demo_wifi_register_state_callback(on_wifi_state_changed, NULL));
 
     esp_err_t wifi_err = basic_demo_wifi_start(s_settings.wifi_ssid, s_settings.wifi_password);

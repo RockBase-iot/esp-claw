@@ -27,6 +27,7 @@
 #include "app_touch_xpt2046.h"
 #include "app_boot_button.h"
 #include "claw_event_publisher.h"
+#include "sdcard_mount.h"
 
 #define APP_FATFS_PARTITION_LABEL "storage"
 #define APP_ENABLE_MEM_LOG        (0)
@@ -79,14 +80,16 @@ static void on_wifi_state_changed(bool connected, void *user_ctx)
     wifi_manager_status_t status = {0};
     wifi_manager_get_status(&status);
     const char *ap_ssid = status.ap_active ? status.ap_ssid : NULL;
+    const char *sta_ip = (connected && status.sta_ip) ? status.sta_ip : NULL;
 
-    ESP_LOGI(TAG, "Wi-Fi state: sta_connected=%d ap_active=%d mode=%s ap_ssid=%s",
+    ESP_LOGI(TAG, "Wi-Fi state: sta_connected=%d ap_active=%d mode=%s ap_ssid=%s sta_ip=%s",
              connected,
              status.ap_active,
              status.mode ? status.mode : "off",
-             ap_ssid ? ap_ssid : "(none)");
+             ap_ssid ? ap_ssid : "(none)",
+             sta_ip ? sta_ip : "(none)");
 
-    esp_err_t err = app_claw_set_network_status(connected, ap_ssid);
+    esp_err_t err = app_claw_set_network_status(connected, ap_ssid, sta_ip);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to update network emote: %s", esp_err_to_name(err));
     }
@@ -412,6 +415,25 @@ void app_main(void)
     ESP_ERROR_CHECK(app_claw_ui_start());
     ESP_ERROR_CHECK(init_fatfs());
 
+    /* Persist incoming IM messages as JSONL into the inbox directory.
+     * Best-effort — failures are logged but non-fatal. Prefer SD card if
+     * we manage to mount one. */
+    bool sd_available = (sdcard_mount_init() == ESP_OK);
+    ESP_LOGI(TAG, "SD card status: %s%s%s",
+             sd_available ? "mounted at " : "unavailable",
+             sd_available ? sdcard_mount_get_mount_point() : "",
+             sd_available ? "" : " (no card / no fs_sdcard device / mount failed)");
+    {
+        char inbox_dir[160];
+        const char *root = sd_available ? sdcard_mount_get_mount_point()
+                                        : app_fatfs_base_path;
+        snprintf(inbox_dir, sizeof(inbox_dir), "%s/inbox", root);
+        app_message_inbox_set_persist_dir(inbox_dir);
+        /* Restore the most recent persisted messages so the queue survives
+         * reboots. 0 means "use the ring buffer's full capacity". */
+        app_message_inbox_load_persisted(0);
+    }
+
     ESP_ERROR_CHECK(wifi_manager_init());
     ESP_ERROR_CHECK(http_server_init(&(http_server_config_t) {
         .storage_base_path = app_fatfs_base_path,
@@ -427,6 +449,24 @@ void app_main(void)
 #endif
         },
     }));
+    /* Always register the /sdcard virtual mount, even if no card is currently
+     * present. The alive_cb (sdcard_mount_alive_or_remount) hides the row
+     * when no card is mounted and transparently mounts a freshly inserted
+     * card on the next web refresh. */
+    {
+        const char *mp = sd_available ? sdcard_mount_get_mount_point() : "/sdcard";
+        if (!mp) {
+            mp = "/sdcard";
+        }
+        ESP_LOGI(TAG, "registering /sdcard -> %s as virtual mount (sd_available=%d)",
+                 mp, sd_available);
+        esp_err_t mount_err = http_server_register_mount("/sdcard", mp, "sd",
+                                                         sdcard_mount_alive_or_remount);
+        if (mount_err != ESP_OK) {
+            ESP_LOGW(TAG, "register sdcard virtual mount failed: %s",
+                     esp_err_to_name(mount_err));
+        }
+    }
     ESP_ERROR_CHECK(wifi_manager_register_state_callback(on_wifi_state_changed, NULL));
 
     esp_err_t wifi_err = wifi_manager_start(&(wifi_manager_config_t) {

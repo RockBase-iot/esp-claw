@@ -17,6 +17,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "spi_bus_arbiter.h"
 
 static const char *LUA_LCD_TOUCH_STATE_KEY = "esp-claw.lcd_touch_state";
 
@@ -54,7 +55,16 @@ static void lua_lcd_touch_int_task(void *arg)
     SemaphoreHandle_t sem = (SemaphoreHandle_t)tp->config.user_data;
     while (1) {
         if (xSemaphoreTake(sem, portMAX_DELAY) == pdTRUE) {
+            /* Touch controller shares SPI2_HOST with LCD/SD on this board.
+             * esp_lcd_touch_read_data uses polling SPI; if an LCD DMA is
+             * still in flight the polling driver asserts in
+             * spi_hal_setup_trans. Take the bus arbiter (recursive) for
+             * the duration of the read. */
+            bool spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
             (void)esp_lcd_touch_read_data(tp);
+            if (spi_locked) {
+                spi_bus_arbiter_unlock();
+            }
         }
     }
 }
@@ -113,7 +123,12 @@ static esp_err_t lua_lcd_touch_read_raw(esp_lcd_touch_handle_t touch_handle,
     if (touch_handle->config.interrupt_callback != NULL) {
         lua_lcd_touch_ensure_int_task(touch_handle);
     } else {
+        /* See note above: serialize with LCD/SD on the shared SPI host. */
+        bool spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
         (void)esp_lcd_touch_read_data(touch_handle);
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
     }
 
     err = esp_lcd_touch_get_data(touch_handle, points, &point_count, 1);

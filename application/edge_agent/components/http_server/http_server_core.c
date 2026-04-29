@@ -92,3 +92,66 @@ esp_err_t http_server_stop(void)
     }
     return err;
 }
+
+esp_err_t http_server_register_mount(const char *vroot,
+                                     const char *real_path,
+                                     const char *label,
+                                     http_server_mount_alive_cb_t alive_cb)
+{
+    if (!vroot || vroot[0] != '/' || !real_path || real_path[0] != '/') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    int free_slot = -1;
+    int match_slot = -1;
+    for (int i = 0; i < HTTP_SERVER_MAX_EXTRA_MOUNTS; ++i) {
+        if (s_ctx.extra_mounts[i].vroot[0] == '\0') {
+            if (free_slot < 0) {
+                free_slot = i;
+            }
+            continue;
+        }
+        if (strcmp(s_ctx.extra_mounts[i].vroot, vroot) == 0) {
+            match_slot = i;
+            break;
+        }
+    }
+
+    int target = (match_slot >= 0) ? match_slot : free_slot;
+    if (target < 0) {
+        return ESP_ERR_NO_MEM;
+    }
+    memset(&s_ctx.extra_mounts[target], 0, sizeof(s_ctx.extra_mounts[target]));
+    strlcpy(s_ctx.extra_mounts[target].vroot, vroot,
+            sizeof(s_ctx.extra_mounts[target].vroot));
+    strlcpy(s_ctx.extra_mounts[target].real_path, real_path,
+            sizeof(s_ctx.extra_mounts[target].real_path));
+    if (label) {
+        strlcpy(s_ctx.extra_mounts[target].label, label,
+                sizeof(s_ctx.extra_mounts[target].label));
+    }
+    s_ctx.extra_mounts[target].alive_cb = alive_cb;
+    ESP_LOGI(TAG, "extra mount registered [slot=%d]: vroot=%s -> real=%s label=%s alive_cb=%p",
+             target,
+             s_ctx.extra_mounts[target].vroot,
+             s_ctx.extra_mounts[target].real_path,
+             s_ctx.extra_mounts[target].label[0] ? s_ctx.extra_mounts[target].label : "(none)",
+             alive_cb);
+    return ESP_OK;
+}
+
+esp_err_t http_server_unregister_mount(const char *vroot)
+{
+    if (!vroot || vroot[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+    for (int i = 0; i < HTTP_SERVER_MAX_EXTRA_MOUNTS; ++i) {
+        if (s_ctx.extra_mounts[i].vroot[0] != '\0' &&
+                strcmp(s_ctx.extra_mounts[i].vroot, vroot) == 0) {
+            ESP_LOGI(TAG, "extra mount unregistered [slot=%d]: vroot=%s", i, vroot);
+            memset(&s_ctx.extra_mounts[i], 0, sizeof(s_ctx.extra_mounts[i]));
+            return ESP_OK;
+        }
+    }
+    return ESP_ERR_NOT_FOUND;
+}

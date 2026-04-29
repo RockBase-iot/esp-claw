@@ -869,6 +869,16 @@ function renderFileRows(entries) {
 
       const tdName = document.createElement("td");
       tdName.textContent = entry.name;
+      if (entry.mount) {
+        const badge = document.createElement("span");
+        badge.className = "mount-badge mount-badge-" + entry.mount;
+        badge.textContent = entry.mount.toUpperCase();
+        badge.style.cssText =
+          "display:inline-block;margin-left:8px;padding:1px 6px;" +
+          "font-size:11px;font-weight:600;border-radius:4px;" +
+          "background:#3b82f6;color:#fff;letter-spacing:0.5px;";
+        tdName.appendChild(badge);
+      }
       row.appendChild(tdName);
 
       const tdType = document.createElement("td");

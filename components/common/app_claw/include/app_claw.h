@@ -59,7 +59,7 @@ typedef struct {
 esp_err_t app_claw_start(const app_claw_config_t *config,
                          const app_claw_storage_paths_t *paths);
 esp_err_t app_claw_ui_start(void);
-esp_err_t app_claw_set_network_status(bool sta_connected, const char *ap_ssid);
+esp_err_t app_claw_set_network_status(bool sta_connected, const char *ap_ssid, const char *sta_ip);
 
 #ifdef __cplusplus
 }

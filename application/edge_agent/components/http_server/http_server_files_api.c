@@ -13,11 +13,31 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "spi_bus_arbiter.h"
+
+static const char *FILES_API_TAG = "http_files";
+
 static esp_err_t files_list_handler(httpd_req_t *req)
 {
     char relative_path[HTTP_SERVER_PATH_MAX] = "/";
     if (http_server_query_get(req, "path", relative_path, sizeof(relative_path)) != ESP_OK) {
         strlcpy(relative_path, "/", sizeof(relative_path));
+    }
+
+    /* If the request targets a virtual mount whose backing storage has gone
+     * away (e.g. SD card pulled), report a clean error instead of letting
+     * opendir() spin against the dead device. The slot is kept registered
+     * so future refreshes can re-probe (e.g. card re-inserted). */
+    const http_server_extra_mount_t *target_mount =
+        http_server_match_extra_mount(relative_path);
+    if (target_mount && target_mount->alive_cb && !target_mount->alive_cb()) {
+        ESP_LOGW(FILES_API_TAG, "virtual mount %s not currently available",
+                 target_mount->vroot);
+        return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND,
+                                   "Mount not available");
     }
 
     char full_path[HTTP_SERVER_PATH_MAX];
@@ -74,6 +94,44 @@ static esp_err_t files_list_handler(httpd_req_t *req)
     }
 
     closedir(dir);
+
+    /* When listing the default root, inject one synthetic entry per
+     * registered virtual mount (e.g. an "/sdcard" SD-card link).
+     * Slots whose alive_cb returns false are simply hidden — the slot
+     * itself is kept so a future refresh can revive the mount. */
+    if (strcmp(relative_path, "/") == 0) {
+        http_server_ctx_t *ctx = http_server_ctx();
+        int injected = 0;
+        for (int i = 0; i < HTTP_SERVER_MAX_EXTRA_MOUNTS; ++i) {
+            const http_server_extra_mount_t *m = &ctx->extra_mounts[i];
+            if (m->vroot[0] == '\0') {
+                continue;
+            }
+            if (m->alive_cb && !m->alive_cb()) {
+                ESP_LOGD(FILES_API_TAG, "hiding inactive virtual mount %s",
+                         m->vroot);
+                continue;
+            }
+            const char *name = m->vroot[0] == '/' ? m->vroot + 1 : m->vroot;
+            cJSON *item = cJSON_CreateObject();
+            if (!item) {
+                continue;
+            }
+            http_server_json_add_string(item, "name", name);
+            http_server_json_add_string(item, "path", m->vroot);
+            cJSON_AddBoolToObject(item, "is_dir", true);
+            cJSON_AddNumberToObject(item, "size", 0);
+            if (m->label[0]) {
+                http_server_json_add_string(item, "mount", m->label);
+            } else {
+                http_server_json_add_string(item, "mount", "ext");
+            }
+            cJSON_AddItemToArray(entries, item);
+            injected++;
+        }
+        ESP_LOGI(FILES_API_TAG, "list / : injected %d extra-mount entries", injected);
+    }
+
     return http_server_send_json_response(req, root);
 }
 
@@ -108,8 +166,16 @@ static esp_err_t file_download_handler(httpd_req_t *req)
 
     httpd_resp_set_type(req, "application/octet-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
+    bool needs_spi_lock = http_server_match_extra_mount(relative_path) != NULL;
     while (!feof(file)) {
+        bool spi_locked = false;
+        if (needs_spi_lock) {
+            spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+        }
         size_t read_bytes = fread(scratch, 1, HTTP_SERVER_SCRATCH_SIZE, file);
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
         if (read_bytes > 0 && httpd_resp_send_chunk(req, scratch, read_bytes) != ESP_OK) {
             free(scratch);
             fclose(file);
@@ -128,8 +194,19 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
     if (http_server_query_get(req, "path", relative_path, sizeof(relative_path)) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing path");
     }
-    if (req->content_len <= 0 || req->content_len > HTTP_SERVER_UPLOAD_MAX_SIZE) {
+    if (req->content_len <= 0) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid upload size");
+    }
+    /* Allow much larger uploads when the destination is a registered virtual
+     * mount (SD card etc.); cap stays small for the on-chip FATFS partition. */
+    size_t max_size = http_server_match_extra_mount(relative_path)
+                      ? HTTP_SERVER_UPLOAD_MAX_SIZE_SD
+                      : HTTP_SERVER_UPLOAD_MAX_SIZE;
+    if ((size_t)req->content_len > max_size) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "Upload too large (max %u bytes)",
+                 (unsigned)max_size);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, msg);
     }
 
     char full_path[HTTP_SERVER_PATH_MAX];
@@ -163,21 +240,53 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
         return ESP_ERR_NO_MEM;
     }
 
+    /* If the upload targets a virtual mount (SD card on a shared SPI host),
+     * take the SPI bus arbiter around each fwrite() so the LCD/touch drivers
+     * on the same host cannot interleave with SDSPI polling and trigger
+     * the spi_hal_setup_trans assert. We lock per-chunk (not for the whole
+     * upload) so display refresh is not blocked for the whole transfer. */
+    bool needs_spi_lock = http_server_match_extra_mount(relative_path) != NULL;
+
     int remaining = req->content_len;
     while (remaining > 0) {
         int chunk = remaining > HTTP_SERVER_SCRATCH_SIZE ? HTTP_SERVER_SCRATCH_SIZE : remaining;
         int received = httpd_req_recv(req, scratch, chunk);
-        if (received <= 0 || fwrite(scratch, 1, received, file) != (size_t)received) {
+        if (received <= 0) {
             free(scratch);
             fclose(file);
             unlink(full_path);
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Upload failed");
         }
+        bool spi_locked = false;
+        if (needs_spi_lock) {
+            spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+        }
+        size_t written = fwrite(scratch, 1, received, file);
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
+        if (written != (size_t)received) {
+            free(scratch);
+            fclose(file);
+            unlink(full_path);
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Upload failed");
+        }
+        /* Yield so the IDLE task on this single-core target can run and
+         * reset the watchdog. SDSPI writes at low frequency can keep the
+         * httpd task hot for many seconds otherwise. */
+        vTaskDelay(1);
         remaining -= received;
     }
 
     free(scratch);
-    fclose(file);
+    bool spi_locked = false;
+    if (needs_spi_lock) {
+        spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+    }
+    fclose(file);   /* may issue final SDSPI writes for the BPB / FAT cache */
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
+    }
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
     return httpd_resp_sendstr(req, "{\"ok\":true}");

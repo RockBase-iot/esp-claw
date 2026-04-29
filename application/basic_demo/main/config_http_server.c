@@ -21,6 +21,9 @@
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "spi_bus_arbiter.h"
 
 static const char *TAG = "config_http";
 
@@ -28,6 +31,8 @@ static const char *TAG = "config_http";
 #define CONFIG_HTTP_SCRATCH_SIZE      4096
 #define CONFIG_HTTP_PATH_MAX          256
 #define CONFIG_HTTP_UPLOAD_MAX_SIZE   (512 * 1024)
+/* Larger cap for uploads targeting a registered virtual mount (SD card). */
+#define CONFIG_HTTP_UPLOAD_MAX_SIZE_SD (64 * 1024 * 1024)
 
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
@@ -38,12 +43,46 @@ extern const uint8_t app_js_end[] asm("_binary_app_js_end");
 extern const uint8_t lean_qr_min_mjs_start[] asm("_binary_lean_qr_min_mjs_start");
 extern const uint8_t lean_qr_min_mjs_end[] asm("_binary_lean_qr_min_mjs_end");
 
+typedef bool (*config_http_server_mount_alive_cb_t)(void);
+
+typedef struct {
+    char vroot[64];
+    char real_path[64];
+    char label[16];
+    config_http_server_mount_alive_cb_t alive_cb;
+} config_http_server_extra_mount_t;
+
+#define CONFIG_HTTP_MAX_EXTRA_MOUNTS 4
+
 typedef struct {
     httpd_handle_t server;
     char storage_base_path[CONFIG_HTTP_PATH_MAX];
+    config_http_server_extra_mount_t extra_mounts[CONFIG_HTTP_MAX_EXTRA_MOUNTS];
 } config_http_server_ctx_t;
 
 static config_http_server_ctx_t s_ctx = {0};
+
+static const config_http_server_extra_mount_t *match_extra_mount(const char *relative_path)
+{
+    if (!relative_path || relative_path[0] != '/') {
+        return NULL;
+    }
+    for (int i = 0; i < CONFIG_HTTP_MAX_EXTRA_MOUNTS; ++i) {
+        const config_http_server_extra_mount_t *m = &s_ctx.extra_mounts[i];
+        if (m->vroot[0] == '\0') {
+            continue;
+        }
+        size_t vlen = strlen(m->vroot);
+        if (strncmp(relative_path, m->vroot, vlen) != 0) {
+            continue;
+        }
+        char next = relative_path[vlen];
+        if (next == '\0' || next == '/') {
+            return m;
+        }
+    }
+    return NULL;
+}
 
 static char *alloc_scratch_buffer(void)
 {
@@ -512,6 +551,17 @@ static esp_err_t resolve_storage_path(const char *relative_path, char *full_path
         return ESP_ERR_INVALID_ARG;
     }
 
+    const config_http_server_extra_mount_t *m = match_extra_mount(relative_path);
+    if (m) {
+        const char *tail = relative_path + strlen(m->vroot);
+        int written = snprintf(full_path, full_path_size, "%s%s",
+                               m->real_path, tail);
+        if (written <= 0 || (size_t)written >= full_path_size) {
+            return ESP_ERR_INVALID_SIZE;
+        }
+        return ESP_OK;
+    }
+
     int written = snprintf(full_path, full_path_size, "%s%s", s_ctx.storage_base_path, relative_path);
     if (written <= 0 || (size_t)written >= full_path_size) {
         return ESP_ERR_INVALID_SIZE;
@@ -549,6 +599,17 @@ static esp_err_t files_list_handler(httpd_req_t *req)
     char relative_path[CONFIG_HTTP_PATH_MAX] = "/";
     if (query_get(req, "path", relative_path, sizeof(relative_path)) != ESP_OK) {
         strlcpy(relative_path, "/", sizeof(relative_path));
+    }
+
+    /* If the request targets a virtual mount whose backing storage has gone
+     * away (e.g. SD card pulled), report a clean error instead of letting
+     * opendir() spin against the dead device. The slot is kept registered
+     * so future refreshes can re-probe (e.g. card re-inserted). */
+    const config_http_server_extra_mount_t *target_mount = match_extra_mount(relative_path);
+    if (target_mount && target_mount->alive_cb && !target_mount->alive_cb()) {
+        ESP_LOGW(TAG, "virtual mount %s not currently available", target_mount->vroot);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Mount not available");
+        return ESP_FAIL;
     }
 
     char full_path[CONFIG_HTTP_PATH_MAX];
@@ -611,6 +672,37 @@ static esp_err_t files_list_handler(httpd_req_t *req)
 
     closedir(dir);
 
+    /* When listing the default root, append a synthetic entry per
+     * registered virtual mount (e.g. SD card). Slots whose alive_cb
+     * returns false are simply hidden — the slot itself is kept so a
+     * future refresh can revive the mount. */
+    if (strcmp(relative_path, "/") == 0) {
+        int injected = 0;
+        for (int i = 0; i < CONFIG_HTTP_MAX_EXTRA_MOUNTS; ++i) {
+            const config_http_server_extra_mount_t *m = &s_ctx.extra_mounts[i];
+            if (m->vroot[0] == '\0') {
+                continue;
+            }
+            if (m->alive_cb && !m->alive_cb()) {
+                ESP_LOGD(TAG, "hiding inactive virtual mount %s", m->vroot);
+                continue;
+            }
+            const char *name = m->vroot[0] == '/' ? m->vroot + 1 : m->vroot;
+            cJSON *item = cJSON_CreateObject();
+            if (!item) {
+                continue;
+            }
+            json_add_string(item, "name", name);
+            json_add_string(item, "path", m->vroot);
+            cJSON_AddBoolToObject(item, "is_dir", true);
+            cJSON_AddNumberToObject(item, "size", 0);
+            json_add_string(item, "mount", m->label[0] ? m->label : "ext");
+            cJSON_AddItemToArray(entries, item);
+            injected++;
+        }
+        ESP_LOGI(TAG, "list / : injected %d extra-mount entries", injected);
+    }
+
     char *payload = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (!payload) {
@@ -660,8 +752,16 @@ static esp_err_t file_download_handler(httpd_req_t *req)
 
     httpd_resp_set_type(req, "application/octet-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
+    bool needs_spi_lock = match_extra_mount(relative_path) != NULL;
     while (!feof(file)) {
+        bool spi_locked = false;
+        if (needs_spi_lock) {
+            spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+        }
         size_t read_bytes = fread(scratch, 1, CONFIG_HTTP_SCRATCH_SIZE, file);
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
         if (read_bytes > 0 && httpd_resp_send_chunk(req, scratch, read_bytes) != ESP_OK) {
             free(scratch);
             fclose(file);
@@ -682,8 +782,19 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (req->content_len <= 0 || req->content_len > CONFIG_HTTP_UPLOAD_MAX_SIZE) {
+    if (req->content_len <= 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid upload size");
+        return ESP_ERR_INVALID_SIZE;
+    }
+    /* Allow large uploads when the destination is an SD-card mount. */
+    size_t max_size = match_extra_mount(relative_path)
+                      ? CONFIG_HTTP_UPLOAD_MAX_SIZE_SD
+                      : CONFIG_HTTP_UPLOAD_MAX_SIZE;
+    if ((size_t)req->content_len > max_size) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "Upload too large (max %u bytes)",
+                 (unsigned)max_size);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, msg);
         return ESP_ERR_INVALID_SIZE;
     }
 
@@ -722,6 +833,11 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
         return ESP_ERR_NO_MEM;
     }
 
+    /* See spi_bus_arbiter rationale: lock around each fwrite() when target
+     * is on a shared SPI bus (SD card) so SDSPI polling does not collide
+     * with concurrent LCD DMA bursts. */
+    bool needs_spi_lock = match_extra_mount(relative_path) != NULL;
+
     int remaining = req->content_len;
     while (remaining > 0) {
         int chunk = remaining > CONFIG_HTTP_SCRATCH_SIZE ? CONFIG_HTTP_SCRATCH_SIZE : remaining;
@@ -734,7 +850,15 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
             return ESP_FAIL;
         }
 
-        if (fwrite(scratch, 1, received, file) != (size_t)received) {
+        bool spi_locked = false;
+        if (needs_spi_lock) {
+            spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+        }
+        size_t written = fwrite(scratch, 1, received, file);
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
+        if (written != (size_t)received) {
             free(scratch);
             fclose(file);
             unlink(full_path);
@@ -742,11 +866,25 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
             return ESP_FAIL;
         }
 
+        /* Yield so the IDLE task on this single-core target can run and
+         * reset the watchdog. SDSPI writes at low frequency can keep the
+         * httpd task hot for many seconds otherwise. */
+        vTaskDelay(1);
+
         remaining -= received;
     }
 
     free(scratch);
-    fclose(file);
+    {
+        bool spi_locked = false;
+        if (needs_spi_lock) {
+            spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+        }
+        fclose(file);   /* may flush FAT cache to SDSPI */
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
+    }
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
     return httpd_resp_sendstr(req, "{\"ok\":true}");
@@ -844,6 +982,70 @@ esp_err_t config_http_server_init(const char *storage_base_path)
 
     strlcpy(s_ctx.storage_base_path, storage_base_path, sizeof(s_ctx.storage_base_path));
     return ESP_OK;
+}
+
+esp_err_t config_http_server_register_mount(const char *vroot,
+                                            const char *real_path,
+                                            const char *label,
+                                            bool (*alive_cb)(void))
+{
+    if (!vroot || vroot[0] == '\0') {
+        return ESP_OK;  /* nothing to do */
+    }
+    if (vroot[0] != '/' || !real_path || real_path[0] != '/') {
+        return ESP_ERR_INVALID_ARG;
+    }
+    int free_slot = -1;
+    int match_slot = -1;
+    for (int i = 0; i < CONFIG_HTTP_MAX_EXTRA_MOUNTS; ++i) {
+        if (s_ctx.extra_mounts[i].vroot[0] == '\0') {
+            if (free_slot < 0) {
+                free_slot = i;
+            }
+            continue;
+        }
+        if (strcmp(s_ctx.extra_mounts[i].vroot, vroot) == 0) {
+            match_slot = i;
+            break;
+        }
+    }
+    int target = (match_slot >= 0) ? match_slot : free_slot;
+    if (target < 0) {
+        return ESP_ERR_NO_MEM;
+    }
+    memset(&s_ctx.extra_mounts[target], 0, sizeof(s_ctx.extra_mounts[target]));
+    strlcpy(s_ctx.extra_mounts[target].vroot, vroot,
+            sizeof(s_ctx.extra_mounts[target].vroot));
+    strlcpy(s_ctx.extra_mounts[target].real_path, real_path,
+            sizeof(s_ctx.extra_mounts[target].real_path));
+    if (label) {
+        strlcpy(s_ctx.extra_mounts[target].label, label,
+                sizeof(s_ctx.extra_mounts[target].label));
+    }
+    s_ctx.extra_mounts[target].alive_cb = alive_cb;
+    ESP_LOGI(TAG, "extra mount registered [slot=%d]: vroot=%s -> real=%s label=%s alive_cb=%p",
+             target,
+             s_ctx.extra_mounts[target].vroot,
+             s_ctx.extra_mounts[target].real_path,
+             s_ctx.extra_mounts[target].label[0] ? s_ctx.extra_mounts[target].label : "(none)",
+             alive_cb);
+    return ESP_OK;
+}
+
+esp_err_t config_http_server_unregister_mount(const char *vroot)
+{
+    if (!vroot || vroot[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+    for (int i = 0; i < CONFIG_HTTP_MAX_EXTRA_MOUNTS; ++i) {
+        if (s_ctx.extra_mounts[i].vroot[0] != '\0' &&
+                strcmp(s_ctx.extra_mounts[i].vroot, vroot) == 0) {
+            ESP_LOGI(TAG, "extra mount unregistered [slot=%d]: vroot=%s", i, vroot);
+            memset(&s_ctx.extra_mounts[i], 0, sizeof(s_ctx.extra_mounts[i]));
+            return ESP_OK;
+        }
+    }
+    return ESP_ERR_NOT_FOUND;
 }
 
 esp_err_t config_http_server_start(void)

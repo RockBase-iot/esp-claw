@@ -17,14 +17,34 @@
 #define HTTP_SERVER_SCRATCH_SIZE      4096
 #define HTTP_SERVER_PATH_MAX          256
 #define HTTP_SERVER_UPLOAD_MAX_SIZE   (512 * 1024)
+/* Larger cap for uploads targeting an extra-mount (e.g. SD card). The
+ * built-in FATFS partition is small (~3 MiB on this board) so we keep the
+ * conservative cap above; SD cards comfortably hold tens of MiB per file. */
+#define HTTP_SERVER_UPLOAD_MAX_SIZE_SD (64 * 1024 * 1024)
+#define HTTP_SERVER_MAX_EXTRA_MOUNTS  4
+
+typedef struct {
+    char vroot[64];          /* Virtual prefix, e.g. "/sdcard". Empty = slot unused. */
+    char real_path[64];      /* Backing VFS path, e.g. "/sdcard". */
+    char label[16];          /* UI tag, e.g. "sd". */
+    http_server_mount_alive_cb_t alive_cb; /* Optional health probe; NULL = always alive. */
+} http_server_extra_mount_t;
 
 typedef struct {
     httpd_handle_t server;
     char storage_base_path[HTTP_SERVER_PATH_MAX];
     http_server_services_t services;
+    http_server_extra_mount_t extra_mounts[HTTP_SERVER_MAX_EXTRA_MOUNTS];
 } http_server_ctx_t;
 
 http_server_ctx_t *http_server_ctx(void);
+
+/**
+ * @brief  If `relative_path` starts with one of the registered extra mount
+ *         prefixes (e.g. "/sdcard" or "/sdcard/..."), returns the matching
+ *         entry; otherwise NULL.
+ */
+const http_server_extra_mount_t *http_server_match_extra_mount(const char *relative_path);
 
 char *http_server_alloc_scratch_buffer(void);
 bool http_server_path_is_safe(const char *path);

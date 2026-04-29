@@ -1,11 +1,12 @@
 idf_component_register(
     SRCS
-        "src/lua_module_lcd_touch.c"
+        "sdcard_mount.c"
     INCLUDE_DIRS
         "include"
     REQUIRES
-        cap_lua
-        esp_lcd_touch
-        esp_timer
+        driver
+        fatfs
+        sdmmc
+        espressif__esp_board_manager
         spi_bus_arbiter
 )
