@@ -45,3 +45,9 @@ dependencies:
 
   wifi_manager:
     path: ../../../components/common/wifi_manager
+
+  display_arbiter:
+    path: ../../../components/common/display_arbiter
+
+  esp_painter:
+    path: ../../../components/common/esp_painter

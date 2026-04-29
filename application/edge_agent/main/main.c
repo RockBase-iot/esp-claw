@@ -22,6 +22,12 @@
 #endif
 #include "app_config.h"
 
+#include "app_message_inbox.h"
+#include "app_status_screen.h"
+#include "app_touch_xpt2046.h"
+#include "app_boot_button.h"
+#include "claw_event_publisher.h"
+
 #define APP_FATFS_PARTITION_LABEL "storage"
 #define APP_ENABLE_MEM_LOG        (0)
 
@@ -83,6 +89,68 @@ static void on_wifi_state_changed(bool connected, void *user_ctx)
     esp_err_t err = app_claw_set_network_status(connected, ap_ssid);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to update network emote: %s", esp_err_to_name(err));
+    }
+
+    if (s_config) {
+        app_status_screen_set_settings(s_config);
+    }
+    app_status_screen_request_refresh();
+}
+
+static void on_message_inbox_changed(void *user_ctx)
+{
+    (void)user_ctx;
+    app_status_screen_request_refresh();
+}
+
+static void on_im_message_observed(const char *channel,
+                                   const char *chat_id,
+                                   const char *sender_id,
+                                   const char *text,
+                                   int64_t timestamp_ms,
+                                   void *user_ctx)
+{
+    (void)chat_id;
+    (void)user_ctx;
+    app_message_inbox_record(channel, sender_id, text, timestamp_ms);
+}
+
+static void on_boot_button_pressed(void *user_ctx)
+{
+    (void)user_ctx;
+    ESP_LOGI(TAG, "BOOT pressed -> next page");
+    app_status_screen_next_page();
+}
+
+static void on_touch_tap(int x, int y, int pressure, void *user_ctx)
+{
+    (void)pressure;
+    (void)user_ctx;
+    ESP_LOGI(TAG, "Touch tap: x=%d y=%d", x, y);
+}
+
+static void on_touch_gesture(app_touch_gesture_t gesture,
+                             int start_x, int start_y,
+                             int end_x, int end_y,
+                             void *user_ctx)
+{
+    (void)start_x; (void)start_y; (void)end_x; (void)end_y; (void)user_ctx;
+    switch (gesture) {
+    case APP_TOUCH_GESTURE_TAP:
+        app_status_screen_next_page();
+        break;
+    case APP_TOUCH_GESTURE_SWIPE_UP:
+        app_status_screen_scroll_messages(1);
+        break;
+    case APP_TOUCH_GESTURE_SWIPE_DOWN:
+        app_status_screen_scroll_messages(-1);
+        break;
+    case APP_TOUCH_GESTURE_SWIPE_LEFT:
+    case APP_TOUCH_GESTURE_SWIPE_RIGHT:
+        app_status_screen_next_page();
+        break;
+    default:
+        break;
     }
 }
 
@@ -298,8 +366,52 @@ void app_main(void)
     app_config_to_claw(s_config, s_claw_config);
     init_timezone(app_config_get_timezone(s_config)); // no need to check error
     ESP_ERROR_CHECK(esp_board_manager_init());
+
+    /* UI helpers (status screen, inbox, BOOT key, touch) MUST be brought up
+     * before app_claw_ui_start(): emote_start() takes ownership of the panel
+     * via display_arbiter, so the splash is rendered first while the screen
+     * is still free, then emote takes over. */
+    ESP_ERROR_CHECK(app_message_inbox_init());
+    app_message_inbox_set_change_callback(on_message_inbox_changed, NULL);
+    claw_event_router_set_message_observer(on_im_message_observed, NULL);
+
+    esp_err_t splash_err = app_status_screen_init();
+    if (splash_err == ESP_OK) {
+        app_status_screen_set_settings(s_config);
+        app_status_screen_show_splash(2000);
+    } else if (splash_err != ESP_ERR_NOT_SUPPORTED) {
+        ESP_LOGW(TAG, "status screen init failed: %s", esp_err_to_name(splash_err));
+    }
+
+    esp_err_t boot_err = app_boot_button_init(28, on_boot_button_pressed, NULL);
+    if (boot_err != ESP_OK) {
+        ESP_LOGW(TAG, "BOOT button init failed: %s", esp_err_to_name(boot_err));
+    }
+
+    {
+        app_touch_xpt2046_config_t tcfg = {
+            .host = SPI2_HOST,
+            .cs_gpio = 1,
+            .irq_gpio = -1,
+            .screen_width = 320,
+            .screen_height = 240,
+            .calibration = {
+                .raw_x_min = 200, .raw_x_max = 3428,
+                .raw_y_min = 345, .raw_y_max = 3437,
+                .swap_xy = true, .invert_x = true, .invert_y = true,
+            },
+        };
+        esp_err_t touch_err = app_touch_xpt2046_init(&tcfg, on_touch_tap, NULL);
+        if (touch_err != ESP_OK) {
+            ESP_LOGW(TAG, "Touch init failed: %s", esp_err_to_name(touch_err));
+        } else {
+            app_touch_xpt2046_set_gesture_callback(on_touch_gesture, NULL);
+        }
+    }
+
     ESP_ERROR_CHECK(app_claw_ui_start());
     ESP_ERROR_CHECK(init_fatfs());
+
     ESP_ERROR_CHECK(wifi_manager_init());
     ESP_ERROR_CHECK(http_server_init(&(http_server_config_t) {
         .storage_base_path = app_fatfs_base_path,

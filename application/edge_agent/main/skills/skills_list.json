@@ -8,6 +8,30 @@
         "cap_time",
         "cap_web_search"
       ]
+    },
+    {
+      "id": "nm_cyd_c5_rgb",
+      "file": "nm_cyd_c5_rgb.md",
+      "summary": "Control the NM-CYD-C5 on-board WS2812 RGB LED on GPIO27. Use the single canonical script `nm_cyd_c5_rgb` with mode/color/brightness args; never hand-write led_strip or gpio code.",
+      "cap_groups": [
+        "cap_lua"
+      ]
+    },
+    {
+      "id": "nm_cyd_c5_screen",
+      "file": "nm_cyd_c5_screen.md",
+      "summary": "Control the NM-CYD-C5 on-board ST7789 LCD. Use the single canonical script `nm_cyd_c5_screen` (mode=color/text/message/clear) with synchronous run_lua_script; never hand-write display code or use async.",
+      "cap_groups": [
+        "cap_lua"
+      ]
+    },
+    {
+      "id": "nm_cyd_c5_backlight",
+      "file": "nm_cyd_c5_backlight.md",
+      "summary": "Adjust the NM-CYD-C5 LCD backlight brightness (0..100%) via the LEDC PWM on GPIO25. Use the single canonical script `nm_cyd_c5_backlight` with `percent` or `mode=on/off`; never hand-write ledc/gpio code.",
+      "cap_groups": [
+        "cap_lua"
+      ]
     }
   ]
 }
