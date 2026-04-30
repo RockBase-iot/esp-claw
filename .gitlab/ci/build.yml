@@ -43,9 +43,14 @@
     EXAMPLE_TARGET: ""
     EXAMPLE_APPEND_ARGS: ""
     EXAMPLE_BOARD: "default"
+    EXAMPLE_BOARD_PATH: "boards"
     BUILD_RECURSIVE: "1"
   script:
     - pip install idf_build_apps esp-bmgr-assist
+    - |
+      if [ -n "${EXAMPLE_BOARD_BRAND}" ]; then
+        export EXAMPLE_BOARD_PATH="boards/${EXAMPLE_BOARD_BRAND}"
+      fi
     - |
       python .gitlab/ci/build_apps.py ${EXAMPLE_DIR} \
               --config ${EXAMPLE_CONFIG} \
@@ -53,6 +58,7 @@
               -r ${BUILD_RECURSIVE} \
               -vv \
               --board ${EXAMPLE_BOARD} \
+              --board-path ${EXAMPLE_BOARD_PATH} \
               ${EXAMPLE_APPEND_ARGS}
     - python .gitlab/ci/merge_bin.py
 
@@ -89,28 +95,47 @@ build_application_edge_agent:
   extends:
     - .build_examples_template
     - .rules:build:application_edge_agent
+  variables:
+    IMAGE: espressif/idf:release-v5.5
+    EXAMPLE_DIR: application/edge_agent
   parallel:
     matrix:
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: esp32_S3_DevKitC_1
+      - EXAMPLE_BOARD: esp32_S3_DevKitC_1
         EXAMPLE_TARGET: esp32s3
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: esp32_S3_DevKitC_1_breadboard
+        EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: esp32_S3_DevKitC_1_breadboard
         EXAMPLE_TARGET: esp32s3
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: esp32_p4_function_ev
+        EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: esp32_p4_function_ev
         EXAMPLE_TARGET: esp32p4
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: esp32_p4x_function_ev
+        EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: esp32_p4x_function_ev
         EXAMPLE_TARGET: esp32p4
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: m5stack_sticks3
+        EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: m5stack_sticks3
         EXAMPLE_TARGET: esp32s3
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: m5stack_cores3
+        EXAMPLE_BOARD_BRAND: "m5stack"
+
+      - EXAMPLE_BOARD: m5stack_cores3
         EXAMPLE_TARGET: esp32s3
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: esp_vocat_board_v1_2
+        EXAMPLE_BOARD_BRAND: "m5stack"
+
+      - EXAMPLE_BOARD: esp_vocat_board_v1_2
         EXAMPLE_TARGET: esp32s3
-  variables:
-    EXAMPLE_DIR: application/edge_agent
+        EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: esp_box_3
+        EXAMPLE_TARGET: esp32s3
+        EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: dfrobot_k10
+        EXAMPLE_TARGET: esp32s3
+        EXAMPLE_BOARD_BRAND: "dfrobot"
+
+      - EXAMPLE_BOARD: lilygo_t_display_s3
+        EXAMPLE_TARGET: esp32s3
+        EXAMPLE_BOARD_BRAND: "lilygo"

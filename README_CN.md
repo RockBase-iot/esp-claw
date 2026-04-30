@@ -39,6 +39,11 @@
   <img alt="From traditional IoT to Edge Agent" src="./docs/static/from-traditional-iot-to-edge-agent.webp" width="90%" />
 </div>
 
+> [!NOTE]
+>
+> 我们正在将 Demo 从 [`basic_demo`](./application/basic_demo) 目录迁移至 [`edge_agent`](./application/edge_agent/) 目录。
+> 如您提交新的 PR，请向 `edge_agent` 目录提交修改。我们会在迁移工作结束后处理修改 `basic_demo` 的 PR。
+
 ## 🌟核心特性
 
 传统 IoT 只停留在连接层——设备能联网，却不能思考；能执行，却不能决策。ESP-Claw 将 Agent Runtime 下沉至乐鑫芯片，让芯片从被动的"执行端"转变为主动的"决策中心"。
@@ -168,9 +173,11 @@ ESP-Claw 目前已适配基于 ESP32-S3 的多款开发版，例如面包板、M
 
 **IM**: ESP-Claw 支持 Telegram、QQ、飞书、微信四大聊天软件，并可扩展。
 
-> ![NOTE]
->
-> 当前项目仍处于开发阶段，如遇问题欢迎提交 issue。
+## 🔧开发计划
+
+ESP-Claw 目前仍处于活跃开发阶段，欢迎向我们提交 Issue 反馈问题或提交 Feature 请求。也可以通过[在线问卷](https://fcn5wbhnyubf.feishu.cn/share/base/form/shrcndYcjbGFY1ymttTSyYoGIPh)告诉我们你的想法。
+
+[点此查看我们的 TODO List](https://fcn5wbhnyubf.feishu.cn/wiki/SRlgwWUYei4WmykU8uMcUtzTnFf?table=tblWSgzWcyW7jv7B&view=vewaP9B0KX)，为你心仪的 Feature / 关注的 Issue 投票，我们可以更早实现/修复！
 
 ## 📷关注我们
 

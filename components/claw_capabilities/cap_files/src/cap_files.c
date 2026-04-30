@@ -280,6 +280,7 @@ static esp_err_t cap_files_read_file_execute(const char *input_json,
     cJSON *root = NULL;
     const char *path = NULL;
     char resolved_path[256];
+    struct stat st = {0};
     FILE *file = NULL;
     size_t max_read;
     size_t read_size;
@@ -299,6 +300,29 @@ static esp_err_t cap_files_read_file_execute(const char *input_json,
         return ESP_ERR_INVALID_ARG;
     }
 
+    max_read = output_size - 1;
+    if (max_read > CAP_FILES_MAX_FILE_SIZE) {
+        max_read = CAP_FILES_MAX_FILE_SIZE;
+    }
+
+    if (stat(resolved_path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        cJSON_Delete(root);
+        snprintf(output, output_size, "Error: file not found: %s", resolved_path);
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (st.st_size > (off_t)max_read) {
+        ESP_LOGE(TAG, "read_file rejected oversized file %s: %ld > %u bytes",
+                 resolved_path, (long)st.st_size, (unsigned)max_read);
+        cJSON_Delete(root);
+        snprintf(output,
+                 output_size,
+                 "Error: file too large: %s (%ld bytes > %u bytes max)",
+                 resolved_path,
+                 (long)st.st_size,
+                 (unsigned)max_read);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
     file = fopen(resolved_path, "rb");
     if (!file) {
         cJSON_Delete(root);
@@ -306,12 +330,13 @@ static esp_err_t cap_files_read_file_execute(const char *input_json,
         return ESP_ERR_NOT_FOUND;
     }
 
-    max_read = output_size - 1;
-    if (max_read > CAP_FILES_MAX_FILE_SIZE) {
-        max_read = CAP_FILES_MAX_FILE_SIZE;
-    }
-
     read_size = fread(output, 1, max_read, file);
+    if (ferror(file)) {
+        fclose(file);
+        cJSON_Delete(root);
+        snprintf(output, output_size, "Error: failed to read file: %s", resolved_path);
+        return ESP_FAIL;
+    }
     output[read_size] = '\0';
     fclose(file);
     cJSON_Delete(root);

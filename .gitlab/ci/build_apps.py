@@ -34,6 +34,7 @@ except ImportError:
 logger = logging.getLogger('idf_build_apps')
 IDF_PATH = os.getenv('IDF_PATH', '')
 BOARD_NAME = 'default'
+BOARD_PATH = ''
 
 # Virtual board variants -> (real board for gen-bmgr-config, extra sdkconfig.defaults snippet)
 BOARD_VARIANTS: t.Dict[str, t.Tuple[str, str]] = {
@@ -103,6 +104,14 @@ class CustomApp(CMakeApp):
             check_app_dependencies=check_app_dependencies,
         )
 
+    def _resolve_board_path(self) -> t.Optional[Path]:
+        if not BOARD_PATH.strip():
+            return None
+        board_path = Path(BOARD_PATH.strip())
+        if board_path.is_absolute():
+            return board_path
+        return Path(self.work_dir).absolute() / board_path
+
     def _get_project_manifest_paths(self) -> t.List[Path]:
         proj = Path(self.work_dir).absolute()
         manifest_paths = []
@@ -164,19 +173,25 @@ class CustomApp(CMakeApp):
             logger.warning('IDF_PATH is not set; skip board manager config generation.')
             return
 
+        board_path = self._resolve_board_path()
+
         # Set environment variable for IDF_EXTRA_ACTIONS_PATH
         env = os.environ.copy()
 
+        cmd = [
+            sys.executable,
+            f'{IDF_PATH}/tools/idf.py',
+            'gen-bmgr-config',
+        ]
+        if board_path is not None:
+            cmd.extend(['-c', str(board_path)])
+        cmd.extend([
+            '-b',
+            board_name,
+        ])
+
         subprocess.run(
-            [
-                sys.executable,
-                f'{IDF_PATH}/tools/idf.py',
-                'gen-bmgr-config',
-                '-c',
-                str(Path(self.work_dir).absolute() / 'boards'),
-                '-b',
-                board_name,
-            ],
+            cmd,
             cwd=self.work_dir,
             env=env,
             check=True,
@@ -225,8 +240,9 @@ def get_cmake_apps(
 
 def main(args):  # type: (argparse.Namespace) -> None
     default_build_targets = args.default_build_targets.split(',') if args.default_build_targets else None
-    global BOARD_NAME
+    global BOARD_NAME, BOARD_PATH
     BOARD_NAME = (args.board or '').strip()
+    BOARD_PATH = (args.board_path or '').strip()
     apps = get_cmake_apps(args.paths, args.target, args.config, args.ignore_warnings, args.recursive, default_build_targets)
 
     if args.find:
@@ -350,6 +366,11 @@ if __name__ == '__main__':
         '--ignore-warnings',
         action='store_true',
         help='Ignore warnings when building apps',
+    )
+    parser.add_argument(
+        '--board-path',
+        default=None,
+        help='Optional extra board package path passed to Board Manager. Ignored when --board is empty or default.',
     )
     parser.add_argument(
         '--board',

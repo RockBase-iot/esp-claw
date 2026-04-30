@@ -62,7 +62,7 @@ esp_err_t http_server_start(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = 80;
     config.ctrl_port = HTTP_SERVER_CTRL_PORT;
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 32;
     config.stack_size = 8192;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
@@ -74,6 +74,7 @@ esp_err_t http_server_start(void)
     ESP_RETURN_ON_ERROR(http_server_register_status_routes(s_ctx.server), TAG, "Failed to register status routes");
     ESP_RETURN_ON_ERROR(http_server_register_files_routes(s_ctx.server), TAG, "Failed to register files routes");
     ESP_RETURN_ON_ERROR(http_server_register_wechat_routes(s_ctx.server), TAG, "Failed to register WeChat routes");
+    ESP_RETURN_ON_ERROR(http_server_register_webim_routes(s_ctx.server), TAG, "Failed to register Web IM routes");
     ESP_RETURN_ON_ERROR(httpd_register_err_handler(s_ctx.server, HTTPD_404_NOT_FOUND, http_server_captive_404_handler),
                         TAG, "Failed to register captive 404 handler");
 

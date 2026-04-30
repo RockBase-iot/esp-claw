@@ -341,7 +341,7 @@ esp_err_t cap_lua_runtime_execute_file(const char *path,
     lua_pushlightuserdata(L, &ctx);
     lua_pushcclosure(L, cap_lua_print_capture, 1);
     lua_setglobal(L, "print");
-    lua_sethook(L, cap_lua_timeout_hook, LUA_MASKCOUNT, 1000);
+    lua_sethook(L, cap_lua_timeout_hook, LUA_MASKCOUNT, 100);
 
     status = luaL_dofile(L, path);
     cap_lua_run_runtime_cleanups();

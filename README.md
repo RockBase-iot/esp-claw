@@ -39,6 +39,11 @@
   <img alt="From traditional IoT to Edge Agent" src="./docs/static/from-traditional-iot-to-edge-agent.webp" width="90%" />
 </div>
 
+> [!NOTE]
+>
+> We are migrating the demo from [`basic_demo`](./application/basic_demo) to [`edge_agent`](./application/edge_agent/).
+> If you submit a new PR, please make your changes under `edge_agent`. We will handle PRs that modify `basic_demo` after the migration is complete.
+
 ## 🌟 Key Features
 
 Traditional IoT usually stops at connectivity: devices can connect to the network, but they cannot think; they can execute commands, but they cannot make decisions. ESP-Claw brings the Agent Runtime down onto Espressif chips, turning them from passive executors into active decision-making centers.
@@ -168,9 +173,13 @@ You can find practical examples in our [documentation](https://esp-claw.com/en/t
 
 **IM**: ESP-Claw supports Telegram, QQ, Feishu, and WeChat, and can be extended further.
 
-> [!NOTE]
->
-> This project is still under active development. If you run into any issues, feel free to open an issue.
+## Development Plan
+
+ESP-Claw is still under active development. Feel free to open an issue to report problems or request features. You can also share your ideas through our [online survey (in Chinese)](https://fcn5wbhnyubf.feishu.cn/share/base/form/shrcndYcjbGFY1ymttTSyYoGIPh).
+
+[Click here to view our TODO List (in Chinese)](https://fcn5wbhnyubf.feishu.cn/wiki/SRlgwWUYei4WmykU8uMcUtzTnFf?table=tblWSgzWcyW7jv7B&view=vewaP9B0KX) and vote for the features or issues you care about. That helps us prioritize them sooner.
+
+
 
 ## 📷 Follow Us
 

@@ -15,7 +15,7 @@
 #include "llm/claw_llm_runtime.h"
 
 #define CLAW_MEMORY_DEFAULT_MAX_SESSION_MESSAGES 20
-#define CLAW_MEMORY_DEFAULT_MAX_MESSAGE_CHARS    256
+#define CLAW_MEMORY_DEFAULT_MAX_MESSAGE_CHARS    4096
 #define CLAW_MEMORY_MAX_PATH                     192
 #define CLAW_MEMORY_MAX_SUMMARIES                3
 #define CLAW_MEMORY_MAX_LABEL_CHARS              8
@@ -96,8 +96,6 @@ size_t file_size_bytes(const char *path);
 esp_err_t ensure_file_with_default(const char *path, const char *default_text);
 esp_err_t claw_memory_join_path(char *dst, size_t dst_size, const char *dir, const char *name);
 
-size_t session_history_json_size(void);
-esp_err_t claw_memory_session_load_json(const char *session_id, char *buf, size_t size);
 esp_err_t claw_memory_auto_extract_prepare_with_runtime(claw_llm_runtime_t *runtime,
                                                         const char *user_text,
                                                         claw_memory_message_intent_t *out_message_intent,

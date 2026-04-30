@@ -16,6 +16,11 @@ menu "Lua IMU Module"
             help
                 Reserved for a future MPU6050 backend. The code path is not
                 implemented yet and will fail at compile time if selected.
+
+        config LUA_MODULE_IMU_CHIP_ICM42670
+            bool "ICM42670"
+            help
+                Build the IMU Lua module with the ICM42670 backend.
     endchoice
 
 endmenu

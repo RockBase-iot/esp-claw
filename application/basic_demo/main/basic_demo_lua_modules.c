@@ -10,6 +10,7 @@
 #include "lua_module_capability.h"
 #include "lua_module_gpio.h"
 #include "lua_module_i2c.h"
+#include "lua_module_lcd.h"
 #include "lua_module_led_strip.h"
 #include "lua_module_storage.h"
 #include "lua_module_button.h"
@@ -62,6 +63,11 @@ esp_err_t basic_demo_lua_modules_register(void)
     }
 
     err = lua_module_i2c_register();
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = lua_module_lcd_register();
     if (err != ESP_OK) {
         return err;
     }

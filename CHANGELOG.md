@@ -1,8 +1,36 @@
 # ChangeLog
 
-## Unreleased
+## 2026-04-29
 
 ### Feature:
+
+* Updated the emote layout asset to change the GFX label scroll speed.
+
+* Refactored the Web Config interface:
+  * Introduced support for fine-grained configuration controls 
+  * Added a basic online chat module.
+
+* Added a boot-complete startup trigger event in the shared app and Basic Demo startup flow, plus a disabled-by-default router rule example that runs `hello.lua` on boot.
+
+* Added support for the following third-party development boards:
+  * `m5stack_cores3` (PR #5, contributed by @imliubo)
+  * `m5stack_sticks3` (PR #6, contributed by @imliubo)
+  * `dfrobot_k10` (PR #28, contributed by @wxzed)
+  * `lilygo_t_display_s3` (PR #14, contributed by @terry-cook)
+
+* Added shared `app_claw` support for the pure-Lua SSD1306 module, including Kconfig and dependency wiring so SSD1306 scripts and skills can be pulled into app builds that enable Lua support.
+
+* Enhanced CI board builds to support optional brand-specific board paths, emit `board_brand` in merged binary metadata, and append ESP32-P4 revision suffixes to generated merged binary artifacts while recording `rev` in the output JSON.
+
+* Added shared `app_claw` support for `lua_module_lcd`, including Kconfig, component dependency, and Lua module registration wiring so LCD scripts can be enabled from shared app builds with Lua support.
+
+* Increased the Claw capability tool result buffer to 32 KB so larger tool responses can be returned. Updated `cap_files` file reads to reject oversized files before reading and return an explicit error when the file exceeds the max read limit.
+  
+* Increased Claw memory session message buffers to 4096 chars.
+  
+* Raised the Edge Agent tool iteration limit to 32 for longer multi-step interactions.
+
+* Updated Claw memory Session History collection to size its JSON buffer from retained session records instead of worst-case configuration limits, reducing unnecessary heap usage for short histories.
 
 * Added the `edge_agent` demo application with Wi-Fi setup, HTTP management UI, FATFS image content, Lua script examples, skill assets, router rules, scheduler rules, and partition defaults.
 
@@ -24,9 +52,28 @@
 
 * Migrated selected Basic Demo updates into Edge Agent, including app configuration handling, HTTP UI updates, Lua module wiring, and default SDK configuration changes.
 
+* Moved `dfrobot_k10` and other shipped board definitions into vendor-specific subdirectories, and relocated the LilyGO T-Display-S3 board assets from `basic_demo` to `edge_agent`.
+
 ### Fix:
 
+* Persisted failed `claw_core` agent turns to session history so follow-up turns can see prior failure traces.
 * Cleared context outputs before collection across Lua jobs, tool catalogs, memory providers, and skill prompts so failed collection paths do not leak stale content.
+
+* Fixed LilyGO T-Display-S3 LCD startup behavior.
+
+## 2026-04-28
+
+### Fix:
+
+* Reduced `httpd` task stack pressure in Edge Agent by moving large configuration and WeChat login status structures from stack allocation to heap-backed buffers across the config and WeChat HTTP handlers.
+
+## 2026-04-27
+
+### Feature:
+
+* Added microsecond delay support to `lua_module_delay`.
+
+* Extended `lua_module_mcpwm` with dual-channel output support, updated the MCPWM demo script, and refreshed the related skill guide.
 
 ## 2026-04-21
 

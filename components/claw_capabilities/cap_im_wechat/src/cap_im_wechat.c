@@ -42,6 +42,8 @@ static const char *TAG = "cap_im_wechat";
 #define CAP_IM_WECHAT_RETRY_DELAY_MS 2000
 #define CAP_IM_WECHAT_DEDUP_CACHE_SIZE 64
 #define CAP_IM_WECHAT_CONTEXT_CACHE_SIZE 32
+#define CAP_IM_WECHAT_STAGE_CACHE_SIZE 32
+#define CAP_IM_WECHAT_STAGE_LIMIT 5
 #define CAP_IM_WECHAT_PATH_BUF_SIZE 256
 #define CAP_IM_WECHAT_NAME_BUF_SIZE 96
 #define CAP_IM_WECHAT_URL_BUF_SIZE 384
@@ -73,6 +75,17 @@ typedef struct {
     char chat_id[72];
     char context_token[160];
 } cap_im_wechat_context_entry_t;
+
+typedef struct {
+    char chat_id[72];
+    uint8_t consecutive_stage_count;
+} cap_im_wechat_stage_entry_t;
+
+typedef enum {
+    CAP_IM_WECHAT_STAGE_SEND_ORIGINAL = 0,
+    CAP_IM_WECHAT_STAGE_SEND_LIMIT_NOTICE = 1,
+    CAP_IM_WECHAT_STAGE_SKIP = 2,
+} cap_im_wechat_stage_send_mode_t;
 
 typedef struct {
     bool active;
@@ -116,6 +129,8 @@ typedef struct {
     size_t seen_msg_idx;
     cap_im_wechat_context_entry_t context_cache[CAP_IM_WECHAT_CONTEXT_CACHE_SIZE];
     size_t context_idx;
+    cap_im_wechat_stage_entry_t stage_cache[CAP_IM_WECHAT_STAGE_CACHE_SIZE];
+    size_t stage_idx;
     cap_im_wechat_qr_state_t qr;
 } cap_im_wechat_state_t;
 
@@ -347,6 +362,71 @@ static const char *cap_im_wechat_context_lookup(const char *chat_id)
     }
 
     return NULL;
+}
+
+static cap_im_wechat_stage_entry_t *cap_im_wechat_stage_entry_find_or_create(const char *chat_id)
+{
+    size_t slot;
+
+    if (!chat_id || !chat_id[0]) {
+        return NULL;
+    }
+
+    for (size_t i = 0; i < CAP_IM_WECHAT_STAGE_CACHE_SIZE; i++) {
+        if (strcmp(s_wechat.stage_cache[i].chat_id, chat_id) == 0) {
+            return &s_wechat.stage_cache[i];
+        }
+    }
+
+    slot = s_wechat.stage_idx;
+    s_wechat.stage_idx = (s_wechat.stage_idx + 1) % CAP_IM_WECHAT_STAGE_CACHE_SIZE;
+    memset(&s_wechat.stage_cache[slot], 0, sizeof(s_wechat.stage_cache[slot]));
+    strlcpy(s_wechat.stage_cache[slot].chat_id,
+            chat_id,
+            sizeof(s_wechat.stage_cache[slot].chat_id));
+    return &s_wechat.stage_cache[slot];
+}
+
+static cap_im_wechat_stage_send_mode_t cap_im_wechat_stage_send_mode_for_event(const char *chat_id,
+                                                                               const char *event_type)
+{
+    cap_im_wechat_stage_entry_t *entry = NULL;
+
+    if (!chat_id || !chat_id[0]) {
+        return CAP_IM_WECHAT_STAGE_SEND_ORIGINAL;
+    }
+
+    if (cap_im_wechat_lock() != ESP_OK) {
+        ESP_LOGW(TAG, "stage limiter lock failed for chat=%s; sending message", chat_id);
+        return CAP_IM_WECHAT_STAGE_SEND_ORIGINAL;
+    }
+
+    entry = cap_im_wechat_stage_entry_find_or_create(chat_id);
+    if (!entry) {
+        cap_im_wechat_unlock();
+        return CAP_IM_WECHAT_STAGE_SEND_ORIGINAL;
+    }
+
+    if (event_type && strcmp(event_type, "agent_stage") == 0) {
+        if (entry->consecutive_stage_count < UINT8_MAX) {
+            entry->consecutive_stage_count++;
+        }
+        if (entry->consecutive_stage_count <= CAP_IM_WECHAT_STAGE_LIMIT) {
+            cap_im_wechat_unlock();
+            return CAP_IM_WECHAT_STAGE_SEND_ORIGINAL;
+        }
+        if (entry->consecutive_stage_count == CAP_IM_WECHAT_STAGE_LIMIT + 1) {
+            cap_im_wechat_unlock();
+            return CAP_IM_WECHAT_STAGE_SEND_LIMIT_NOTICE;
+        }
+        cap_im_wechat_unlock();
+        return CAP_IM_WECHAT_STAGE_SKIP;
+    } else {
+        entry->consecutive_stage_count = 0;
+    }
+
+    cap_im_wechat_unlock();
+    return CAP_IM_WECHAT_STAGE_SEND_ORIGINAL;
 }
 
 static esp_err_t cap_im_wechat_http_event_handler(esp_http_client_event_t *event)
@@ -1952,6 +2032,8 @@ static esp_err_t cap_im_wechat_send_message_execute(const char *input_json,
     cJSON *root = NULL;
     const char *chat_id = NULL;
     const char *message = NULL;
+    const char *event_type = NULL;
+    cap_im_wechat_stage_send_mode_t stage_mode;
     esp_err_t err;
 
     (void)ctx;
@@ -1967,9 +2049,26 @@ static esp_err_t cap_im_wechat_send_message_execute(const char *input_json,
 
     chat_id = cap_im_wechat_string_value(cJSON_GetObjectItemCaseSensitive(root, "chat_id"));
     message = cap_im_wechat_string_value(cJSON_GetObjectItemCaseSensitive(root, "message"));
+    event_type = cap_im_wechat_string_value(cJSON_GetObjectItemCaseSensitive(root, "event_type"));
     if (!chat_id || !message) {
         cJSON_Delete(root);
         return ESP_ERR_INVALID_ARG;
+    }
+
+    stage_mode = cap_im_wechat_stage_send_mode_for_event(chat_id, event_type);
+    if (stage_mode == CAP_IM_WECHAT_STAGE_SKIP) {
+        ESP_LOGI(TAG,
+                 "skip agent_stage text for chat=%s after %d consecutive stage messages",
+                 chat_id,
+                 CAP_IM_WECHAT_STAGE_LIMIT);
+        cJSON_Delete(root);
+        strlcpy(output, "{\"ok\":true,\"skipped\":true}", output_size);
+        return ESP_OK;
+    }
+
+    if (stage_mode == CAP_IM_WECHAT_STAGE_SEND_LIMIT_NOTICE) {
+        message =
+            "Due to Weixin's limitation of supporting only up to 10 output messages, any subsequent step messages will be ignored.";
     }
 
     err = cap_im_wechat_send_text(chat_id, message);
@@ -2112,7 +2211,7 @@ static const claw_cap_descriptor_t s_wechat_descriptors[] = {
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json =
-        "{\"type\":\"object\",\"properties\":{\"chat_id\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"}},\"required\":[\"chat_id\",\"message\"]}",
+        "{\"type\":\"object\",\"properties\":{\"chat_id\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"event_type\":{\"type\":\"string\"}},\"required\":[\"chat_id\",\"message\"]}",
         .execute = cap_im_wechat_send_message_execute,
     },
     {

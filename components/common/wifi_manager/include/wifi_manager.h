@@ -10,6 +10,7 @@
 
 #include "esp_err.h"
 #include "esp_netif.h"
+#include "esp_wifi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,12 +37,22 @@ typedef struct {
     const char *mode;
 } wifi_manager_status_t;
 
+typedef struct {
+    char ssid[33];
+    int8_t rssi;
+    uint8_t primary;
+    wifi_auth_mode_t authmode;
+} wifi_manager_scan_record_t;
+
 esp_err_t wifi_manager_init(void);
 esp_err_t wifi_manager_start(const wifi_manager_config_t *config);
 esp_err_t wifi_manager_wait_connected(uint32_t timeout_ms);
 esp_err_t wifi_manager_register_state_callback(wifi_manager_state_cb_t cb, void *user_ctx);
 void wifi_manager_get_status(wifi_manager_status_t *status);
 esp_netif_t *wifi_manager_get_ap_netif(void);
+esp_err_t wifi_manager_scan_aps(wifi_manager_scan_record_t *records,
+                                uint16_t max_records,
+                                uint16_t *out_count);
 
 #ifdef __cplusplus
 }
