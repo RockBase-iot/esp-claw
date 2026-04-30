@@ -42,6 +42,10 @@ if(CONFIG_APP_CLAW_CAP_IM_WECHAT)
     list(APPEND app_claw_requires cap_im_wechat)
 endif()
 
+if(CONFIG_APP_CLAW_CAP_IM_LOCAL)
+    list(APPEND app_claw_requires cap_im_local)
+endif()
+
 if(CONFIG_APP_CLAW_CAP_LLM_INSPECT)
     list(APPEND app_claw_requires cap_llm_inspect)
 endif()
@@ -102,6 +106,10 @@ if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_TOUCH)
     list(APPEND app_claw_requires lua_module_touch)
 endif()
 
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_IR)
+    list(APPEND app_claw_requires lua_module_ir)
+endif()
+
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_CAPABILITY)
     list(APPEND app_claw_requires lua_module_call_capability)
 endif()
@@ -122,6 +130,10 @@ if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_DISPLAY)
     list(APPEND app_claw_requires lua_module_display)
 endif()
 
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_LCD)
+    list(APPEND app_claw_requires lua_module_lcd)
+endif()
+
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_ESP_HEAP)
     list(APPEND app_claw_requires lua_module_esp_heap)
 endif()
@@ -136,6 +148,10 @@ endif()
 
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_I2C)
     list(APPEND app_claw_requires lua_module_i2c)
+endif()
+
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_SSD1306)
+    list(APPEND app_claw_requires lua_module_ssd1306)
 endif()
 
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_LED_STRIP)

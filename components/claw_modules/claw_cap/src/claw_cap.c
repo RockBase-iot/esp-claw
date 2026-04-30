@@ -351,7 +351,7 @@ esp_err_t claw_cap_call_from_core(const char *cap_name,
     claw_cap_call_context_t ctx = {0};
     char *output = NULL;
     esp_err_t err;
-    const size_t output_size = 4096;
+    const size_t output_size = 32 * 1024;
 
     (void)user_ctx;
 

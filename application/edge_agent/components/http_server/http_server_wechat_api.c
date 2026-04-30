@@ -5,43 +5,17 @@
  */
 #include "http_server_priv.h"
 
+#include <stdlib.h>
 #include <string.h>
-
-static esp_err_t http_server_wechat_login_persist_if_needed(http_server_wechat_login_status_t *status)
-{
-    http_server_ctx_t *ctx = http_server_ctx();
-    if (!status || !status->completed || status->persisted || !status->token[0]) {
-        return ESP_OK;
-    }
-
-    app_config_t config;
-    esp_err_t err = ctx->services.load_config(&config);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    strlcpy(config.wechat_token, status->token, sizeof(config.wechat_token));
-    strlcpy(config.wechat_base_url,
-            status->base_url[0] ? status->base_url : config.wechat_base_url,
-            sizeof(config.wechat_base_url));
-    strlcpy(config.wechat_account_id,
-            status->account_id[0] ? status->account_id : config.wechat_account_id,
-            sizeof(config.wechat_account_id));
-
-    err = ctx->services.save_config(&config);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    return ctx->services.wechat_login_mark_persisted ? ctx->services.wechat_login_mark_persisted() : ESP_OK;
-}
 
 static esp_err_t wechat_login_start_handler(httpd_req_t *req)
 {
     http_server_ctx_t *ctx = http_server_ctx();
     cJSON *root = NULL;
+    http_server_wechat_login_status_t *status = NULL;
     const char *account_id = NULL;
     bool force = false;
+    esp_err_t err;
 
     if (req->content_len > 0) {
         esp_err_t err = http_server_parse_json_body(req, &root);
@@ -52,7 +26,7 @@ static esp_err_t wechat_login_start_handler(httpd_req_t *req)
         force = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(root, "force"));
     }
 
-    esp_err_t err = ctx->services.wechat_login_start ? ctx->services.wechat_login_start(account_id, force) : ESP_ERR_INVALID_STATE;
+    err = ctx->services.wechat_login_start ? ctx->services.wechat_login_start(account_id, force) : ESP_ERR_INVALID_STATE;
     if (root) {
         cJSON_Delete(root);
     }
@@ -60,59 +34,83 @@ static esp_err_t wechat_login_start_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to start WeChat login");
     }
 
-    http_server_wechat_login_status_t status = {0};
-    err = ctx->services.wechat_login_get_status ? ctx->services.wechat_login_get_status(&status) : ESP_ERR_INVALID_STATE;
+    status = calloc(1, sizeof(*status));
+    if (!status) {
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    err = ctx->services.wechat_login_get_status ? ctx->services.wechat_login_get_status(status) : ESP_ERR_INVALID_STATE;
     if (err != ESP_OK) {
+        free(status);
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to fetch WeChat login status");
     }
 
     cJSON *resp = cJSON_CreateObject();
     if (!resp) {
+        free(status);
         httpd_resp_send_500(req);
         return ESP_ERR_NO_MEM;
     }
     cJSON_AddBoolToObject(resp, "ok", true);
-    http_server_json_add_string(resp, "session_key", status.session_key);
-    http_server_json_add_string(resp, "status", status.status);
-    http_server_json_add_string(resp, "message", status.message);
-    http_server_json_add_string(resp, "qr_data_url", status.qr_data_url);
-    return http_server_send_json_response(req, resp);
+    http_server_json_add_string(resp, "session_key", status->session_key);
+    http_server_json_add_string(resp, "status", status->status);
+    http_server_json_add_string(resp, "message", status->message);
+    http_server_json_add_string(resp, "qr_data_url", status->qr_data_url);
+    err = http_server_send_json_response(req, resp);
+    free(status);
+    return err;
 }
 
 static esp_err_t wechat_login_status_handler(httpd_req_t *req)
 {
     http_server_ctx_t *ctx = http_server_ctx();
-    http_server_wechat_login_status_t status = {0};
-    esp_err_t err = ctx->services.wechat_login_get_status ? ctx->services.wechat_login_get_status(&status) : ESP_ERR_INVALID_STATE;
+    http_server_wechat_login_status_t *status = NULL;
+    esp_err_t err;
+
+    status = calloc(1, sizeof(*status));
+    if (!status) {
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    err = ctx->services.wechat_login_get_status ? ctx->services.wechat_login_get_status(status) : ESP_ERR_INVALID_STATE;
     if (err != ESP_OK) {
+        free(status);
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read WeChat login status");
     }
 
-    err = http_server_wechat_login_persist_if_needed(&status);
-    if (err == ESP_OK && status.completed && !status.persisted) {
-        status.persisted = true;
-        strlcpy(status.message, "微信登录成功，凭据已保存。重启设备后生效。", sizeof(status.message));
-    }
+    /* Credentials are NOT auto-saved here. The web frontend receives the
+     * token and related fields, populates its form, and the user must
+     * explicitly click Save to persist them via the /api/config endpoint. */
 
     cJSON *resp = cJSON_CreateObject();
     if (!resp) {
+        free(status);
         httpd_resp_send_500(req);
         return ESP_ERR_NO_MEM;
     }
     cJSON_AddBoolToObject(resp, "ok", true);
-    cJSON_AddBoolToObject(resp, "active", status.active);
-    cJSON_AddBoolToObject(resp, "completed", status.completed);
-    cJSON_AddBoolToObject(resp, "persisted", status.persisted);
-    cJSON_AddBoolToObject(resp, "configured", status.configured);
-    http_server_json_add_string(resp, "session_key", status.session_key);
-    http_server_json_add_string(resp, "status", status.status);
-    http_server_json_add_string(resp, "message", status.message);
-    http_server_json_add_string(resp, "qr_data_url", status.qr_data_url);
-    http_server_json_add_string(resp, "account_id", status.account_id);
-    http_server_json_add_string(resp, "user_id", status.user_id);
-    http_server_json_add_string(resp, "base_url", status.base_url);
-    cJSON_AddBoolToObject(resp, "restart_required", status.persisted);
-    return http_server_send_json_response(req, resp);
+    cJSON_AddBoolToObject(resp, "active", status->active);
+    cJSON_AddBoolToObject(resp, "completed", status->completed);
+    cJSON_AddBoolToObject(resp, "persisted", status->persisted);
+    cJSON_AddBoolToObject(resp, "configured", status->configured);
+    http_server_json_add_string(resp, "session_key", status->session_key);
+    http_server_json_add_string(resp, "status", status->status);
+    http_server_json_add_string(resp, "message", status->message);
+    http_server_json_add_string(resp, "qr_data_url", status->qr_data_url);
+    http_server_json_add_string(resp, "account_id", status->account_id);
+    http_server_json_add_string(resp, "user_id", status->user_id);
+    http_server_json_add_string(resp, "base_url", status->base_url);
+    /* Return token to frontend only when login has completed so the user
+     * can review it and save it manually.  Never include the token while
+     * the session is still active (QR not yet scanned). */
+    if (status->completed && status->token[0]) {
+        http_server_json_add_string(resp, "token", status->token);
+    }
+    err = http_server_send_json_response(req, resp);
+    free(status);
+    return err;
 }
 
 static esp_err_t wechat_login_cancel_handler(httpd_req_t *req)

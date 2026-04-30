@@ -26,6 +26,9 @@
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
 #include "cap_im_wechat.h"
 #endif
+#if CONFIG_APP_CLAW_CAP_IM_LOCAL
+#include "cap_im_local.h"
+#endif
 #if CONFIG_APP_CLAW_CAP_LLM_INSPECT
 #include "cap_llm_inspect.h"
 #endif
@@ -362,6 +365,27 @@ static esp_err_t app_cap_register_im_wechat(const app_claw_config_t *config,
 }
 #endif
 
+#if CONFIG_APP_CLAW_CAP_IM_LOCAL
+static esp_err_t app_cap_prepare_im_local(const app_claw_config_t *config,
+                                          const app_claw_storage_paths_t *paths)
+{
+    (void)config;
+    (void)paths;
+    return cap_im_local_set_config(&(cap_im_local_config_t) {
+        .default_sender_id = "web_user",
+        .log_outbound_messages = true,
+    });
+}
+
+static esp_err_t app_cap_register_im_local(const app_claw_config_t *config,
+                                           const app_claw_storage_paths_t *paths)
+{
+    (void)config;
+    (void)paths;
+    return cap_im_local_register_group();
+}
+#endif
+
 #if CONFIG_APP_CLAW_CAP_SCHEDULER
 static esp_err_t app_cap_register_scheduler(const app_claw_config_t *config,
                                             const app_claw_storage_paths_t *paths)
@@ -522,6 +546,9 @@ static const app_capability_group_entry_t s_capability_group_entries[] = {
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
     { "cap_im_wechat", "WeChat", "Register WeChat cap", false, app_cap_prepare_im_wechat, app_cap_register_im_wechat },
 #endif
+#if CONFIG_APP_CLAW_CAP_IM_LOCAL
+    { "cap_im_local", "Local IM", "Register local / Web IM cap", false, app_cap_prepare_im_local, app_cap_register_im_local },
+#endif
 #if CONFIG_APP_CLAW_CAP_FILES
     { "cap_files", "Files", "Register files cap", true, app_cap_prepare_files, app_cap_register_files },
 #endif
@@ -575,6 +602,9 @@ static const app_capability_group_info_t s_capability_group_infos[] = {
 #endif
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
     { "cap_im_wechat", "WeChat", false },
+#endif
+#if CONFIG_APP_CLAW_CAP_IM_LOCAL
+    { "cap_im_local", "Local IM", false },
 #endif
 #if CONFIG_APP_CLAW_CAP_FILES
     { "cap_files", "Files", true },

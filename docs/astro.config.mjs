@@ -16,12 +16,18 @@ export default defineConfig({
     starlight({
       title: "ESP-Claw Docs",
       favicon: "/favicon.ico",
+      lastUpdated: true,
       social: [
         {
           icon: "github",
           label: "GitHub",
           href: "https://github.com/espressif/esp-claw",
         },
+        {
+          icon: "rocket",
+          label: "Flash via Browser",
+          href: "https://esp-claw.com/en/flash/",
+        }
       ],
       sidebar: [
         {

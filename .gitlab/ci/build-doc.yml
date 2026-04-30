@@ -6,7 +6,7 @@ build_doc:
   extends:
     - .rules:build:doc
   needs:
-    - job: build_application_basic_demo
+    - job: build_application_edge_agent
       artifacts: true
       optional: true
   script:

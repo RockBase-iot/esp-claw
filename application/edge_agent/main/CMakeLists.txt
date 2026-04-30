@@ -4,6 +4,7 @@ set(main_requires
     captive_dns
     http_server
     wifi_manager
+    cmd_wifi
 )
 
 if(CONFIG_APP_CLAW_CAP_IM_WECHAT)

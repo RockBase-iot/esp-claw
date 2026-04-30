@@ -7,6 +7,7 @@
 #include "claw_task.h"
 
 #include <inttypes.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,6 +106,33 @@ static char *dup_string(const char *src)
     }
 
     return strdup(src);
+}
+
+static char *dup_printf(const char *fmt, ...)
+{
+    va_list args;
+    va_list copy;
+    int needed;
+    char *buf;
+
+    va_start(args, fmt);
+    va_copy(copy, args);
+    needed = vsnprintf(NULL, 0, fmt, copy);
+    va_end(copy);
+    if (needed < 0) {
+        va_end(args);
+        return NULL;
+    }
+
+    buf = calloc(1, (size_t)needed + 1);
+    if (!buf) {
+        va_end(args);
+        return NULL;
+    }
+
+    vsnprintf(buf, (size_t)needed + 1, fmt, args);
+    va_end(args);
+    return buf;
 }
 
 static const char *log_snippet(const char *text)
@@ -438,6 +466,7 @@ static esp_err_t build_response_payload_json(const claw_core_request_t *request,
 }
 
 static esp_err_t build_out_message_event_common(const char *event_id_prefix,
+                                                const char *event_type,
                                                 uint32_t request_id,
                                                 int64_t now_ms,
                                                 const char *channel,
@@ -445,8 +474,9 @@ static esp_err_t build_out_message_event_common(const char *event_id_prefix,
                                                 const char *text,
                                                 claw_event_t *out_event)
 {
-    if (!event_id_prefix || !event_id_prefix[0] || !channel || !channel[0] ||
-            !chat_id || !chat_id[0] || !text || !text[0] || !out_event) {
+    if (!event_id_prefix || !event_id_prefix[0] || !event_type || !event_type[0] ||
+            !channel || !channel[0] || !chat_id || !chat_id[0] ||
+            !text || !text[0] || !out_event) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -454,7 +484,7 @@ static esp_err_t build_out_message_event_common(const char *event_id_prefix,
     snprintf(out_event->event_id, sizeof(out_event->event_id),
              "%s-%" PRIu32 "-%" PRId64, event_id_prefix, request_id, now_ms);
     strlcpy(out_event->source_cap, "claw_core", sizeof(out_event->source_cap));
-    strlcpy(out_event->event_type, "out_message", sizeof(out_event->event_type));
+    strlcpy(out_event->event_type, event_type, sizeof(out_event->event_type));
     strlcpy(out_event->source_channel, channel, sizeof(out_event->source_channel));
     strlcpy(out_event->chat_id, chat_id, sizeof(out_event->chat_id));
     strlcpy(out_event->content_type, "text", sizeof(out_event->content_type));
@@ -499,6 +529,7 @@ static esp_err_t build_agent_out_message_event(const claw_core_request_t *reques
               response->target_chat_id : request->source_chat_id;
 
     err = build_out_message_event_common("agent",
+                                         "out_message",
                                          request->request_id,
                                          now_ms,
                                          channel,
@@ -570,6 +601,7 @@ static void publish_stage_event(const claw_core_request_t *request, const char *
     now_ms = claw_core_now_ms();
     err = build_out_message_event_common(
         "stage",
+        "agent_stage",
         request->request_id,
         now_ms,
         (request->target_channel && request->target_channel[0]) ?
@@ -921,6 +953,23 @@ static void claw_core_finish_from_plain_text(uint32_t request_id,
              request_id,
              log_snippet(text),
              strlen(text) > CLAW_CORE_LOG_SNIPPET_LEN ? "..." : "");
+}
+
+static char *claw_core_build_session_failure_trace(const char *error_message,
+                                                   const char *tool_summary)
+{
+    const char *reason = (error_message && error_message[0]) ? error_message : "unknown error";
+
+    if (tool_summary && tool_summary[0]) {
+        return dup_printf("Session note: the previous request failed before producing a final answer.\n"
+                          "Reason: %s\n%s",
+                          reason,
+                          tool_summary);
+    }
+
+    return dup_printf("Session note: the previous request failed before producing a final answer.\n"
+                      "Reason: %s",
+                      reason);
 }
 
 static esp_err_t append_tool_results_message(cJSON *runtime_messages,
@@ -1305,6 +1354,28 @@ finish_request:
             ESP_LOGE(TAG, "request=%" PRIu32 " failed: %s",
                      request.view.request_id,
                      response.view.error_message ? response.view.error_message : esp_err_to_name(err));
+            if (s_core->append_session_turn &&
+                    request.view.session_id && request.view.session_id[0] &&
+                    request.view.user_text && request.view.user_text[0]) {
+                char *failure_trace = claw_core_build_session_failure_trace(response.view.error_message,
+                                                                            tool_summary);
+
+                if (!failure_trace) {
+                    ESP_LOGW(TAG, "append_session_turn skipped for failed request=%" PRIu32 ": no memory",
+                             request.view.request_id);
+                } else {
+                    esp_err_t append_err = s_core->append_session_turn(request.view.session_id,
+                                                                       request.view.user_text,
+                                                                       failure_trace,
+                                                                       s_core->append_session_turn_user_ctx);
+                    if (append_err != ESP_OK) {
+                        ESP_LOGW(TAG, "append_session_turn failed for failed request=%" PRIu32 ": %s",
+                                 request.view.request_id,
+                                 esp_err_to_name(append_err));
+                    }
+                    free(failure_trace);
+                }
+            }
         }
         publish_out_message_if_requested(&request, &response);
         if (request.view.flags & CLAW_CORE_REQUEST_FLAG_SKIP_RESPONSE_QUEUE) {

@@ -24,6 +24,11 @@ dependencies:
       - if: $CONFIG{APP_CLAW_CAP_IM_TG} == True
     path: ../../claw_capabilities/cap_im_tg
 
+  cap_im_local:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_IM_LOCAL} == True
+    path: ../../claw_capabilities/cap_im_local
+
   cap_im_wechat:
     rules:
       - if: $CONFIG{APP_CLAW_CAP_IM_WECHAT} == True
@@ -136,6 +141,12 @@ dependencies:
       - if: $CONFIG{APP_CLAW_LUA_MODULE_TOUCH} == True
     path: ../../lua_modules/lua_module_touch
 
+  lua_module_ir:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_IR} == True
+    path: ../../lua_modules/lua_module_ir
+
   lua_module_adc:
     rules:
       - if: $CONFIG{APP_CLAW_CAP_LUA} == True
@@ -173,6 +184,12 @@ dependencies:
       - if: $CONFIG{APP_CLAW_LUA_MODULE_DISPLAY} == True
     path: ../../lua_modules/lua_module_display
 
+  lua_module_lcd:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_LCD} == True
+    path: ../../lua_modules/lua_module_lcd
+
   lua_module_esp_heap:
     rules:
       - if: $CONFIG{APP_CLAW_CAP_LUA} == True
@@ -196,6 +213,12 @@ dependencies:
       - if: $CONFIG{APP_CLAW_CAP_LUA} == True
       - if: $CONFIG{APP_CLAW_LUA_MODULE_I2C} == True
     path: ../../lua_modules/lua_module_i2c
+
+  lua_module_ssd1306:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_SSD1306} == True
+    path: ../../lua_modules/lua_module_ssd1306
 
   lua_module_lcd_touch:
     rules:

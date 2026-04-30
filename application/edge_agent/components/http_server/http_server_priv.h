@@ -51,4 +51,5 @@ esp_err_t http_server_register_config_routes(httpd_handle_t server);
 esp_err_t http_server_register_status_routes(httpd_handle_t server);
 esp_err_t http_server_register_files_routes(httpd_handle_t server);
 esp_err_t http_server_register_wechat_routes(httpd_handle_t server);
+esp_err_t http_server_register_webim_routes(httpd_handle_t server);
 esp_err_t http_server_captive_404_handler(httpd_req_t *req, httpd_err_code_t error);

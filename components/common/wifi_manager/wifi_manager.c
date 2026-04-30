@@ -6,6 +6,7 @@
 #include "wifi_manager.h"
 
 #include <inttypes.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "esp_event.h"
@@ -141,7 +142,11 @@ static void wifi_event_handler(void *arg,
     if (event_base == WIFI_EVENT) {
         switch (event_id) {
         case WIFI_EVENT_STA_START:
-            esp_wifi_connect();
+            if (s_sta_configured) {
+                esp_wifi_connect();
+            } else {
+                ESP_LOGW(TAG, "Wi-Fi STA not configured, skipping connection");
+            }
             return;
 
         case WIFI_EVENT_STA_DISCONNECTED:
@@ -366,4 +371,89 @@ void wifi_manager_get_status(wifi_manager_status_t *status)
 esp_netif_t *wifi_manager_get_ap_netif(void)
 {
     return s_ap_netif;
+}
+
+esp_err_t wifi_manager_scan_aps(wifi_manager_scan_record_t *records,
+                                uint16_t max_records,
+                                uint16_t *out_count)
+{
+    wifi_mode_t original_mode = WIFI_MODE_NULL;
+    wifi_mode_t scan_mode = WIFI_MODE_NULL;
+    wifi_scan_config_t scan_cfg = {
+        .show_hidden = true,
+    };
+    wifi_ap_record_t *ap_records = NULL;
+    uint16_t ap_count = 0;
+    esp_err_t err;
+
+    if (!records || max_records == 0 || !out_count) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_count = 0;
+
+    err = esp_wifi_get_mode(&original_mode);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    scan_mode = original_mode;
+    if (original_mode == WIFI_MODE_AP) {
+        scan_mode = WIFI_MODE_APSTA;
+        err = esp_wifi_set_mode(scan_mode);
+        if (err != ESP_OK) {
+            return err;
+        }
+    } else if (original_mode != WIFI_MODE_STA && original_mode != WIFI_MODE_APSTA) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    err = esp_wifi_scan_start(&scan_cfg, true);
+    if (err != ESP_OK) {
+        goto cleanup;
+    }
+
+    err = esp_wifi_scan_get_ap_num(&ap_count);
+    if (err != ESP_OK) {
+        goto cleanup;
+    }
+
+    if (ap_count == 0) {
+        err = ESP_OK;
+        goto cleanup;
+    }
+
+    if (ap_count > max_records) {
+        ap_count = max_records;
+    }
+
+    ap_records = calloc(ap_count, sizeof(wifi_ap_record_t));
+    if (!ap_records) {
+        err = ESP_ERR_NO_MEM;
+        goto cleanup;
+    }
+
+    err = esp_wifi_scan_get_ap_records(&ap_count, ap_records);
+    if (err != ESP_OK) {
+        goto cleanup;
+    }
+
+    for (uint16_t i = 0; i < ap_count; ++i) {
+        strlcpy(records[i].ssid, (const char *)ap_records[i].ssid, sizeof(records[i].ssid));
+        records[i].rssi = ap_records[i].rssi;
+        records[i].primary = ap_records[i].primary;
+        records[i].authmode = ap_records[i].authmode;
+    }
+    *out_count = ap_count;
+    err = ESP_OK;
+
+cleanup:
+    free(ap_records);
+    if (scan_mode != original_mode) {
+        esp_err_t restore_err = esp_wifi_set_mode(original_mode);
+        if (err == ESP_OK && restore_err != ESP_OK) {
+            err = restore_err;
+        }
+    }
+    return err;
 }

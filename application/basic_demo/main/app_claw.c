@@ -39,6 +39,9 @@
 #include "freertos/task.h"
 
 static const char *TAG = "app_esp_claw";
+static const char *BASIC_DEMO_STARTUP_EVENT_SOURCE_CAP = "basic_demo";
+static const char *BASIC_DEMO_STARTUP_EVENT_TYPE = "startup";
+static const char *BASIC_DEMO_STARTUP_EVENT_KEY = "boot_completed";
 #if CONFIG_BASIC_DEMO_MEMORY_MODE_FULL
 static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
     "cap_files",
@@ -319,6 +322,19 @@ static bool basic_demo_llm_is_configured(const basic_demo_settings_t *settings)
     return settings && settings->llm_api_key[0] && settings->llm_model[0] && settings->llm_profile[0];
 }
 
+static esp_err_t basic_demo_publish_startup_event(void)
+{
+    static const char *payload_json =
+        "{\"phase\":\"boot_completed\"}";
+
+    ESP_LOGI(TAG, "Publishing startup trigger event: %s/%s",
+             BASIC_DEMO_STARTUP_EVENT_TYPE, BASIC_DEMO_STARTUP_EVENT_KEY);
+    return claw_event_router_publish_trigger(BASIC_DEMO_STARTUP_EVENT_SOURCE_CAP,
+                                             BASIC_DEMO_STARTUP_EVENT_TYPE,
+                                             BASIC_DEMO_STARTUP_EVENT_KEY,
+                                             payload_json);
+}
+
 esp_err_t app_claw_start(const basic_demo_settings_t *settings)
 {
     basic_demo_paths_t paths = {0};
@@ -425,6 +441,8 @@ esp_err_t app_claw_start(const basic_demo_settings_t *settings)
                         TAG, "Failed to start time sync service");
     ESP_RETURN_ON_ERROR(cap_scheduler_start(), TAG, "Failed to start scheduler");
     ESP_RETURN_ON_ERROR(basic_demo_cli_start(), TAG, "Failed to start CLI");
+    ESP_RETURN_ON_ERROR(basic_demo_publish_startup_event(), TAG,
+                        "Failed to publish startup event");
 
     return ESP_OK;
 }

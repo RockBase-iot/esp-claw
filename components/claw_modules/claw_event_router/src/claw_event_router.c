@@ -1699,6 +1699,7 @@ static esp_err_t claw_event_router_execute_send_message_action(
     }
     cJSON_AddStringToObject(payload_root, "chat_id", chat_id);
     cJSON_AddStringToObject(payload_root, "message", message);
+    cJSON_AddStringToObject(payload_root, "event_type", event->event_type);
     payload = cJSON_PrintUnformatted(payload_root);
     cJSON_Delete(payload_root);
     if (!payload) {

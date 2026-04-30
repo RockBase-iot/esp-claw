@@ -56,6 +56,7 @@ typedef struct {
 esp_err_t http_server_init(const http_server_config_t *config);
 esp_err_t http_server_start(void);
 esp_err_t http_server_stop(void);
+esp_err_t http_server_webim_bind_im(void);
 
 #ifdef __cplusplus
 }

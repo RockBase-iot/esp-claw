@@ -37,6 +37,9 @@
 #endif
 
 static const char *TAG = "app_claw";
+static const char *APP_STARTUP_EVENT_SOURCE_CAP = "app_claw";
+static const char *APP_STARTUP_EVENT_TYPE = "startup";
+static const char *APP_STARTUP_EVENT_KEY = "boot_completed";
 
 #define APP_SYSTEM_PROMPT_COMMON \
     "You are the ESP-Claw. " \
@@ -91,7 +94,7 @@ static esp_err_t init_memory(const app_claw_config_t *config,
         .session_root_dir = paths->memory_session_root,
         .memory_root_dir = paths->memory_root_dir,
         .max_session_messages = 20,
-        .max_message_chars = 1024,
+        .max_message_chars = 4096,
         .llm = {
             .api_key = config->llm_api_key,
             .backend_type = config->llm_backend_type,
@@ -151,6 +154,19 @@ static const char *app_llm_provider_name(const app_claw_config_t *config)
         return "OpenAI";
     }
     return "Custom";
+}
+
+static esp_err_t app_claw_publish_startup_event(void)
+{
+    static const char *payload_json =
+        "{\"phase\":\"boot_completed\"}";
+
+    ESP_LOGI(TAG, "Publishing startup trigger event: %s/%s",
+             APP_STARTUP_EVENT_TYPE, APP_STARTUP_EVENT_KEY);
+    return claw_event_router_publish_trigger(APP_STARTUP_EVENT_SOURCE_CAP,
+                                             APP_STARTUP_EVENT_TYPE,
+                                             APP_STARTUP_EVENT_KEY,
+                                             payload_json);
 }
 
 static bool app_llm_is_configured(const app_claw_config_t *config)
@@ -244,6 +260,10 @@ esp_err_t app_claw_start(const app_claw_config_t *config,
     ESP_RETURN_ON_ERROR(claw_event_router_register_outbound_binding("wechat", "wechat_send_message"),
                         TAG, "Failed to bind WeChat outbound");
 #endif
+#if CONFIG_APP_CLAW_CAP_IM_LOCAL
+    ESP_RETURN_ON_ERROR(claw_event_router_register_outbound_binding("web", "local_send_message"),
+                        TAG, "Failed to bind Web / local IM outbound");
+#endif
 
     core_config.api_key = config->llm_api_key;
     core_config.backend_type = config->llm_backend_type;
@@ -264,7 +284,7 @@ esp_err_t app_claw_start(const app_claw_config_t *config,
     core_config.task_stack_size = 16 * 1024;
     core_config.task_priority = 5;
     core_config.task_core = tskNO_AFFINITY;
-    core_config.max_tool_iterations = 20;
+    core_config.max_tool_iterations = 32;
     core_config.request_queue_len = 4;
     core_config.response_queue_len = 4;
     core_config.max_context_providers = 8;
@@ -334,6 +354,8 @@ esp_err_t app_claw_start(const app_claw_config_t *config,
 #if CONFIG_APP_CLAW_ENABLE_CLI
     ESP_RETURN_ON_ERROR(app_claw_cli_start(), TAG, "Failed to start CLI");
 #endif
+    ESP_RETURN_ON_ERROR(app_claw_publish_startup_event(), TAG,
+                        "Failed to publish startup event");
 
     return ESP_OK;
 }

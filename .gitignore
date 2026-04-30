@@ -1,6 +1,5 @@
 # Build output
 build/
-dist/
 tmp/
 releases/
 

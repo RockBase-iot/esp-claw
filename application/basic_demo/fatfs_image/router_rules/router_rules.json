@@ -110,5 +110,26 @@
         }
       }
     ]
+  },
+  {
+    "id": "startup_run_hello_lua",
+    "description": "Run hello.lua once the device finishes booting.",
+    "enabled": false,
+    "consume_on_match": false,
+    "ack": "startup hello.lua executed",
+    "match": {
+      "source_cap": "basic_demo",
+      "event_type": "startup",
+      "event_key": "boot_completed",
+      "content_type": "trigger"
+    },
+    "actions": [
+      {
+        "type": "run_script",
+        "input": {
+          "path": "hello.lua"
+        }
+      }
+    ]
   }
 ]

@@ -198,10 +198,33 @@ def _merge_bin(build_dir: Path, target: str, out_bin: Path) -> None:
     )
 
 
+def _resolve_rev_and_suffix(build_dir: Path, target: str) -> Tuple[int, str]:
+    if target != 'esp32p4':
+        raise RuntimeError(f'rev resolution is only supported for esp32p4, got: {target}')
+
+    sdkconfig_json = build_dir / 'config' / 'sdkconfig.json'
+    if not sdkconfig_json.is_file():
+        raise RuntimeError(f'missing sdkconfig.json: {sdkconfig_json}')
+
+    with sdkconfig_json.open('r', encoding='utf-8') as fr:
+        sdkconfig = json.load(fr)
+
+    if not isinstance(sdkconfig, dict):
+        raise RuntimeError(f'invalid sdkconfig.json object: {sdkconfig_json}')
+
+    selects_rev_less_v3 = sdkconfig.get('ESP32P4_SELECTS_REV_LESS_V3')
+    if selects_rev_less_v3 is True:
+        return 1, '__rev1'
+
+    return 3, '__rev3'
+
+
 def _write_output_json(
     out_json: Path,
     board: str,
-    target: str,
+    board_brand: str,
+    chip: str,
+    rev: int,
     merged_binary_name: str,
     flash_size: str,
     nvs_start: str,
@@ -209,7 +232,8 @@ def _write_output_json(
 ) -> None:
     payload = {
         'board': board,
-        'chip': target,
+        'board_brand': board_brand,
+        'chip': chip,
         'merged_binary': merged_binary_name,
         'min_flash_size': flash_size,
         'nvs_info': {
@@ -217,6 +241,8 @@ def _write_output_json(
             'size': nvs_size,
         },
     }
+    if chip == 'esp32p4':
+        payload['rev'] = rev
 
     out_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
@@ -226,6 +252,8 @@ def main() -> int:
     if not board:
         _log('EXAMPLE_BOARD is not set')
         return 1
+
+    board_brand = os.getenv('EXAMPLE_BOARD_BRAND', '').strip() or 'others'
 
     target = os.getenv('EXAMPLE_TARGET', '').strip()
     if not target:
@@ -247,20 +275,26 @@ def main() -> int:
     merge_dir.mkdir(parents=True, exist_ok=True)
 
     git_desc = _git_description()
-    out_basename = f'{board}__{git_desc}'
-    out_bin = merge_dir / f'{out_basename}.bin'
-    out_json = merge_dir / f'{out_basename}.json'
 
     for build_dir in build_dirs:
         _log(f'Trying build directory: {build_dir}')
         try:
             _, flash_size, partition_file = _load_flasher_json(build_dir)
+            rev = 0
+            filename_suffix = ''
+            if target == 'esp32p4':
+                rev, filename_suffix = _resolve_rev_and_suffix(build_dir, target)
+            out_basename = f'{board}__{git_desc}{filename_suffix}'
+            out_bin = merge_dir / f'{out_basename}.bin'
+            out_json = merge_dir / f'{out_basename}.json'
             nvs_start, nvs_size = _extract_nvs_info(build_dir, partition_file)
             _merge_bin(build_dir, target, out_bin)
             _write_output_json(
                 out_json=out_json,
                 board=board,
-                target=target,
+                board_brand=board_brand,
+                chip=target,
+                rev=rev,
                 merged_binary_name=out_bin.name,
                 flash_size=flash_size,
                 nvs_start=nvs_start,

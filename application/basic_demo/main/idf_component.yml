@@ -133,6 +133,12 @@ dependencies:
   lua_module_i2c:
     path: ../../../components/lua_modules/lua_module_i2c
 
+  lua_module_lcd:
+    path: ../../../components/lua_modules/lua_module_lcd
+
+  lua_module_ssd1306:
+    path: ../../../components/lua_modules/lua_module_ssd1306
+
   lua_module_lcd_touch:
     matches:
       - if: $CONFIG{ESP_BOARD_DEV_LCD_TOUCH_I2C_SUPPORT} == True
