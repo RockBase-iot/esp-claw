@@ -2,6 +2,7 @@ set(main_requires
     app_claw
     app_config
     captive_dns
+    cmd_wifi
     http_server
     wifi_manager
     display_arbiter
