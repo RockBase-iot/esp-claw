@@ -14,6 +14,7 @@ set(main_requires
     esp_app_format
     freertos
     spi_bus_arbiter
+    settings
 )
 
 if(CONFIG_APP_CLAW_CAP_IM_WECHAT)

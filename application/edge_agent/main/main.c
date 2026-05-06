@@ -29,6 +29,8 @@
 #include "app_boot_button.h"
 #include "claw_event_publisher.h"
 #include "sdcard_mount.h"
+#include "settings_store.h"
+#include "spi_bus_arbiter.h"
 
 #define APP_FATFS_PARTITION_LABEL "storage"
 #define APP_ENABLE_MEM_LOG        (0)
@@ -42,6 +44,20 @@ static app_claw_storage_paths_t *s_claw_paths;
 static const char *app_fatfs_base_path = "/fatfs";
 
 static wl_handle_t s_wl_handle = WL_INVALID_HANDLE;
+
+/* Bus-arbiter shims passed to settings_store so its SD-card mirror writes
+ * never collide with the LCD on the shared SPI host. */
+static bool sd_settings_bus_lock(void)
+{
+    return spi_bus_arbiter_lock(2000) == ESP_OK;
+}
+
+static void sd_settings_bus_unlock(bool was_locked)
+{
+    if (was_locked) {
+        spi_bus_arbiter_unlock();
+    }
+}
 
 static esp_err_t app_allocate_runtime_state(void)
 {
@@ -433,6 +449,40 @@ void app_main(void)
              sd_available ? "mounted at " : "unavailable",
              sd_available ? sdcard_mount_get_mount_point() : "",
              sd_available ? "" : " (no card / no fs_sdcard device / mount failed)");
+
+    /* Mirror the app_config NVS namespace to the SD card so that an
+     * `idf.py erase-flash` (or any factory re-flash) does not wipe Wi-Fi /
+     * LLM / IM credentials. After every successful settings_store_set_string
+     * the entire namespace is dumped to <sd>/config/app_config.json. If NVS
+     * is empty on boot but a backup file exists, we restore it and reload
+     * the in-RAM config snapshot. */
+    if (sd_available) {
+        char backup_path[160];
+        snprintf(backup_path, sizeof(backup_path), "%s/config/app_config.json",
+                 sdcard_mount_get_mount_point());
+        if (settings_store_set_backup_path(backup_path,
+                                           sd_settings_bus_lock,
+                                           sd_settings_bus_unlock) == ESP_OK) {
+            bool nvs_empty = false;
+            if (settings_store_is_namespace_empty(&nvs_empty) == ESP_OK
+                    && nvs_empty) {
+                esp_err_t rerr = settings_store_restore_from_backup();
+                if (rerr == ESP_OK) {
+                    ESP_LOGI(TAG, "Restored app_config from SD backup");
+                    app_config_load(s_config);
+                    app_config_to_claw(s_config, s_claw_config);
+                    app_status_screen_set_settings(s_config);
+                } else if (rerr != ESP_ERR_NOT_FOUND) {
+                    ESP_LOGW(TAG, "SD restore failed: %s", esp_err_to_name(rerr));
+                }
+            } else {
+                /* NVS already has values — make sure the SD mirror reflects
+                 * them so a subsequent re-flash can restore. */
+                (void)settings_store_dump_to_backup();
+            }
+        }
+    }
+
     {
         char inbox_dir[160];
         const char *root = sd_available ? sdcard_mount_get_mount_point()

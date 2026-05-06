@@ -197,11 +197,49 @@ static void ass_draw_text(const esp_painter_basic_font_t *font,
     if (y < 0 || y >= s_state.height) {
         return;
     }
+    /* The bundled basic_font_* tables only carry ASCII glyphs (0x20–0x7E).
+     * Multi-byte UTF-8 sequences (CJK etc.) would otherwise be sliced byte
+     * by byte and rendered as garbage glyphs. Until a real CJK font is
+     * integrated, fold any non-ASCII byte to '?' so Chinese/emoji at least
+     * render as a visible placeholder instead of pixel garbage. The first
+     * non-ASCII byte of a UTF-8 multi-byte char becomes one '?', and the
+     * trailing continuation bytes are dropped. */
+    char ascii_buf[256];
+    bool need_fold = false;
+    for (const char *p = text; *p; ++p) {
+        if ((unsigned char)*p >= 0x80) {
+            need_fold = true;
+            break;
+        }
+    }
+    const char *to_draw = text;
+    if (need_fold) {
+        size_t o = 0;
+        bool last_was_q = false;
+        for (const char *p = text; *p && o + 1 < sizeof(ascii_buf); ++p) {
+            unsigned char c = (unsigned char)*p;
+            if (c < 0x80) {
+                ascii_buf[o++] = (char)c;
+                last_was_q = false;
+            } else if ((c & 0xC0) != 0x80) {  /* lead byte of a UTF-8 char */
+                if (!last_was_q) {
+                    ascii_buf[o++] = '?';
+                    last_was_q = true;
+                }
+            }
+            /* continuation bytes (0x80..0xBF) are silently dropped */
+        }
+        ascii_buf[o] = '\0';
+        to_draw = ascii_buf;
+        if (to_draw[0] == '\0') {
+            return;
+        }
+    }
     esp_err_t err = esp_painter_draw_string(s_state.painter,
                                             (uint8_t *)s_state.fb,
                                             (uint32_t)s_state.fb_bytes,
                                             (uint16_t)x, (uint16_t)y,
-                                            font, color, text);
+                                            font, color, to_draw);
     if (err != ESP_OK && err != ESP_ERR_NOT_FOUND) {
         ESP_LOGD(TAG, "draw_string failed at (%d,%d): %s", x, y, esp_err_to_name(err));
     }
