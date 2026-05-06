@@ -1,0 +1,10 @@
+idf_component_register(
+    SRC_DIRS
+        "src"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        cap_lua
+        esp_http_client
+        json
+)

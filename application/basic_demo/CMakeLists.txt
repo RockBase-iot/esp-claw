@@ -4,6 +4,7 @@ include("${CMAKE_SOURCE_DIR}/tools/cmake/esp_idf_patch.cmake")
 include("${CMAKE_SOURCE_DIR}/tools/cmake/flash_partition_defaults.cmake")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+set(PROJECT_VER "0.1.0-nmminer")
 project(basic_demo)
 include("${CMAKE_SOURCE_DIR}/tools/cmake/board_manager_patch.cmake")
 

@@ -43,6 +43,9 @@
 #if CONFIG_APP_CLAW_LUA_MODULE_ESP_HEAP
 #include "lua_module_esp_heap.h"
 #endif
+#if CONFIG_APP_CLAW_LUA_MODULE_HTTP
+#include "lua_module_http.h"
+#endif
 #if CONFIG_APP_CLAW_LUA_MODULE_SYSTEM
 #include "lua_module_system.h"
 #endif
@@ -282,6 +285,14 @@ static esp_err_t app_lua_register_esp_heap(const char *fatfs_base_path)
 }
 #endif
 
+#if CONFIG_APP_CLAW_LUA_MODULE_HTTP
+static esp_err_t app_lua_register_http(const char *fatfs_base_path)
+{
+    (void)fatfs_base_path;
+    return lua_module_http_register();
+}
+#endif
+
 #if CONFIG_APP_CLAW_LUA_MODULE_SYSTEM
 static esp_err_t app_lua_register_system(const char *fatfs_base_path)
 {
@@ -433,6 +444,9 @@ static const app_lua_module_entry_t s_lua_module_entries[] = {
 #if CONFIG_APP_CLAW_LUA_MODULE_ESP_HEAP
     { "esp_heap", "ESP Heap", app_lua_register_esp_heap },
 #endif
+#if CONFIG_APP_CLAW_LUA_MODULE_HTTP
+    { "http", "HTTP Client", app_lua_register_http },
+#endif
 #if CONFIG_APP_CLAW_LUA_MODULE_SYSTEM
     { "system", "System", app_lua_register_system },
 #endif
@@ -501,6 +515,9 @@ static const app_lua_module_info_t s_lua_module_infos[] = {
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_ESP_HEAP
     { "esp_heap", "ESP Heap" },
+#endif
+#if CONFIG_APP_CLAW_LUA_MODULE_HTTP
+    { "http", "HTTP Client" },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_SYSTEM
     { "system", "System" },

@@ -16,6 +16,8 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "sdcard_mount.h"
+#include "spi_bus_arbiter.h"
 
 static const char *TAG = "msg_inbox";
 
@@ -33,9 +35,30 @@ typedef struct {
     void *cb_ctx;
     char persist_dir[INBOX_PERSIST_PATH_LEN];
     char persist_path[INBOX_PERSIST_PATH_LEN];
+    bool persist_on_shared_spi;   /* persist dir lives on the SD card mount */
 } app_message_inbox_state_t;
 
 static app_message_inbox_state_t s_inbox;
+
+/* Acquire/release the SPI bus arbiter only when the persist target lives on
+ * a peripheral (SD card) that shares the SPI host with the LCD. Otherwise
+ * skip — the lock is unnecessary for internal FATFS/NVS writes. Required to
+ * prevent concurrent SPI transactions when an IM message arrives while the
+ * display task is mid-refresh (would trip the spi_hal_setup_trans assert). */
+static bool inbox_spi_lock(void)
+{
+    if (!s_inbox.persist_on_shared_spi) {
+        return false;
+    }
+    return spi_bus_arbiter_lock(2000) == ESP_OK;
+}
+
+static void inbox_spi_unlock(bool was_locked)
+{
+    if (was_locked) {
+        spi_bus_arbiter_unlock();
+    }
+}
 
 static esp_err_t inbox_lock_take(void)
 {
@@ -124,10 +147,12 @@ static void inbox_persist_write(const app_message_inbox_entry_t *e)
     if (!e || s_inbox.persist_path[0] == '\0') {
         return;
     }
+    bool spi_locked = inbox_spi_lock();
     inbox_persist_rotate_if_needed();
     FILE *fp = fopen(s_inbox.persist_path, "ab");
     if (!fp) {
         ESP_LOGW(TAG, "persist open failed: %s", strerror(errno));
+        inbox_spi_unlock(spi_locked);
         return;
     }
     char ch_buf[APP_MESSAGE_INBOX_CHANNEL_LEN * 2];
@@ -140,6 +165,7 @@ static void inbox_persist_write(const app_message_inbox_entry_t *e)
             "{\"ts\":%lld,\"channel\":\"%s\",\"sender\":\"%s\",\"text\":\"%s\"}\n",
             (long long)e->timestamp_ms, ch_buf, sd_buf, tx_buf);
     fclose(fp);
+    inbox_spi_unlock(spi_locked);
 }
 
 esp_err_t app_message_inbox_set_persist_dir(const char *dir)
@@ -153,13 +179,29 @@ esp_err_t app_message_inbox_set_persist_dir(const char *dir)
     if (!dir || dir[0] == '\0') {
         s_inbox.persist_dir[0] = '\0';
         s_inbox.persist_path[0] = '\0';
+        s_inbox.persist_on_shared_spi = false;
         inbox_lock_give();
         return ESP_OK;
     }
+    /* Determine whether the persist target lives on the SD card mount point
+     * (which shares the SPI bus with the LCD) so subsequent FS calls take
+     * the SPI bus arbiter to avoid concurrent transactions. */
+    const char *sd_mp = sdcard_mount_get_mount_point();
+    bool on_sd = false;
+    if (sd_mp && sd_mp[0] != '\0') {
+        size_t mp_len = strlen(sd_mp);
+        if (strncmp(dir, sd_mp, mp_len) == 0
+                && (dir[mp_len] == '\0' || dir[mp_len] == '/')) {
+            on_sd = true;
+        }
+    }
+    s_inbox.persist_on_shared_spi = on_sd;
+    bool spi_locked = inbox_spi_lock();
     /* Best-effort mkdir(parent); ignore EEXIST. */
     if (mkdir(dir, 0775) != 0 && errno != EEXIST) {
         ESP_LOGW(TAG, "persist mkdir(%s) failed: %s", dir, strerror(errno));
     }
+    inbox_spi_unlock(spi_locked);
     strlcpy(s_inbox.persist_dir, dir, sizeof(s_inbox.persist_dir));
     int n = snprintf(s_inbox.persist_path, sizeof(s_inbox.persist_path),
                      "%s/%s", dir, INBOX_PERSIST_FILE_NAME);
@@ -327,40 +369,50 @@ esp_err_t app_message_inbox_load_persisted(size_t max_load)
         max_load = APP_MESSAGE_INBOX_CAPACITY;
     }
 
+    /* Take the SPI bus arbiter for the entire load I/O if the persist file
+     * lives on the SD card (shared SPI bus with the LCD). */
+    bool spi_locked = inbox_spi_lock();
     FILE *fp = fopen(path, "rb");
     if (!fp) {
-        if (errno == ENOENT) {
+        int saved_errno = errno;
+        inbox_spi_unlock(spi_locked);
+        if (saved_errno == ENOENT) {
             ESP_LOGI(TAG, "load: %s does not exist yet", path);
             return ESP_OK;
         }
-        ESP_LOGW(TAG, "load: fopen(%s) failed: %s", path, strerror(errno));
+        ESP_LOGW(TAG, "load: fopen(%s) failed: %s", path, strerror(saved_errno));
         return ESP_FAIL;
     }
 
     /* Tail-read: only the last ~64 KiB matter even for a huge file. */
     if (fseek(fp, 0, SEEK_END) != 0) {
         fclose(fp);
+        inbox_spi_unlock(spi_locked);
         return ESP_FAIL;
     }
     long fsize = ftell(fp);
     if (fsize <= 0) {
         fclose(fp);
+        inbox_spi_unlock(spi_locked);
         return ESP_OK;
     }
     const long tail_window = 64 * 1024;
     long offset = (fsize > tail_window) ? (fsize - tail_window) : 0;
     if (fseek(fp, offset, SEEK_SET) != 0) {
         fclose(fp);
+        inbox_spi_unlock(spi_locked);
         return ESP_FAIL;
     }
     size_t to_read = (size_t)(fsize - offset);
     char *buf = malloc(to_read + 1);
     if (!buf) {
         fclose(fp);
+        inbox_spi_unlock(spi_locked);
         return ESP_ERR_NO_MEM;
     }
     size_t got = fread(buf, 1, to_read, fp);
     fclose(fp);
+    inbox_spi_unlock(spi_locked);
     buf[got] = '\0';
 
     /* If we started mid-file, drop the first partial line. */

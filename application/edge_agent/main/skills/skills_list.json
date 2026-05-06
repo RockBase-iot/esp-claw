@@ -32,6 +32,14 @@
       "cap_groups": [
         "cap_lua"
       ]
+    },
+    {
+      "id": "nmminer",
+      "file": "nmminer.md",
+      "summary": "Discover and control NMMiner / NMAxe / NMAxeGamma / NMQAxe++ Bitcoin solo miners on the LAN via on-device Lua scripts (nmminer_scan / nmminer_info / nmminer_control / nmminer_setting). nmminer_scan auto-derives the /24 from the device's own STA IP and sweeps it; pass seed_ips=[...] only as an optional speedup. The scripts perform all HTTP work locally; the LLM only chooses a script and forwards the printed summary.",
+      "cap_groups": [
+        "cap_lua"
+      ]
     }
   ]
 }

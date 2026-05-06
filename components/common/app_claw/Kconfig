@@ -244,6 +244,15 @@ menu "App Claw Config"
                 Enable the esp_heap Lua module and keep app_claw's direct dependency
                 on lua_module_esp_heap when Lua capability is enabled.
 
+        config APP_CLAW_LUA_MODULE_HTTP
+            bool "Enable HTTP client Lua module"
+            default y
+            help
+                Enable the http Lua module (http.get/post/request) so skills can
+                talk to LAN HTTP endpoints (e.g. NMMiner /probe, /alive,
+                /api/system/info). Disabling it removes app_claw's dependency
+                on lua_module_http.
+
         config APP_CLAW_LUA_MODULE_EVENT_PUBLISHER
             bool "Enable event publisher Lua module"
             default y
