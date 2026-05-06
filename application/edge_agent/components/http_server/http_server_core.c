@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "esp_check.h"
 #include "esp_log.h"
@@ -53,6 +54,13 @@ esp_err_t http_server_init(const http_server_config_t *config)
     return ESP_OK;
 }
 
+static void http_server_close_fn(httpd_handle_t hd, int sockfd)
+{
+    (void)hd;
+    http_server_webim_ws_fd_remove(sockfd);
+    close(sockfd);
+}
+
 esp_err_t http_server_start(void)
 {
     if (s_ctx.server) {
@@ -64,6 +72,9 @@ esp_err_t http_server_start(void)
     config.ctrl_port = HTTP_SERVER_CTRL_PORT;
     config.max_uri_handlers = 32;
     config.stack_size = 8192;
+    config.max_open_sockets = 12;
+    config.lru_purge_enable = true;
+    config.close_fn = http_server_close_fn;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     ESP_RETURN_ON_ERROR(httpd_start(&s_ctx.server, &config), TAG, "Failed to start HTTP server");

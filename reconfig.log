@@ -1,0 +1,317 @@
+[Board Manager] Checking sdkconfig consistency before action execution...
+   sdkconfig board-manager symbols are consistent with current board generation
+Executing action: reconfigure
+Running cmake in directory E:\github\esp-claw\application\basic_demo\build
+Executing "cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe -DESP_PLATFORM=1 -DCCACHE_ENABLE=1 E:\github\esp-claw\application\basic_demo"...
+-- [basic_demo] ESP-IDF patch already applied: E:/github/esp-claw/application/basic_demo/tools/esp-idf.patch
+-- [basic_demo] Partition table auto-selected: partitions_16MB.csv
+-- Minimal build - OFF
+-- ccache will be used for faster recompilation
+-- Building ESP-IDF components for target esp32c5
+NOTICE: Skipping optional dependency: espressif/esp_wifi_remote
+NOTICE: Skipping optional dependency: espressif/esp_hosted
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_boards for dependency "cap_boards", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_cli for dependency "cap_cli", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_files for dependency "cap_files", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_attachment for dependency "cap_im_attachment", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_feishu for dependency "cap_im_feishu", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_qq for dependency "cap_im_qq", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_tg for dependency "cap_im_tg", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_wechat for dependency "cap_im_wechat", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_llm_inspect for dependency "cap_llm_inspect", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_lua for dependency "cap_lua", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_mcp_client for dependency "cap_mcp_client", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_mcp_server for dependency "cap_mcp_server", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_router_mgr for dependency "cap_router_mgr", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_scheduler for dependency "cap_scheduler", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_session_mgr for dependency "cap_session_mgr", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_skill_mgr for dependency "cap_skill_mgr", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_system for dependency "cap_system", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_time for dependency "cap_time", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_web_search for dependency "cap_web_search", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_cap for dependency "claw_cap", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_core for dependency "claw_core", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_event_router for dependency "claw_event_router", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_memory for dependency "claw_memory", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_skill for dependency "claw_skill", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\esp_painter for dependency "esp_painter", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_adc for dependency "lua_module_adc", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_board_manager for dependency "lua_module_board_manager", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_button for dependency "lua_module_button", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_call_capability for dependency "lua_module_call_capability", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_delay for dependency "lua_module_delay", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_display for dependency "lua_module_display", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_esp_heap for dependency "lua_module_esp_heap", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_event_publisher for dependency "lua_module_event_publisher", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_gpio for dependency "lua_module_gpio", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_i2c for dependency "lua_module_i2c", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_led_strip for dependency "lua_module_led_strip", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_mcpwm for dependency "lua_module_mcpwm", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_storage for dependency "lua_module_storage", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_system for dependency "lua_module_system", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_uart for dependency "lua_module_uart", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Processing 61 dependencies:
+NOTICE: [1/61] cap_boards (*) (E:\github\esp-claw\components\claw_capabilities\cap_boards)
+NOTICE: [2/61] cap_cli (*) (E:\github\esp-claw\components\claw_capabilities\cap_cli)
+NOTICE: [3/61] cap_files (*) (E:\github\esp-claw\components\claw_capabilities\cap_files)
+NOTICE: [4/61] cap_im_attachment (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_attachment)
+NOTICE: [5/61] cap_im_feishu (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_feishu)
+NOTICE: [6/61] cap_im_qq (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_qq)
+NOTICE: [7/61] cap_im_tg (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_tg)
+NOTICE: [8/61] cap_im_wechat (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_wechat)
+NOTICE: [9/61] cap_llm_inspect (*) (E:\github\esp-claw\components\claw_capabilities\cap_llm_inspect)
+NOTICE: [10/61] cap_lua (*) (E:\github\esp-claw\components\claw_capabilities\cap_lua)
+NOTICE: [11/61] cap_mcp_client (*) (E:\github\esp-claw\components\claw_capabilities\cap_mcp_client)
+NOTICE: [12/61] cap_mcp_server (*) (E:\github\esp-claw\components\claw_capabilities\cap_mcp_server)
+NOTICE: [13/61] cap_router_mgr (*) (E:\github\esp-claw\components\claw_capabilities\cap_router_mgr)
+NOTICE: [14/61] cap_scheduler (*) (E:\github\esp-claw\components\claw_capabilities\cap_scheduler)
+NOTICE: [15/61] cap_session_mgr (*) (E:\github\esp-claw\components\claw_capabilities\cap_session_mgr)
+NOTICE: [16/61] cap_skill_mgr (*) (E:\github\esp-claw\components\claw_capabilities\cap_skill_mgr)
+NOTICE: [17/61] cap_system (*) (E:\github\esp-claw\components\claw_capabilities\cap_system)
+NOTICE: [18/61] cap_time (*) (E:\github\esp-claw\components\claw_capabilities\cap_time)
+NOTICE: [19/61] cap_web_search (*) (E:\github\esp-claw\components\claw_capabilities\cap_web_search)
+NOTICE: [20/61] claw_cap (*) (E:\github\esp-claw\components\claw_modules\claw_cap)
+NOTICE: [21/61] claw_core (*) (E:\github\esp-claw\components\claw_modules\claw_core)
+NOTICE: [22/61] claw_event_router (*) (E:\github\esp-claw\components\claw_modules\claw_event_router)
+NOTICE: [23/61] claw_memory (*) (E:\github\esp-claw\components\claw_modules\claw_memory)
+NOTICE: [24/61] claw_skill (*) (E:\github\esp-claw\components\claw_modules\claw_skill)
+NOTICE: [25/61] esp_painter (*) (E:\github\esp-claw\components\lua_modules\esp_painter)
+NOTICE: [26/61] espressif/button (4.1.6)
+NOTICE: [27/61] espressif/cmake_utilities (0.5.0)
+NOTICE: [28/61] espressif/esp_board_manager (0.5.8)
+NOTICE: [29/61] espressif/esp_lcd_touch (1.2.1)
+NOTICE: [30/61] espressif/esp_mmap_assets (1.4.0)
+NOTICE: [31/61] espressif/esp_new_jpeg (1.0.0)
+NOTICE: [32/61] espressif/esp_websocket_client (1.6.1)
+NOTICE: [33/61] espressif/freetype (2.14.2)
+NOTICE: [34/61] espressif/i2c_bus (1.5.1)
+NOTICE: [35/61] espressif/led_strip (3.0.3)
+NOTICE: [36/61] espressif/libpng (1.6.56)
+NOTICE: [37/61] espressif/mcp-c-sdk (1.0.0)
+NOTICE: [38/61] espressif/mdns (1.11.1)
+NOTICE: [39/61] espressif/zlib (1.3.2)
+NOTICE: [40/61] espressif2022/esp_emote_assets (0.1.2)
+NOTICE: [41/61] espressif2022/esp_emote_expression (1.0.0)
+NOTICE: [42/61] espressif2022/esp_emote_gfx (3.0.2)
+NOTICE: [43/61] georgik/lua (5.5.0~7)
+NOTICE: [44/61] laride/heatshrink (0.4.1)
+NOTICE: [45/61] lua_module_adc (*) (E:\github\esp-claw\components\lua_modules\lua_module_adc)
+NOTICE: [46/61] lua_module_board_manager (*) (E:\github\esp-claw\components\lua_modules\lua_module_board_manager)
+NOTICE: [47/61] lua_module_button (*) (E:\github\esp-claw\components\lua_modules\lua_module_button)
+NOTICE: [48/61] lua_module_call_capability (*) (E:\github\esp-claw\components\lua_modules\lua_module_call_capability)
+NOTICE: [49/61] lua_module_delay (*) (E:\github\esp-claw\components\lua_modules\lua_module_delay)
+NOTICE: [50/61] lua_module_display (*) (E:\github\esp-claw\components\lua_modules\lua_module_display)
+NOTICE: [51/61] lua_module_esp_heap (*) (E:\github\esp-claw\components\lua_modules\lua_module_esp_heap)
+NOTICE: [52/61] lua_module_event_publisher (*) (E:\github\esp-claw\components\lua_modules\lua_module_event_publisher)
+NOTICE: [53/61] lua_module_gpio (*) (E:\github\esp-claw\components\lua_modules\lua_module_gpio)
+NOTICE: [54/61] lua_module_i2c (*) (E:\github\esp-claw\components\lua_modules\lua_module_i2c)
+NOTICE: [55/61] lua_module_led_strip (*) (E:\github\esp-claw\components\lua_modules\lua_module_led_strip)
+NOTICE: [56/61] lua_module_mcpwm (*) (E:\github\esp-claw\components\lua_modules\lua_module_mcpwm)
+NOTICE: [57/61] lua_module_storage (*) (E:\github\esp-claw\components\lua_modules\lua_module_storage)
+NOTICE: [58/61] lua_module_system (*) (E:\github\esp-claw\components\lua_modules\lua_module_system)
+NOTICE: [59/61] lua_module_uart (*) (E:\github\esp-claw\components\lua_modules\lua_module_uart)
+NOTICE: [60/61] lvgl/lvgl (9.5.0)
+NOTICE: [61/61] idf (5.5.4)
+CMake Warning at C:/Espressif/frameworks/esp-idf-v5.5.4/tools/cmake/build.cmake:629 (message):
+Call Stack (most recent call first):
+  C:/Espressif/frameworks/esp-idf-v5.5.4/tools/cmake/project.cmake:752 (idf_build_process)
+  CMakeLists.txt:7 (project)
+
+
+-- Selected Board: nm_cyd_c5
+-- Board Path: E:/github/esp-claw/application/basic_demo/boards/nm_cyd_c5
+-- Using esp_driver_i2c (SRC_FILE=i2c_bus_v2.c, REQ=esp_driver_i2c driver)
+NOTICE: Skipping optional dependency: espressif/esp_wifi_remote
+NOTICE: Skipping optional dependency: espressif/esp_hosted
+-- Project sdkconfig file E:/github/esp-claw/application/basic_demo/sdkconfig
+Loading defaults file E:/github/esp-claw/application/basic_demo/sdkconfig.defaults...
+Loading defaults file E:/github/esp-claw/application/basic_demo/build/basic_demo_partition_auto.defaults...
+CMake Warning at C:/Espressif/frameworks/esp-idf-v5.5.4/tools/cmake/project.cmake:765 (message):
+  Missing kconfig option.  Re-run the build process...
+Call Stack (most recent call first):
+  CMakeLists.txt:7 (project)
+
+
+NOTICE: Skipping optional dependency: espressif/button
+NOTICE: Skipping optional dependency: espressif/esp_codec_dev
+NOTICE: Skipping optional dependency: espressif/esp_io_expander
+NOTICE: Skipping optional dependency: espressif/esp_lcd_touch
+NOTICE: Skipping optional dependency: espressif/esp_video
+NOTICE: Skipping optional dependency: espressif/esp_wifi_remote
+NOTICE: Skipping optional dependency: espressif/esp_hosted
+NOTICE: Skipping optional dependency: lua_module_audio
+NOTICE: Skipping optional dependency: lua_module_camera
+NOTICE: Skipping optional dependency: lua_module_lcd_touch
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_boards for dependency "cap_boards", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_cli for dependency "cap_cli", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_files for dependency "cap_files", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_attachment for dependency "cap_im_attachment", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_feishu for dependency "cap_im_feishu", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_qq for dependency "cap_im_qq", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_tg for dependency "cap_im_tg", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_im_wechat for dependency "cap_im_wechat", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_llm_inspect for dependency "cap_llm_inspect", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_lua for dependency "cap_lua", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_mcp_client for dependency "cap_mcp_client", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_mcp_server for dependency "cap_mcp_server", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_router_mgr for dependency "cap_router_mgr", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_scheduler for dependency "cap_scheduler", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_session_mgr for dependency "cap_session_mgr", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_skill_mgr for dependency "cap_skill_mgr", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_system for dependency "cap_system", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_time for dependency "cap_time", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_capabilities\cap_web_search for dependency "cap_web_search", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_cap for dependency "claw_cap", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_core for dependency "claw_core", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_event_router for dependency "claw_event_router", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_memory for dependency "claw_memory", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\claw_modules\claw_skill for dependency "claw_skill", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\esp_painter for dependency "esp_painter", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_adc for dependency "lua_module_adc", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_board_manager for dependency "lua_module_board_manager", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_button for dependency "lua_module_button", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_call_capability for dependency "lua_module_call_capability", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_delay for dependency "lua_module_delay", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_display for dependency "lua_module_display", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_esp_heap for dependency "lua_module_esp_heap", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_event_publisher for dependency "lua_module_event_publisher", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_gpio for dependency "lua_module_gpio", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_i2c for dependency "lua_module_i2c", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_led_strip for dependency "lua_module_led_strip", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_mcpwm for dependency "lua_module_mcpwm", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_storage for dependency "lua_module_storage", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_system for dependency "lua_module_system", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Using component placed at E:\github\esp-claw\components\lua_modules\lua_module_uart for dependency "lua_module_uart", specified in E:\github\esp-claw\application\basic_demo\main\idf_component.yml
+NOTICE: Processing 61 dependencies:
+NOTICE: [1/61] cap_boards (*) (E:\github\esp-claw\components\claw_capabilities\cap_boards)
+NOTICE: [2/61] cap_cli (*) (E:\github\esp-claw\components\claw_capabilities\cap_cli)
+NOTICE: [3/61] cap_files (*) (E:\github\esp-claw\components\claw_capabilities\cap_files)
+NOTICE: [4/61] cap_im_attachment (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_attachment)
+NOTICE: [5/61] cap_im_feishu (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_feishu)
+NOTICE: [6/61] cap_im_qq (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_qq)
+NOTICE: [7/61] cap_im_tg (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_tg)
+NOTICE: [8/61] cap_im_wechat (*) (E:\github\esp-claw\components\claw_capabilities\cap_im_wechat)
+NOTICE: [9/61] cap_llm_inspect (*) (E:\github\esp-claw\components\claw_capabilities\cap_llm_inspect)
+NOTICE: [10/61] cap_lua (*) (E:\github\esp-claw\components\claw_capabilities\cap_lua)
+NOTICE: [11/61] cap_mcp_client (*) (E:\github\esp-claw\components\claw_capabilities\cap_mcp_client)
+NOTICE: [12/61] cap_mcp_server (*) (E:\github\esp-claw\components\claw_capabilities\cap_mcp_server)
+NOTICE: [13/61] cap_router_mgr (*) (E:\github\esp-claw\components\claw_capabilities\cap_router_mgr)
+NOTICE: [14/61] cap_scheduler (*) (E:\github\esp-claw\components\claw_capabilities\cap_scheduler)
+NOTICE: [15/61] cap_session_mgr (*) (E:\github\esp-claw\components\claw_capabilities\cap_session_mgr)
+NOTICE: [16/61] cap_skill_mgr (*) (E:\github\esp-claw\components\claw_capabilities\cap_skill_mgr)
+NOTICE: [17/61] cap_system (*) (E:\github\esp-claw\components\claw_capabilities\cap_system)
+NOTICE: [18/61] cap_time (*) (E:\github\esp-claw\components\claw_capabilities\cap_time)
+NOTICE: [19/61] cap_web_search (*) (E:\github\esp-claw\components\claw_capabilities\cap_web_search)
+NOTICE: [20/61] claw_cap (*) (E:\github\esp-claw\components\claw_modules\claw_cap)
+NOTICE: [21/61] claw_core (*) (E:\github\esp-claw\components\claw_modules\claw_core)
+NOTICE: [22/61] claw_event_router (*) (E:\github\esp-claw\components\claw_modules\claw_event_router)
+NOTICE: [23/61] claw_memory (*) (E:\github\esp-claw\components\claw_modules\claw_memory)
+NOTICE: [24/61] claw_skill (*) (E:\github\esp-claw\components\claw_modules\claw_skill)
+NOTICE: [25/61] esp_painter (*) (E:\github\esp-claw\components\lua_modules\esp_painter)
+NOTICE: [26/61] espressif/button (4.1.6)
+NOTICE: [27/61] espressif/cmake_utilities (0.5.0)
+NOTICE: [28/61] espressif/esp_board_manager (0.5.8)
+NOTICE: [29/61] espressif/esp_lcd_touch (1.2.1)
+NOTICE: [30/61] espressif/esp_mmap_assets (1.4.0)
+NOTICE: [31/61] espressif/esp_new_jpeg (1.0.0)
+NOTICE: [32/61] espressif/esp_websocket_client (1.6.1)
+NOTICE: [33/61] espressif/freetype (2.14.2)
+NOTICE: [34/61] espressif/i2c_bus (1.5.1)
+NOTICE: [35/61] espressif/led_strip (3.0.3)
+NOTICE: [36/61] espressif/libpng (1.6.56)
+NOTICE: [37/61] espressif/mcp-c-sdk (1.0.0)
+NOTICE: [38/61] espressif/mdns (1.11.1)
+NOTICE: [39/61] espressif/zlib (1.3.2)
+NOTICE: [40/61] espressif2022/esp_emote_assets (0.1.2)
+NOTICE: [41/61] espressif2022/esp_emote_expression (1.0.0)
+NOTICE: [42/61] espressif2022/esp_emote_gfx (3.0.2)
+NOTICE: [43/61] georgik/lua (5.5.0~7)
+NOTICE: [44/61] laride/heatshrink (0.4.1)
+NOTICE: [45/61] lua_module_adc (*) (E:\github\esp-claw\components\lua_modules\lua_module_adc)
+NOTICE: [46/61] lua_module_board_manager (*) (E:\github\esp-claw\components\lua_modules\lua_module_board_manager)
+NOTICE: [47/61] lua_module_button (*) (E:\github\esp-claw\components\lua_modules\lua_module_button)
+NOTICE: [48/61] lua_module_call_capability (*) (E:\github\esp-claw\components\lua_modules\lua_module_call_capability)
+NOTICE: [49/61] lua_module_delay (*) (E:\github\esp-claw\components\lua_modules\lua_module_delay)
+NOTICE: [50/61] lua_module_display (*) (E:\github\esp-claw\components\lua_modules\lua_module_display)
+NOTICE: [51/61] lua_module_esp_heap (*) (E:\github\esp-claw\components\lua_modules\lua_module_esp_heap)
+NOTICE: [52/61] lua_module_event_publisher (*) (E:\github\esp-claw\components\lua_modules\lua_module_event_publisher)
+NOTICE: [53/61] lua_module_gpio (*) (E:\github\esp-claw\components\lua_modules\lua_module_gpio)
+NOTICE: [54/61] lua_module_i2c (*) (E:\github\esp-claw\components\lua_modules\lua_module_i2c)
+NOTICE: [55/61] lua_module_led_strip (*) (E:\github\esp-claw\components\lua_modules\lua_module_led_strip)
+NOTICE: [56/61] lua_module_mcpwm (*) (E:\github\esp-claw\components\lua_modules\lua_module_mcpwm)
+NOTICE: [57/61] lua_module_storage (*) (E:\github\esp-claw\components\lua_modules\lua_module_storage)
+NOTICE: [58/61] lua_module_system (*) (E:\github\esp-claw\components\lua_modules\lua_module_system)
+NOTICE: [59/61] lua_module_uart (*) (E:\github\esp-claw\components\lua_modules\lua_module_uart)
+NOTICE: [60/61] lvgl/lvgl (9.5.0)
+NOTICE: [61/61] idf (5.5.4)
+-- Selected Board: nm_cyd_c5
+-- Board Path: E:/github/esp-claw/application/basic_demo/boards/nm_cyd_c5
+-- Using esp_driver_i2c (SRC_FILE=i2c_bus_v2.c, REQ=esp_driver_i2c driver)
+NOTICE: Skipping optional dependency: espressif/esp_wifi_remote
+NOTICE: Skipping optional dependency: espressif/esp_hosted
+NOTICE: Skipping optional dependency: lua_module_audio
+NOTICE: Skipping optional dependency: lua_module_camera
+NOTICE: Skipping optional dependency: lua_module_lcd_touch
+NOTICE: Skipping optional dependency: espressif/button
+NOTICE: Skipping optional dependency: espressif/esp_codec_dev
+NOTICE: Skipping optional dependency: espressif/esp_io_expander
+NOTICE: Skipping optional dependency: espressif/esp_lcd_touch
+NOTICE: Skipping optional dependency: espressif/esp_video
+-- Project sdkconfig file E:/github/esp-claw/application/basic_demo/sdkconfig
+Loading defaults file E:/github/esp-claw/application/basic_demo/sdkconfig.defaults...
+Loading defaults file E:/github/esp-claw/application/basic_demo/build/basic_demo_partition_auto.defaults...
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/riscv/ld/rom.api.ld
+-- USING O3
+-- App "basic_demo" version: a82fdd2-dirty
+-- Adding linker script E:/github/esp-claw/application/basic_demo/build/esp-idf/esp_system/ld/memory.ld
+-- Adding linker script E:/github/esp-claw/application/basic_demo/build/esp-idf/esp_system/ld/sections.ld.in
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.api.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.rvfp.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.wdt.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.systimer.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.version.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.phy.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.coexist.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.net80211.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.pp.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.libc.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.newlib.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom/esp32c5/ld/esp32c5.rom.heap.ld
+-- Adding linker script C:/Espressif/frameworks/esp-idf-v5.5.4/components/soc/esp32c5/ld/esp32c5.peripherals.ld
+-- I2C_SUPPORT
+-- LCD_SPI_SUPPORT
+-- LEDC_SUPPORT
+-- ESP_MMAP_ASSETS: 1.4.0
+-- Could NOT find PkgConfig (missing: PKG_CONFIG_EXECUTABLE) 
+-- ESP_EMOTE_EXPRESSION: 1.0.0
+-- BUTTON: 4.1.6
+-- Using esp_driver_i2c (SRC_FILE=i2c_bus_v2.c, REQ=esp_driver_i2c driver)
+-- I2C_BUS: 1.5.1
+-- Partition 'emote' size validation:
+--   File size: 2426K (2484943 bytes)
+--   Partition size: 3072K (0x300000 bytes)
+--   ✓ Partition size validation passed
+-- Generated emote assets: E:/github/esp-claw/application/basic_demo/build/emote_assets.bin -> emote partition
+-- Selected Board: nm_cyd_c5
+-- Board Path: E:/github/esp-claw/application/basic_demo/boards/nm_cyd_c5
+-- Component idf::espressif__esp_board_manager will be linked with -Wl,--whole-archive
+-- Component idf::espressif2022__esp_emote_expression will be linked with -Wl,--whole-archive
+-- Component idf::gen_bmgr_codes will be linked with -Wl,--whole-archive
+-- Components: app_trace app_update bootloader bootloader_support bt cap_boards cap_cli cap_files cap_im_attachment cap_im_feishu cap_im_qq cap_im_tg cap_im_wechat cap_llm_inspect cap_lua cap_mcp_client cap_mcp_server cap_router_mgr cap_scheduler cap_session_mgr cap_skill_mgr cap_system cap_time cap_web_search claw_cap claw_core claw_event_router claw_memory claw_skill cmock console cxx display_arbiter driver efuse esp-tls esp_adc esp_app_format esp_bootloader_format esp_coex esp_common esp_driver_ana_cmpr esp_driver_bitscrambler esp_driver_cam esp_driver_dac esp_driver_gpio esp_driver_gptimer esp_driver_i2c esp_driver_i2s esp_driver_isp esp_driver_jpeg esp_driver_ledc esp_driver_mcpwm esp_driver_parlio esp_driver_pcnt esp_driver_ppa esp_driver_rmt esp_driver_sdio esp_driver_sdm esp_driver_sdmmc esp_driver_sdspi esp_driver_spi esp_driver_touch_sens esp_driver_tsens esp_driver_twai esp_driver_uart esp_driver_usb_serial_jtag esp_eth esp_event esp_gdbstub esp_hal_ieee802154 esp_hid esp_http_client esp_http_server esp_https_ota esp_https_server esp_hw_support esp_lcd esp_local_ctrl esp_mm esp_netif esp_netif_stack esp_painter esp_partition esp_phy esp_pm esp_psram esp_ringbuf esp_rom esp_security esp_system esp_tee esp_timer esp_vfs_console esp_wifi espcoredump espressif2022__esp_emote_assets espressif2022__esp_emote_expression espressif2022__esp_emote_gfx espressif__button espressif__cmake_utilities espressif__esp_board_manager espressif__esp_lcd_touch espressif__esp_mmap_assets espressif__esp_new_jpeg espressif__esp_websocket_client espressif__freetype espressif__i2c_bus espressif__led_strip espressif__libpng espressif__mcp-c-sdk espressif__mdns espressif__zlib esptool_py fatfs freertos gen_bmgr_codes georgik__lua hal heap http_parser idf_test ieee802154 json laride__heatshrink log lua_module_adc lua_module_board_manager lua_module_button lua_module_call_capability lua_module_delay lua_module_display lua_module_esp_heap lua_module_event_publisher lua_module_gpio lua_module_i2c lua_module_led_strip lua_module_mcpwm lua_module_storage lua_module_system lua_module_uart lvgl__lvgl lwip main mbedtls mqtt newlib nvs_flash nvs_sec_provider openthread partition_table protobuf-c protocomm pthread riscv rt sdmmc soc spi_flash spiffs tcp_transport ulp unity usb vfs wear_levelling wifi_provisioning wpa_supplicant
+-- Component paths: C:/Espressif/frameworks/esp-idf-v5.5.4/components/app_trace C:/Espressif/frameworks/esp-idf-v5.5.4/components/app_update C:/Espressif/frameworks/esp-idf-v5.5.4/components/bootloader C:/Espressif/frameworks/esp-idf-v5.5.4/components/bootloader_support C:/Espressif/frameworks/esp-idf-v5.5.4/components/bt E:/github/esp-claw/components/claw_capabilities/cap_boards E:/github/esp-claw/components/claw_capabilities/cap_cli E:/github/esp-claw/components/claw_capabilities/cap_files E:/github/esp-claw/components/claw_capabilities/cap_im_attachment E:/github/esp-claw/components/claw_capabilities/cap_im_feishu E:/github/esp-claw/components/claw_capabilities/cap_im_qq E:/github/esp-claw/components/claw_capabilities/cap_im_tg E:/github/esp-claw/components/claw_capabilities/cap_im_wechat E:/github/esp-claw/components/claw_capabilities/cap_llm_inspect E:/github/esp-claw/components/claw_capabilities/cap_lua E:/github/esp-claw/components/claw_capabilities/cap_mcp_client E:/github/esp-claw/components/claw_capabilities/cap_mcp_server E:/github/esp-claw/components/claw_capabilities/cap_router_mgr E:/github/esp-claw/components/claw_capabilities/cap_scheduler E:/github/esp-claw/components/claw_capabilities/cap_session_mgr E:/github/esp-claw/components/claw_capabilities/cap_skill_mgr E:/github/esp-claw/components/claw_capabilities/cap_system E:/github/esp-claw/components/claw_capabilities/cap_time E:/github/esp-claw/components/claw_capabilities/cap_web_search E:/github/esp-claw/components/claw_modules/claw_cap E:/github/esp-claw/components/claw_modules/claw_core E:/github/esp-claw/components/claw_modules/claw_event_router E:/github/esp-claw/components/claw_modules/claw_memory E:/github/esp-claw/components/claw_modules/claw_skill C:/Espressif/frameworks/esp-idf-v5.5.4/components/cmock C:/Espressif/frameworks/esp-idf-v5.5.4/components/console C:/Espressif/frameworks/esp-idf-v5.5.4/components/cxx E:/github/esp-claw/application/basic_demo/components/display_arbiter C:/Espressif/frameworks/esp-idf-v5.5.4/components/driver C:/Espressif/frameworks/esp-idf-v5.5.4/components/efuse C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp-tls C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_adc C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_app_format C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_bootloader_format C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_coex C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_common C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_ana_cmpr C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_bitscrambler C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_cam C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_dac C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_gpio C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_gptimer C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_i2c C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_i2s C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_isp C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_jpeg C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_ledc C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_mcpwm C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_parlio C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_pcnt C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_ppa C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_rmt C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_sdio C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_sdm C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_sdmmc C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_sdspi C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_spi C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_touch_sens C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_tsens C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_twai C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_uart C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_driver_usb_serial_jtag C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_eth C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_event C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_gdbstub C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_hal_ieee802154 C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_hid C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_http_client C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_http_server C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_https_ota C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_https_server C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_hw_support C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_lcd C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_local_ctrl C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_mm C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_netif C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_netif_stack E:/github/esp-claw/components/lua_modules/esp_painter C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_partition C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_phy C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_pm C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_psram C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_ringbuf C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_rom C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_security C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_system C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_tee C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_timer C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_vfs_console C:/Espressif/frameworks/esp-idf-v5.5.4/components/esp_wifi C:/Espressif/frameworks/esp-idf-v5.5.4/components/espcoredump E:/github/esp-claw/application/basic_demo/managed_components/espressif2022__esp_emote_assets E:/github/esp-claw/application/basic_demo/managed_components/espressif2022__esp_emote_expression E:/github/esp-claw/application/basic_demo/managed_components/espressif2022__esp_emote_gfx E:/github/esp-claw/application/basic_demo/managed_components/espressif__button E:/github/esp-claw/application/basic_demo/managed_components/espressif__cmake_utilities E:/github/esp-claw/application/basic_demo/managed_components/espressif__esp_board_manager E:/github/esp-claw/application/basic_demo/managed_components/espressif__esp_lcd_touch E:/github/esp-claw/application/basic_demo/managed_components/espressif__esp_mmap_assets E:/github/esp-claw/application/basic_demo/managed_components/espressif__esp_new_jpeg E:/github/esp-claw/application/basic_demo/managed_components/espressif__esp_websocket_client E:/github/esp-claw/application/basic_demo/managed_components/espressif__freetype E:/github/esp-claw/application/basic_demo/managed_components/espressif__i2c_bus E:/github/esp-claw/application/basic_demo/managed_components/espressif__led_strip E:/github/esp-claw/application/basic_demo/managed_components/espressif__libpng E:/github/esp-claw/application/basic_demo/managed_components/espressif__mcp-c-sdk E:/github/esp-claw/application/basic_demo/managed_components/espressif__mdns E:/github/esp-claw/application/basic_demo/managed_components/espressif__zlib C:/Espressif/frameworks/esp-idf-v5.5.4/components/esptool_py C:/Espressif/frameworks/esp-idf-v5.5.4/components/fatfs C:/Espressif/frameworks/esp-idf-v5.5.4/components/freertos E:/github/esp-claw/application/basic_demo/components/gen_bmgr_codes E:/github/esp-claw/application/basic_demo/managed_components/georgik__lua C:/Espressif/frameworks/esp-idf-v5.5.4/components/hal C:/Espressif/frameworks/esp-idf-v5.5.4/components/heap C:/Espressif/frameworks/esp-idf-v5.5.4/components/http_parser C:/Espressif/frameworks/esp-idf-v5.5.4/components/idf_test C:/Espressif/frameworks/esp-idf-v5.5.4/components/ieee802154 C:/Espressif/frameworks/esp-idf-v5.5.4/components/json E:/github/esp-claw/application/basic_demo/managed_components/laride__heatshrink C:/Espressif/frameworks/esp-idf-v5.5.4/components/log E:/github/esp-claw/components/lua_modules/lua_module_adc E:/github/esp-claw/components/lua_modules/lua_module_board_manager E:/github/esp-claw/components/lua_modules/lua_module_button E:/github/esp-claw/components/lua_modules/lua_module_call_capability E:/github/esp-claw/components/lua_modules/lua_module_delay E:/github/esp-claw/components/lua_modules/lua_module_display E:/github/esp-claw/components/lua_modules/lua_module_esp_heap E:/github/esp-claw/components/lua_modules/lua_module_event_publisher E:/github/esp-claw/components/lua_modules/lua_module_gpio E:/github/esp-claw/components/lua_modules/lua_module_i2c E:/github/esp-claw/components/lua_modules/lua_module_led_strip E:/github/esp-claw/components/lua_modules/lua_module_mcpwm E:/github/esp-claw/components/lua_modules/lua_module_storage E:/github/esp-claw/components/lua_modules/lua_module_system E:/github/esp-claw/components/lua_modules/lua_module_uart E:/github/esp-claw/application/basic_demo/managed_components/lvgl__lvgl C:/Espressif/frameworks/esp-idf-v5.5.4/components/lwip E:/github/esp-claw/application/basic_demo/main C:/Espressif/frameworks/esp-idf-v5.5.4/components/mbedtls C:/Espressif/frameworks/esp-idf-v5.5.4/components/mqtt C:/Espressif/frameworks/esp-idf-v5.5.4/components/newlib C:/Espressif/frameworks/esp-idf-v5.5.4/components/nvs_flash C:/Espressif/frameworks/esp-idf-v5.5.4/components/nvs_sec_provider C:/Espressif/frameworks/esp-idf-v5.5.4/components/openthread C:/Espressif/frameworks/esp-idf-v5.5.4/components/partition_table C:/Espressif/frameworks/esp-idf-v5.5.4/components/protobuf-c C:/Espressif/frameworks/esp-idf-v5.5.4/components/protocomm C:/Espressif/frameworks/esp-idf-v5.5.4/components/pthread C:/Espressif/frameworks/esp-idf-v5.5.4/components/riscv C:/Espressif/frameworks/esp-idf-v5.5.4/components/rt C:/Espressif/frameworks/esp-idf-v5.5.4/components/sdmmc C:/Espressif/frameworks/esp-idf-v5.5.4/components/soc C:/Espressif/frameworks/esp-idf-v5.5.4/components/spi_flash C:/Espressif/frameworks/esp-idf-v5.5.4/components/spiffs C:/Espressif/frameworks/esp-idf-v5.5.4/components/tcp_transport C:/Espressif/frameworks/esp-idf-v5.5.4/components/ulp C:/Espressif/frameworks/esp-idf-v5.5.4/components/unity C:/Espressif/frameworks/esp-idf-v5.5.4/components/usb C:/Espressif/frameworks/esp-idf-v5.5.4/components/vfs C:/Espressif/frameworks/esp-idf-v5.5.4/components/wear_levelling C:/Espressif/frameworks/esp-idf-v5.5.4/components/wifi_provisioning C:/Espressif/frameworks/esp-idf-v5.5.4/components/wpa_supplicant
+-- Configuring done (25.2s)
+-- Generating done (1.6s)
+-- Build files have been written to: E:/github/esp-claw/application/basic_demo/build

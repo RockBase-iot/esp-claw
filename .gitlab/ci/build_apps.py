@@ -39,6 +39,7 @@ BOARD_PATH = ''
 # Virtual board variants -> (real board for gen-bmgr-config, extra sdkconfig.defaults snippet)
 BOARD_VARIANTS: t.Dict[str, t.Tuple[str, str]] = {
     'esp32_p4x_function_ev': ('esp32_p4_function_ev', '# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set\n'),
+    'esp32_p4x_eye': ('esp32_p4_eye', '# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set\n'),
 }
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent.absolute()

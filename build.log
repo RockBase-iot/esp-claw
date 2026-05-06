@@ -1,0 +1,37 @@
+[Board Manager] Running global callback for tasks: all
+[Board Manager] Checking sdkconfig consistency before action execution...
+   sdkconfig board-manager symbols are consistent with current board generation
+Executing action: all (aliases: build)
+Running ninja in directory E:\github\esp-claw\application\edge_agent\build
+Executing "ninja all"...
+[0/2] Re-checking globbed directories...
+[1/12] [edge_agent] Patching managed component sources
+File E:\github\esp-claw\application\edge_agent\managed_components\espressif__usb_host_uac\uac_host.c does not exist, skipping patch.
+No changes needed.
+[2/12] C:\WINDOWS\system32\cmd.exe /C "cd /D E:\github\esp-claw\application\edge_agent\build && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-v5.5.4/components/fatfs/wl_fatfsgen.py E:/github/esp-claw/application/edge_agent/fatfs_image --long_name_support --use_default_datetime --partition_size 0x400000 --output_file E:/github/esp-claw/application/edge_agent/build/storage.bin --sector_size 4096"
+[3/12] Performing build step for 'bootloader'
+[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D E:\github\esp-claw\application\edge_agent\build\bootloader\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-v5.5.4/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 E:/github/esp-claw/application/edge_agent/build/bootloader/bootloader.bin"
+Bootloader binary size 0x5670 bytes. 0x990 bytes (10%) free.
+[4/12] No install step for 'bootloader'
+[5/12] Building C object esp-idf/http_server/CMakeFiles/__idf_http_server.dir/http_server_files_api.c.obj
+[6/12] Completed 'bootloader'
+[7/12] Linking C static library esp-idf\http_server\libhttp_server.a
+[8/12] Generating esp-idf/esp_system/ld/sections.ld
+[9/12] Linking CXX executable edge_agent.elf
+[10/12] Generating binary image from built executable
+esptool.py v4.12.dev1
+Creating esp32c5 image...
+Merged 1 ELF section
+Successfully created esp32c5 image.
+Generated E:/github/esp-claw/application/edge_agent/build/edge_agent.bin
+[11/12] C:\WINDOWS\system32\cmd.exe /C "cd /D E:\github\esp-claw\application\edge_agent\build\esp-idf\esptool_py && C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:/Espressif/frameworks/esp-idf-v5.5.4/components/partition_table/check_sizes.py --offset 0x8000 partition --type app E:/github/esp-claw/application/edge_agent/build/partition_table/partition-table.bin E:/github/esp-claw/application/edge_agent/build/edge_agent.bin"
+edge_agent.bin binary size 0x292570 bytes. Smallest app partition is 0x400000 bytes. 0x16da90 bytes (36%) free.
+
+Project build complete. To flash, run:
+ idf.py flash
+or
+ idf.py -p PORT flash
+or
+ python -m esptool --chip esp32c5 -b 460800 --before default_reset --after hard_reset --no-stub write_flash --flash_mode dio --flash_size 16MB --flash_freq 80m 0x2000 build\bootloader\bootloader.bin 0x8000 build\partition_table\partition-table.bin 0xf000 build\ota_data_initial.bin 0x20000 build\edge_agent.bin 0x820000 build\emote_assets.bin 0xb20000 build\storage.bin
+or from the "E:\github\esp-claw\application\edge_agent\build" directory
+ python -m esptool --chip esp32c5 -b 460800 --before default_reset --after hard_reset --no-stub write_flash "@flash_args"

@@ -44,7 +44,7 @@ local CLEAR_H = 32
 local CLEAR_X = math.floor((width - CLEAR_W) / 2)
 local CLEAR_Y = 8
 local BRUSH_R = 4
-local POLL_INTERVAL_MS = 10
+local POLL_MS = 2
 local FLUSH_INTERVAL_MS = 16
 local RUN_TIME_MS = 50000
 
@@ -64,18 +64,27 @@ local function draw_ui()
         font_size = 16,
         align = "center",
         valign = "middle",
+        bg_r = ACCENT_R,
+        bg_g = ACCENT_G,
+        bg_b = ACCENT_B,
     })
     display.draw_text(10, 10, "LCD Touch Paint", {
         r = TEXT_R,
         g = TEXT_G,
         b = TEXT_B,
         font_size = 20,
+        bg_r = BG_R,
+        bg_g = BG_G,
+        bg_b = BG_B,
     })
     display.draw_text(10, 34, "draw with finger, tap CLEAR to wipe", {
         r = 90,
         g = 96,
         b = 104,
         font_size = 12,
+        bg_r = BG_R,
+        bg_g = BG_G,
+        bg_b = BG_B,
     })
     display.present()
 end
@@ -137,7 +146,7 @@ local function flush_dirty(force)
         return
     end
 
-    display.present_rect(dirty_x0, dirty_y0, dirty_x1 - dirty_x0, dirty_y1 - dirty_y0)
+    display.present()
     dirty_x0 = nil
     dirty_y0 = nil
     dirty_x1 = nil
@@ -171,7 +180,7 @@ local drawing = false
 local last_x = 0
 local last_y = 0
 
-for _ = 1, math.floor(RUN_TIME_MS / POLL_INTERVAL_MS) do
+for _ = 1, math.floor(RUN_TIME_MS / POLL_MS) do
     local polled
     polled, info = pcall(lcd_touch.poll, touch_handle)
     if not polled then
@@ -207,9 +216,9 @@ for _ = 1, math.floor(RUN_TIME_MS / POLL_INTERVAL_MS) do
         drawing = false
     end
 
-    dirty_age_ms = dirty_age_ms + POLL_INTERVAL_MS
+    dirty_age_ms = dirty_age_ms + POLL_MS
     flush_dirty(false)
-    delay.delay_ms(POLL_INTERVAL_MS)
+    delay.delay_ms(POLL_MS)
 end
 
 flush_dirty(true)

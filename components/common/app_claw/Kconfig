@@ -167,19 +167,35 @@ menu "App Claw Config"
                 Enable the IMU Lua module and keep app_claw's direct dependency
                 on lua_module_imu when Lua capability is enabled.
 
-        config APP_CLAW_LUA_MODULE_BQ27220
-            bool "Enable BQ27220 Lua module"
+        config APP_CLAW_LUA_MODULE_MAGNETOMETER
+            bool "Enable magnetometer Lua module"
             default n
             help
-                Enable the BQ27220 Lua module and keep app_claw's direct dependency
-                on lua_module_bq27220 when Lua capability is enabled.
+                Enable the magnetometer Lua module and keep app_claw's direct
+                dependency on lua_module_magnetometer when Lua capability is enabled.
+
+        config APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR
+            bool "Enable environmental sensor Lua module"
+            default n
+            help
+                Enable the environmental sensor Lua module and keep app_claw's direct
+                dependency on lua_module_environmental_sensor when Lua capability is enabled.
+
+        config APP_CLAW_LUA_MODULE_FUEL_GAUGE
+            bool "Enable Fuel Gauge Lua module"
+            default n
+            help
+                Enable the Fuel Gauge Lua module and keep app_claw's direct dependency
+                on lua_module_fuel_gauge when Lua capability is enabled.
 
         config APP_CLAW_LUA_MODULE_TOUCH
             bool "Enable touch Lua module"
-            default y
+            default y if SOC_TOUCH_SENSOR_SUPPORTED
+            default n
             help
                 Enable the touch Lua module and keep app_claw's direct dependency
                 on lua_module_touch when Lua capability is enabled.
+                Defaults to n on chips without touch sensor hardware support.
 
         config APP_CLAW_LUA_MODULE_IR
             bool "Enable IR Lua module"
@@ -194,6 +210,13 @@ menu "App Claw Config"
             help
                 Enable the ADC Lua module and keep app_claw's direct dependency
                 on lua_module_adc when Lua capability is enabled.
+
+        config APP_CLAW_LUA_MODULE_DHT
+            bool "Enable DHT Lua module"
+            default y
+            help
+                Enable the DHT Lua module and keep app_claw's direct dependency
+                on lua_module_dht when Lua capability is enabled.
 
         config APP_CLAW_LUA_MODULE_BOARD_MANAGER
             bool "Enable board manager Lua module"
@@ -215,6 +238,13 @@ menu "App Claw Config"
             help
                 Enable the button Lua module and keep app_claw's direct dependency
                 on lua_module_button when Lua capability is enabled.
+
+        config APP_CLAW_LUA_MODULE_KNOB
+            bool "Enable knob (rotary encoder) Lua module"
+            default n
+            help
+                Enable the knob Lua module and keep app_claw's direct dependency
+                on lua_module_knob when Lua capability is enabled.
 
         config APP_CLAW_LUA_MODULE_DELAY
             bool "Enable delay Lua module"

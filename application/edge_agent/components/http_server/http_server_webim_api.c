@@ -39,6 +39,23 @@ static esp_err_t webim_ws_mx_ensure(void)
     return s_ws_mx ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
+static void webim_ws_gc_locked(void)
+{
+    size_t write = 0;
+
+    if (!s_httpd) {
+        return;
+    }
+    for (size_t i = 0; i < s_ws_count; i++) {
+        if (httpd_ws_get_fd_info(s_httpd, s_ws_fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
+            s_ws_fds[write++] = s_ws_fds[i];
+        } else {
+            ESP_LOGW(TAG, "WS gc: pruned stale fd=%d", s_ws_fds[i]);
+        }
+    }
+    s_ws_count = write;
+}
+
 static void webim_ws_fd_add(int fd)
 {
     size_t i;
@@ -53,9 +70,14 @@ static void webim_ws_fd_add(int fd)
             return;
         }
     }
+    if (s_ws_count >= WEBIM_WS_MAX_CLIENTS) {
+        webim_ws_gc_locked();
+    }
     if (s_ws_count < WEBIM_WS_MAX_CLIENTS) {
         s_ws_fds[s_ws_count++] = fd;
-        ESP_LOGD(TAG, "WS client fd=%d (n=%u)", fd, (unsigned)s_ws_count);
+        ESP_LOGI(TAG, "WS client fd=%d (n=%u)", fd, (unsigned)s_ws_count);
+    } else {
+        ESP_LOGW(TAG, "WS client fd=%d rejected: max clients reached", fd);
     }
     xSemaphoreGive(s_ws_mx);
 }
@@ -79,11 +101,18 @@ static void webim_ws_fd_remove(int fd)
     xSemaphoreGive(s_ws_mx);
 }
 
+void http_server_webim_ws_fd_remove(int fd)
+{
+    webim_ws_fd_remove(fd);
+}
+
 static void webim_ws_broadcast_json(const char *json)
 {
     httpd_ws_frame_t pkt;
+    int local_fds[WEBIM_WS_MAX_CLIENTS];
+    size_t local_count = 0;
 
-    if (!json || !s_httpd || !s_ws_mx || s_ws_count == 0) {
+    if (!json || !s_httpd || !s_ws_mx) {
         return;
     }
 
@@ -93,19 +122,28 @@ static void webim_ws_broadcast_json(const char *json)
     pkt.len = strlen(json);
 
     xSemaphoreTake(s_ws_mx, portMAX_DELAY);
-    for (size_t i = 0; i < s_ws_count;) {
-        int fd = s_ws_fds[i];
-        esp_err_t err = httpd_ws_send_frame_async(s_httpd, fd, &pkt);
+    webim_ws_gc_locked();
+    local_count = s_ws_count;
+    memcpy(local_fds, s_ws_fds, local_count * sizeof(int));
+    xSemaphoreGive(s_ws_mx);
+
+    if (local_count == 0) {
+        ESP_LOGW(TAG, "WS broadcast skipped: no connected clients");
+        return;
+    }
+
+    ESP_LOGI(TAG, "WS broadcast: %u client(s) len=%u", (unsigned)local_count, (unsigned)pkt.len);
+
+    for (size_t i = 0; i < local_count; i++) {
+        esp_err_t err = httpd_ws_send_data(s_httpd, local_fds[i], &pkt);
 
         if (err != ESP_OK) {
-            s_ws_fds[i] = s_ws_fds[s_ws_count - 1];
-            s_ws_count--;
-            ESP_LOGW(TAG, "WS drop fd=%d (%s)", fd, esp_err_to_name(err));
-            continue;
+            webim_ws_fd_remove(local_fds[i]);
+            ESP_LOGW(TAG, "WS drop fd=%d (%s)", local_fds[i], esp_err_to_name(err));
+        } else {
+            ESP_LOGI(TAG, "WS sent fd=%d ok", local_fds[i]);
         }
-        i++;
     }
-    xSemaphoreGive(s_ws_mx);
 }
 
 static esp_err_t webim_emit_outbound_json(const cap_im_local_message_t *message)
@@ -155,13 +193,15 @@ static esp_err_t webim_outbound_cb(const cap_im_local_message_t *message, void *
 {
     (void)user_ctx;
     if (!message || !message->chat_id || !message->chat_id[0]) {
+        ESP_LOGD(TAG, "outbound_cb: dropped (no message or chat_id)");
         return ESP_OK;
     }
     if (strcmp(message->channel, WEB_IM_CHANNEL) != 0) {
+        ESP_LOGD(TAG, "outbound_cb: dropped channel=%s (expected %s)",
+                 message->channel, WEB_IM_CHANNEL);
         return ESP_OK;
     }
-    (void)webim_emit_outbound_json(message);
-    return ESP_OK;
+    return webim_emit_outbound_json(message);
 }
 
 esp_err_t http_server_webim_bind_im(void)

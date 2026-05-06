@@ -39,11 +39,6 @@
   <img alt="From traditional IoT to Edge Agent" src="./docs/static/from-traditional-iot-to-edge-agent.webp" width="90%" />
 </div>
 
-> [!NOTE]
->
-> 我们正在将 Demo 从 [`basic_demo`](./application/basic_demo) 目录迁移至 [`edge_agent`](./application/edge_agent/) 目录。
-> 如您提交新的 PR，请向 `edge_agent` 目录提交修改。我们会在迁移工作结束后处理修改 `basic_demo` 的 PR。
-
 ## 🌟核心特性
 
 传统 IoT 只停留在连接层——设备能联网，却不能思考；能执行，却不能决策。ESP-Claw 将 Agent Runtime 下沉至乐鑫芯片，让芯片从被动的"执行端"转变为主动的"决策中心"。

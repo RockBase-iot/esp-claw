@@ -67,30 +67,6 @@
     matrix:
       - IMAGE: espressif/idf:release-v5.5
 
-build_application_basic_demo:
-  extends:
-    - .build_examples_template
-    - .rules:build:application_basic_demo
-  parallel:
-    matrix:
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: esp32_S3_DevKitC_1
-        EXAMPLE_TARGET: esp32s3
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: esp32_S3_DevKitC_1_breadboard
-        EXAMPLE_TARGET: esp32s3
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: esp32_p4_function_ev
-        EXAMPLE_TARGET: esp32p4
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: m5stack_sticks3
-        EXAMPLE_TARGET: esp32s3
-      - IMAGE: espressif/idf:release-v5.5
-        EXAMPLE_BOARD: m5stack_cores3
-        EXAMPLE_TARGET: esp32s3
-  variables:
-    EXAMPLE_DIR: application/basic_demo
-
 build_application_edge_agent:
   extends:
     - .build_examples_template
@@ -113,6 +89,14 @@ build_application_edge_agent:
         EXAMPLE_BOARD_BRAND: "espressif"
 
       - EXAMPLE_BOARD: esp32_p4x_function_ev
+        EXAMPLE_TARGET: esp32p4
+        EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: esp32_p4_eye
+        EXAMPLE_TARGET: esp32p4
+        EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: esp32_p4x_eye
         EXAMPLE_TARGET: esp32p4
         EXAMPLE_BOARD_BRAND: "espressif"
 
@@ -139,3 +123,7 @@ build_application_edge_agent:
       - EXAMPLE_BOARD: lilygo_t_display_s3
         EXAMPLE_TARGET: esp32s3
         EXAMPLE_BOARD_BRAND: "lilygo"
+
+      - EXAMPLE_BOARD: esp_SensairShuttle
+        EXAMPLE_TARGET: esp32c5
+        EXAMPLE_BOARD_BRAND: "espressif"

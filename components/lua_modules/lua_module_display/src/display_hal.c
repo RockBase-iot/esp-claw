@@ -1215,8 +1215,13 @@ static esp_err_t display_hal_present_locked(void)
         TAG, "present failed");
 
     if (s_state.framebuffer_count > 1) {
+        uint16_t *prev_draw_fb = framebuffer;
         s_state.draw_framebuffer_index = (uint8_t)((s_state.draw_framebuffer_index + 1) %
                                                    s_state.framebuffer_count);
+        uint16_t *new_draw_fb = display_hal_get_draw_framebuffer_locked();
+        if (new_draw_fb && new_draw_fb != prev_draw_fb) {
+            memcpy(new_draw_fb, prev_draw_fb, s_state.framebuffer_bytes);
+        }
     }
     return ESP_OK;
 }

@@ -1,0 +1,45 @@
+[Board Manager] Running global callback for tasks: gen-bmgr-config
+Executing action: gen-bmgr-config
+ℹ️  Using user-specified project directory: E:\github\esp-claw\application\edge_agent
+📋 Version Information:
+   • Component Version: 0.5.9
+   • Git Commit: 51f36e0e (2026-04-28)
+   • Generation Time: 2026-04-28 19:56:04
+
+ℹ️  Using script directory as root directory: E:\github\esp-claw\application\edge_agent\managed_components\espressif__esp_board_manager
+   Scanning main boards: E:\github\esp-claw\application\edge_agent\managed_components\espressif__esp_board_manager\boards
+   Scanning component boards (recursive): E:\github\esp-claw\application\edge_agent\components
+Scanning all directories in component path: E:\github\esp-claw\application\edge_agent\components
+   Scanning managed components boards: E:\github\esp-claw\application\edge_agent\managed_components
+Scanning customer boards: E:\github\esp-claw\application\edge_agent\boards
+Scanning all directories in customer path: E:\github\esp-claw\application\edge_agent\boards
+ℹ️  Resolved board: nm_cyd_c5
+ℹ️  Changed working directory to: E:\github\esp-claw\application\edge_agent
+=== Board Manager Configuration Generator ===
+⚙️  Step 1/8: Scanning board directories...
+✅ Found 18 boards: ['dual_eyes_board_v1_0', 'esp32_c3_lyra', 'esp32_c5_spot', 'esp32_p4_function_ev', 'esp32_s3_korvo2l', 'esp32_s3_korvo2_v3', 'esp_box_3', 'esp_box_lite', 'esp_hi', 'esp_vocat_board_v1_0', 'esp_vocat_board_v1_2', 'lyrat_mini_v1_1', 'm5stack_cores3', 'm5stack_tab5', 'esp32_S3_DevKitC_1', 'esp32_S3_DevKitC_1_breadboard', 'm5stack_sticks3', 'nm_cyd_c5']
+⚙️  Step 2/8: Reading board selection...
+✅ Using board from command line: nm_cyd_c5
+✅ Board path: E:\github\esp-claw\application\edge_agent\boards\nm_cyd_c5
+✅ gen_bmgr_codes directory cleared successfully (13 files, 0 directories)
+⚙️  Step 3/8: Finding board configuration files...
+   Peripherals: E:\github\esp-claw\application\edge_agent\boards\nm_cyd_c5\board_peripherals.yaml
+   Devices: E:\github\esp-claw\application\edge_agent\boards\nm_cyd_c5\board_devices.yaml
+⚙️  Step 4/8: Processing peripherals...
+✅ Successfully validated 3 peripherals
+⚙️  Step 5/8: Processing devices and dependencies...
+✅ Successfully validated 4 devices
+⚙️  Step 6/8: Generating Kconfig menu system...
+✅ Writing Kconfig file to: E:\github\esp-claw\application\edge_agent\managed_components\espressif__esp_board_manager\gen_codes\Kconfig.in
+✅ Generated selected-board Kconfig.projbuild at: E:\github\esp-claw\application\edge_agent\components\gen_bmgr_codes\Kconfig.projbuild
+⚙️  Step 7/8: Updating SDK configuration...
+   Found sdkconfig.defaults.board at E:\github\esp-claw\application\edge_agent\boards\nm_cyd_c5\sdkconfig.defaults.board
+✅ Generated board-specific defaults to E:\github\esp-claw\application\edge_agent\components\gen_bmgr_codes\board_manager.defaults
+⚙️  Step 8/8: Writing board information and setting up components...
+   Added board source directory: ../../boards/nm_cyd_c5
+   Created CMakeLists.txt: E:\github\esp-claw\application\edge_agent\components\gen_bmgr_codes\CMakeLists.txt
+   Created idf_component.yml: E:\github\esp-claw\application\edge_agent\components\gen_bmgr_codes\idf_component.yml
+✅ Generated files directly to components/gen_bmgr_codes completed successfully!
+✅ === Board configuration generation completed successfully for board: nm_cyd_c5 ===
+ℹ️  Restored working directory to: e:\github\esp-claw\application\edge_agent
+✅ ESP Board Manager configuration generation completed successfully!

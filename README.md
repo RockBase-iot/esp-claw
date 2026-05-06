@@ -39,11 +39,6 @@
   <img alt="From traditional IoT to Edge Agent" src="./docs/static/from-traditional-iot-to-edge-agent.webp" width="90%" />
 </div>
 
-> [!NOTE]
->
-> We are migrating the demo from [`basic_demo`](./application/basic_demo) to [`edge_agent`](./application/edge_agent/).
-> If you submit a new PR, please make your changes under `edge_agent`. We will handle PRs that modify `basic_demo` after the migration is complete.
-
 ## 🌟 Key Features
 
 Traditional IoT usually stops at connectivity: devices can connect to the network, but they cannot think; they can execute commands, but they cannot make decisions. ESP-Claw brings the Agent Runtime down onto Espressif chips, turning them from passive executors into active decision-making centers.

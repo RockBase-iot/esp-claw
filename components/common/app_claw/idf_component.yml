@@ -129,11 +129,23 @@ dependencies:
       - if: $CONFIG{APP_CLAW_LUA_MODULE_IMU} == True
     path: ../../lua_modules/lua_module_imu
 
-  lua_module_bq27220:
+  lua_module_magnetometer:
     rules:
       - if: $CONFIG{APP_CLAW_CAP_LUA} == True
-      - if: $CONFIG{APP_CLAW_LUA_MODULE_BQ27220} == True
-    path: ../../lua_modules/lua_module_bq27220
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_MAGNETOMETER} == True
+    path: ../../lua_modules/lua_module_magnetometer
+
+  lua_module_environmental_sensor:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR} == True
+    path: ../../lua_modules/lua_module_environmental_sensor
+
+  lua_module_fuel_gauge:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_FUEL_GAUGE} == True
+    path: ../../lua_modules/lua_module_fuel_gauge
 
   lua_module_touch:
     rules:
@@ -153,6 +165,12 @@ dependencies:
       - if: $CONFIG{APP_CLAW_LUA_MODULE_ADC} == True
     path: ../../lua_modules/lua_module_adc
 
+  lua_module_dht:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_DHT} == True
+    path: ../../lua_modules/lua_module_dht
+
   lua_module_call_capability:
     rules:
       - if: $CONFIG{APP_CLAW_CAP_LUA} == True
@@ -164,6 +182,12 @@ dependencies:
       - if: $CONFIG{APP_CLAW_CAP_LUA} == True
       - if: $CONFIG{APP_CLAW_LUA_MODULE_BUTTON} == True
     path: ../../lua_modules/lua_module_button
+
+  lua_module_knob:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_KNOB} == True
+    path: ../../lua_modules/lua_module_knob
 
   lua_module_camera:
     rules:

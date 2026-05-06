@@ -3,10 +3,6 @@
 #    *  A == 1 or (B == 2 and C in [1,2,3])
 #    *  (A == 1 and B == 2) or (C not in ["3", "4", 5])
 
-application/basic_demo:
-  enable:
-    - if: INCLUDE_DEFAULT == 1
-
 application/edge_agent:
   enable:
     - if: INCLUDE_DEFAULT == 1

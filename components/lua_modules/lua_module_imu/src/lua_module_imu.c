@@ -49,6 +49,7 @@ typedef struct {
     char peripheral_name[LUA_MODULE_IMU_MAX_NAME_LEN];
     bool peripheral_ref_held;
     gpio_num_t int_gpio_num;
+    gpio_num_t sdo_gpio_num;
 } lua_module_imu_handle_t;
 
 typedef struct {
@@ -76,6 +77,7 @@ typedef struct {
     int8_t      i2c_addr;
     int32_t     frequency;
     int8_t      int_gpio_num;
+    int8_t      sdo_gpio_num;
     uint8_t     peripheral_count;
     const char *peripheral_name;
 } lua_imu_board_cfg_t;
@@ -85,10 +87,12 @@ typedef struct {
     int         i2c_addr;
     int         frequency;
     int         int_gpio_num;
+    int         sdo_gpio_num;
     bool        has_peripheral;
     bool        has_i2c_addr;
     bool        has_frequency;
     bool        has_int_gpio;
+    bool        has_sdo_gpio;
 } lua_imu_resolved_cfg_t;
 
 static const char *TAG = "lua_module_imu";
@@ -110,6 +114,28 @@ static esp_err_t lua_module_imu_configure_interrupt_pin(int int_gpio_num)
     };
 
     return gpio_config(&int_pin_cfg);
+}
+
+static esp_err_t lua_module_imu_configure_sdo_pin(int sdo_gpio_num)
+{
+    if (sdo_gpio_num < 0) {
+        return ESP_OK;
+    }
+
+    const gpio_config_t sdo_pin_cfg = {
+        .pin_bit_mask = 1ULL << sdo_gpio_num,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+
+    esp_err_t err = gpio_config(&sdo_pin_cfg);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    return gpio_set_level((gpio_num_t)sdo_gpio_num, 0);
 }
 
 static esp_err_t lua_module_imu_open_i2c_bus(const char *peripheral_name,
@@ -214,8 +240,16 @@ static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
 
     snprintf(handle->peripheral_name, sizeof(handle->peripheral_name), "%s", cfg->peripheral_name);
     handle->int_gpio_num = (gpio_num_t)cfg->int_gpio_num;
+    handle->sdo_gpio_num = (gpio_num_t)cfg->sdo_gpio_num;
 
-    esp_err_t err = lua_module_imu_configure_interrupt_pin(cfg->int_gpio_num);
+    esp_err_t err = lua_module_imu_configure_sdo_pin(cfg->sdo_gpio_num);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure SDO pin GPIO%d: %s", cfg->sdo_gpio_num, esp_err_to_name(err));
+        free(handle);
+        return err;
+    }
+
+    err = lua_module_imu_configure_interrupt_pin(cfg->int_gpio_num);
     if (err != ESP_OK) {
         free(handle);
         return err;
@@ -305,8 +339,16 @@ static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
 
     snprintf(handle->peripheral_name, sizeof(handle->peripheral_name), "%s", cfg->peripheral_name);
     handle->int_gpio_num = (gpio_num_t)cfg->int_gpio_num;
+    handle->sdo_gpio_num = (gpio_num_t)cfg->sdo_gpio_num;
 
-    esp_err_t err = lua_module_imu_configure_interrupt_pin(cfg->int_gpio_num);
+    esp_err_t err = lua_module_imu_configure_sdo_pin(cfg->sdo_gpio_num);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure SDO pin GPIO%d: %s", cfg->sdo_gpio_num, esp_err_to_name(err));
+        free(handle);
+        return err;
+    }
+
+    err = lua_module_imu_configure_interrupt_pin(cfg->int_gpio_num);
     if (err != ESP_OK) {
         free(handle);
         return err;
@@ -378,6 +420,9 @@ static void lua_module_imu_destroy_handle(lua_module_imu_handle_t *handle)
     }
     if (handle->int_gpio_num >= 0) {
         gpio_reset_pin(handle->int_gpio_num);
+    }
+    if (handle->sdo_gpio_num >= 0) {
+        gpio_reset_pin(handle->sdo_gpio_num);
     }
     if (handle->peripheral_ref_held && handle->peripheral_name[0] != '\0') {
         esp_board_periph_unref_handle(handle->peripheral_name);
@@ -587,10 +632,10 @@ static esp_err_t lua_module_imu_load_board_defaults(const char *device_name,
         out->frequency = board->frequency;
         out->has_frequency = true;
     }
-    if (board->int_gpio_num >= 0) {
-        out->int_gpio_num = board->int_gpio_num;
-        out->has_int_gpio = true;
-    }
+    out->int_gpio_num = board->int_gpio_num;
+    out->has_int_gpio = true;
+    out->sdo_gpio_num = board->sdo_gpio_num;
+    out->has_sdo_gpio = true;
 
     return ESP_OK;
 }
@@ -630,6 +675,13 @@ static void lua_module_imu_apply_lua_overrides(lua_State *L, int opts_idx,
         cfg->has_int_gpio = true;
     }
     lua_pop(L, 1);
+
+    lua_getfield(L, opts_idx, "sdo_gpio");
+    if (lua_isnumber(L, -1)) {
+        cfg->sdo_gpio_num = (int)lua_tointeger(L, -1);
+        cfg->has_sdo_gpio = true;
+    }
+    lua_pop(L, 1);
 }
 
 static int lua_module_imu_new(lua_State *L)
@@ -664,6 +716,7 @@ static int lua_module_imu_new(lua_State *L)
 
     lua_imu_resolved_cfg_t cfg = { 0 };
     cfg.int_gpio_num = -1;
+    cfg.sdo_gpio_num = -1;
 
     /* Defaults from board manager (if device declared on this board). Falls
      * back to the legacy "bmi270_sensor" name when the user did not request
@@ -698,8 +751,7 @@ static int lua_module_imu_new(lua_State *L)
     }
 #if CONFIG_LUA_MODULE_IMU_CHIP_BMI270
     if (!cfg.has_int_gpio) {
-        return luaL_error(L, "imu.new: missing 'int_gpio' (board declares no '%s', "
-                              "and no override given)", device_name);
+        cfg.int_gpio_num = -1;
     }
     if (cfg.i2c_addr != BMI270_I2C_ADDRESS) {
         return luaL_error(L, "imu.new: unsupported BMI270 I2C address 0x%02x", cfg.i2c_addr);

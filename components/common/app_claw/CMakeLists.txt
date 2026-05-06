@@ -98,8 +98,16 @@ if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_IMU)
     list(APPEND app_claw_requires lua_module_imu)
 endif()
 
-if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_BQ27220)
-    list(APPEND app_claw_requires lua_module_bq27220)
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_MAGNETOMETER)
+    list(APPEND app_claw_requires lua_module_magnetometer)
+endif()
+
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR)
+    list(APPEND app_claw_requires lua_module_environmental_sensor)
+endif()
+
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_FUEL_GAUGE)
+    list(APPEND app_claw_requires lua_module_fuel_gauge)
 endif()
 
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_TOUCH)
@@ -116,6 +124,10 @@ endif()
 
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_BUTTON)
     list(APPEND app_claw_requires lua_module_button)
+endif()
+
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_KNOB)
+    list(APPEND app_claw_requires lua_module_knob)
 endif()
 
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_ADC)

@@ -1,5 +1,65 @@
 # ChangeLog
 
+## 2026-05-06
+
+### Fix:
+
+* Improved file descriptor management for WebSocket connections to reduce the issue where Web Chat did not receive reply messages. (https://github.com/espressif/esp-claw/issues/36)
+
+## 2026-05-03
+
+### Fix:
+
+* Increased baudrate during flashing to speed up the process.
+
+* Fixed an issue where the device could fail to enter network provisioning after online flashing. (https://github.com/espressif/esp-claw/issues/34)
+
+* Fixed an issue where Web Chat might not receive reply messages from ESP-Claw.
+
+## 2026-04-30
+
+### Feature:
+
+* Added `esp_SensairShuttle` board support for `edge_agent`, including board metadata, peripheral definitions, default board config, and device setup wiring.
+
+* Added shared `app_claw` integration for the new Lua environmental sensor and magnetometer modules, including Kconfig, component dependencies, and Lua module registration.
+
+* Added the `lua_module_environmental_sensor` module with Lua-facing sensor APIs and a `basic_environmental_sensor.lua` example script.
+
+* Added the `lua_module_magnetometer` module with bundled `bmm350` driver sources, Lua bindings, example scripts, and skill metadata.
+
+* Renamed the `lua_module_bq27220` module to the more generic `lua_module_fuel_gauge`, and refreshed its Lua examples, helper library, and skill docs.
+
+* Added `esp32_p4_eye` board support for `edge_agent`, including board device/peripheral definitions, board defaults, CI build coverage, and early board bring-up for camera, SD power, and LCD panel initialization.
+
+* Added shared `app_claw` support for `lua_module_knob`, including Kconfig and dependency wiring, Lua module registration, a basic rotary encoder demo script, and the related skill metadata.
+
+* Make max tokens configurable
+
+* Sent Feishu `feishu_send_message` responses as Markdown-capable interactive cards with plain-text fallback. Added Feishu inbound rich text `post` message flattening to Markdown text, including styled text, links, mentions, code blocks, horizontal rules, and image/file placeholders.
+
+* Preserved Feishu inbound file names in saved attachment paths while keeping the message hash prefix for uniqueness.
+
+* Added Feishu rich text `post` embedded attachment handling so inline images and media/file elements are queued through the existing attachment save flow.
+
+* Added a guided Edge Agent setup wizard for first-run configuration, covering LLM provider presets, search provider keys, and IM platform setup with built-in WeChat QR login flow.
+
+* Enhanced the Edge Agent web chat experience with local chat session persistence, file upload support, richer status and restart feedback, and updated configuration editing UI.
+
+* Refactored the docs online flashing workflow with a redesigned multi-step flash page, refreshed localized copy, and updated firmware metadata generation for the new tool flow.
+
+### Change:
+
+* Removed the deprecated `application/basic_demo` app and its CI/build rules.
+
+* Simplified the docs flash tool implementation by consolidating firmware selection and flashing logic into the main page flow and removing the old helper modules.
+
+### Fix:
+
+* Fixed the `wifi --apply` flow so updated STA settings are applied immediately, with more reliable AP fallback and reconnect handling in `wifi_manager`.
+
+
+
 ## 2026-04-29
 
 ### Feature:
