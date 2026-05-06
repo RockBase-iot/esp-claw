@@ -46,3 +46,6 @@ docs/public/d2
 docs/dist
 docs/.astro
 docs/**/*.bin
+
+# Apps
+application/basic_demo

@@ -40,6 +40,15 @@
       "cap_groups": [
         "cap_lua"
       ]
+    },
+    {
+      "id": "skill_creator",
+      "file": "skill_creator.md",
+      "summary": "Author a new on-device skill on user request: confirm metadata, draft markdown skeleton, write_file to /fatfs/skills/<id>.md, then register_skill into skills_list.json so future similar requests resolve through activate_skill. Lets ESP-Claw evolve its long-term capabilities locally. Only invoke when the user explicitly asks to save, create, or teach a new skill.",
+      "cap_groups": [
+        "cap_files",
+        "cap_skill"
+      ]
     }
   ]
 }
