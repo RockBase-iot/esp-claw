@@ -211,6 +211,11 @@ esp_err_t http_server_webim_bind_im(void)
     if (err == ESP_OK) {
         s_webim_bound = true;
         ESP_LOGI(TAG, "Web IM outbound -> WebSocket (no server-side history)");
+
+        esp_err_t start_err = cap_im_local_start();
+        if (start_err != ESP_OK) {
+            ESP_LOGW(TAG, "cap_im_local_start failed: %s", esp_err_to_name(start_err));
+        }
     } else {
         ESP_LOGW(TAG, "Web IM bind failed: %s", esp_err_to_name(err));
     }

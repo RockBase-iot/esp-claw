@@ -112,6 +112,7 @@ static esp_err_t cap_im_local_gateway_start(void)
 
     s_local.started = true;
     cap_im_local_unlock();
+    ESP_LOGI(TAG, "Local IM gateway started");
     return ESP_OK;
 }
 
