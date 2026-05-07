@@ -4,7 +4,7 @@ include("${CMAKE_SOURCE_DIR}/tools/cmake/esp_idf_patch.cmake")
 include("${CMAKE_SOURCE_DIR}/tools/cmake/flash_partition_defaults.cmake")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-set(PROJECT_VER "0.1.1-nmminer")
+set(PROJECT_VER "0.1.2")
 project(edge_agent)
 include("${CMAKE_SOURCE_DIR}/tools/cmake/board_manager_patch.cmake")
 

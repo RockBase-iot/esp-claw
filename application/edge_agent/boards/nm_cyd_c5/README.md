@@ -213,3 +213,15 @@ LLM Advanced Options: (do not need to change)
  - Profile: custom_openai_compatible
  - Base URL: https://api.deepseek.com
  - Auth Type: bearer
+
+### Local Model: Ollama
+LLM Provider: Custom
+API Key: **** (any not empty, like Ollama)
+Model: gemma4:e4b/qwen3.6:27b
+LLM Advanced Options:
+ - Backend Type: openai_compatible
+ - Profile: custom_openai_compatible
+ - Base URL: http://192.168.x.x:11434/v1  (do not use localhost or 127.0.0.1, not running on ESP32)
+ - Auth Type: none
+
+*Notes: The ability of local models determines the success rate of execution, which is usually relatively low; for the models which can not support tools, do not support.* 

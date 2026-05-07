@@ -8,6 +8,7 @@ set(main_requires
     display_arbiter
     esp_painter
     sdcard_mount
+    app_sd_mirror
     claw_event_router
     driver
     esp_lcd

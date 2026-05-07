@@ -24,6 +24,7 @@ static const char *TAG = "wifi_manager";
 #define WIFI_FAIL_BIT       BIT1
 #define WIFI_RETRY_BASE_MS  1000
 #define WIFI_RETRY_MAX_MS   30000
+#define WIFI_RETRY_LONG_MS  60000   /* slow-retry interval after fast retries exhausted */
 
 #ifndef CONFIG_APP_WIFI_AP_SSID_PREFIX
 #define CONFIG_APP_WIFI_AP_SSID_PREFIX "esp-claw"
@@ -231,10 +232,26 @@ static void wifi_event_handler(void *arg,
                     esp_wifi_connect();
                 }
             } else {
-                ESP_LOGE(TAG, "STA failed after %" PRIu32 " retries, falling back to AP",
-                         wifi_manager_max_retry());
+                /* Fast retries exhausted. Bring up the AP fallback for
+                 * provisioning UI but keep STA configured and keep retrying
+                 * forever at WIFI_RETRY_LONG_MS so the device recovers
+                 * automatically once the router / uplink comes back. */
                 xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-                fallback_to_ap();
+                if (s_mode != WIFI_MODE_AP_FALLBACK) {
+                    ESP_LOGW(TAG,
+                             "STA failed after %" PRIu32 " retries, enabling AP fallback; "
+                             "will keep retrying STA every %dms",
+                             wifi_manager_max_retry(), WIFI_RETRY_LONG_MS);
+                    fallback_to_ap();
+                } else {
+                    ESP_LOGD(TAG, "STA still down, scheduling slow reconnect in %dms",
+                             WIFI_RETRY_LONG_MS);
+                }
+                if (s_reconnect_timer) {
+                    esp_timer_stop(s_reconnect_timer);
+                    esp_timer_start_once(s_reconnect_timer,
+                                         (uint64_t)WIFI_RETRY_LONG_MS * 1000ULL);
+                }
             }
             return;
 
@@ -261,6 +278,10 @@ static void wifi_event_handler(void *arg,
         s_retry_count = 0;
         s_connected = true;
         s_mode = s_ap_active ? WIFI_MODE_APSTA_OK : s_mode;
+        if (s_reconnect_timer) {
+            esp_timer_stop(s_reconnect_timer);
+        }
+        xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT);
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         notify_state_changed(true);
     }
@@ -300,11 +321,15 @@ static void reconnect_timer_cb(void *arg)
 
 static esp_err_t fallback_to_ap(void)
 {
-    s_mode = WIFI_MODE_AP_FALLBACK;
-    s_sta_configured = false;
-    s_retry_count = 0;
+    esp_err_t err;
 
-    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_AP);
+    s_mode = WIFI_MODE_AP_FALLBACK;
+    s_retry_count = 0;
+    /* Keep s_sta_configured = true so the slow-retry path stays armed and
+     * we recover automatically when the network comes back. We switch to
+     * APSTA (not AP-only) so the STA interface remains available for the
+     * periodic esp_wifi_connect() retries from reconnect_timer_cb. */
+    err = esp_wifi_set_mode(s_sta_configured ? WIFI_MODE_APSTA : WIFI_MODE_AP);
     if (err != ESP_OK) {
         return err;
     }

@@ -55,5 +55,8 @@ dependencies:
   sdcard_mount:
     path: ../../../components/common/sdcard_mount
 
+  app_sd_mirror:
+    path: ../../../components/common/app_sd_mirror
+
   spi_bus_arbiter:
     path: ../../../components/common/spi_bus_arbiter

@@ -34,6 +34,7 @@
 #include "sdcard_mount.h"
 #include "settings_store.h"
 #include "spi_bus_arbiter.h"
+#include "app_sd_mirror.h"
 
 #define APP_FATFS_PARTITION_LABEL "storage"
 #define APP_ENABLE_MEM_LOG        (0)
@@ -496,6 +497,33 @@ void app_main(void)
                  * them so a subsequent re-flash can restore. */
                 (void)settings_store_dump_to_backup();
             }
+        }
+
+        /* Bidirectional sync of editable user-authored content (memory
+         * persona files: soul / identity / user) between FATFS and SD.
+         * Runs BEFORE app_claw_start() so claw_memory_init() picks up the
+         * restored content on boot. Newer-mtime side wins; first boot
+         * simply seeds the SD with the FATFS defaults. */
+        {
+            static const app_sd_mirror_entry_t mirror_entries[] = {
+                { "/fatfs/memory/soul.md",     "memory/soul.md"     },
+                { "/fatfs/memory/identity.md", "memory/identity.md" },
+                { "/fatfs/memory/user.md",     "memory/user.md"     },
+            };
+            app_sd_mirror_config_t mirror_cfg = {
+                .sd_root     = sdcard_mount_get_mount_point(),
+                .entries     = mirror_entries,
+                .entry_count = sizeof(mirror_entries) / sizeof(mirror_entries[0]),
+            };
+            (void)app_sd_mirror_sync(&mirror_cfg);
+
+            /* Mirror the entire skills directory so user-created skills
+             * (and the auto-updated skills_list.json) survive a re-flash.
+             * Files deleted on one side are NOT propagated, so a fresh
+             * factory image cannot wipe user skills on the SD card. */
+            (void)app_sd_mirror_sync_dir(sdcard_mount_get_mount_point(),
+                                         "/fatfs/skills",
+                                         "skills");
         }
     }
 
