@@ -1,10 +1,17 @@
 menu "Lua Environmental Sensor Module"
 
-    config LUA_MODULE_ENVIRONMENTAL_SENSOR_ENABLE
-        bool "Enable environmental sensor backend"
+    config LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690
+        bool "Enable BME690 backend"
         default y
         help
-            Build the environmental sensor Lua module against the official
-            Bosch BME690 component.
+            Build the environmental sensor Lua module with the Bosch BME690
+            backend.
+
+    config LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_DHT
+        bool "Enable DHT backend"
+        default y
+        help
+            Build the environmental sensor Lua module with the DHT-family
+            single-wire backend.
 
 endmenu

@@ -2,7 +2,7 @@ idf_component_register(
     SRCS
         "src/lua_module_system.c"
     INCLUDE_DIRS
-        "include"
+        "src"
     REQUIRES
         cap_lua
         esp_netif

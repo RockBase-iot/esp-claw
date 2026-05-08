@@ -24,6 +24,10 @@ static const char *TAG = "claw_cap";
 
 #define CLAW_CAP_TOOL_DESCRIPTION_MAX 256
 
+#ifndef CLAW_CAP_CORE_OUTPUT_SIZE
+#define CLAW_CAP_CORE_OUTPUT_SIZE (32 * 1024)
+#endif
+
 typedef struct {
     bool occupied;
     const claw_cap_group_t *group;
@@ -351,7 +355,7 @@ esp_err_t claw_cap_call_from_core(const char *cap_name,
     claw_cap_call_context_t ctx = {0};
     char *output = NULL;
     esp_err_t err;
-    const size_t output_size = 32 * 1024;
+    const size_t output_size = CLAW_CAP_CORE_OUTPUT_SIZE;
 
     (void)user_ctx;
 

@@ -67,8 +67,24 @@ static esp_err_t files_list_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid path");
     }
 
+    /* Listings of a virtual mount (currently only the SD card on a SPI host
+     * shared with the LCD) must serialise their opendir/readdir/stat calls
+     * against the LCD driver, otherwise the polling SDSPI driver collides
+     * with the LCD's queued/DMA transactions and trips
+     *   `assert failed: spi_hal_setup_trans (spi_ll_get_running_cmd(hw) == 0)`.
+     * The arbiter mutex is recursive, so it is fine if alive_cb above also
+     * took it. */
+    bool needs_spi_lock = target_mount != NULL;
+    bool spi_locked = false;
+    if (needs_spi_lock) {
+        spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+    }
+
     DIR *dir = opendir(full_path);
     if (!dir) {
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
         return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Directory not found");
     }
 
@@ -76,6 +92,9 @@ static esp_err_t files_list_handler(httpd_req_t *req)
     cJSON *entries = cJSON_CreateArray();
     if (!root || !entries) {
         closedir(dir);
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
         cJSON_Delete(root);
         cJSON_Delete(entries);
         httpd_resp_send_500(req);
@@ -116,6 +135,9 @@ static esp_err_t files_list_handler(httpd_req_t *req)
     }
 
     closedir(dir);
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
+    }
 
     /* When listing the default root, inject one synthetic entry per
      * registered virtual mount (e.g. an "/sdcard" SD-card link).
@@ -169,28 +191,44 @@ static esp_err_t file_download_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid path");
     }
 
+    bool needs_spi_lock = http_server_match_extra_mount(relative_path) != NULL;
+    bool spi_locked = false;
+    if (needs_spi_lock) {
+        spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+    }
     struct stat st = {0};
-    if (stat(full_path, &st) != 0 || S_ISDIR(st.st_mode)) {
+    int stat_rc = stat(full_path, &st);
+    FILE *file = NULL;
+    if (stat_rc == 0 && !S_ISDIR(st.st_mode)) {
+        file = fopen(full_path, "rb");
+    }
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
+    }
+    if (stat_rc != 0 || S_ISDIR(st.st_mode)) {
         return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File not found");
     }
-
-    FILE *file = fopen(full_path, "rb");
     if (!file) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to open file");
     }
 
     char *scratch = http_server_alloc_scratch_buffer();
     if (!scratch) {
+        if (needs_spi_lock) {
+            spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+        }
         fclose(file);
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
         httpd_resp_send_500(req);
         return ESP_ERR_NO_MEM;
     }
 
     httpd_resp_set_type(req, "application/octet-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
-    bool needs_spi_lock = http_server_match_extra_mount(relative_path) != NULL;
     while (!feof(file)) {
-        bool spi_locked = false;
+        spi_locked = false;
         if (needs_spi_lock) {
             spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
         }
@@ -200,13 +238,29 @@ static esp_err_t file_download_handler(httpd_req_t *req)
         }
         if (read_bytes > 0 && httpd_resp_send_chunk(req, scratch, read_bytes) != ESP_OK) {
             free(scratch);
+            if (needs_spi_lock) {
+                spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+            } else {
+                spi_locked = false;
+            }
             fclose(file);
+            if (spi_locked) {
+                spi_bus_arbiter_unlock();
+            }
             return ESP_FAIL;
         }
     }
 
     free(scratch);
+    if (needs_spi_lock) {
+        spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+    } else {
+        spi_locked = false;
+    }
     fclose(file);
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
+    }
     return httpd_resp_send_chunk(req, NULL, 0);
 }
 
@@ -236,28 +290,49 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid path");
     }
 
+    bool needs_spi_lock = http_server_match_extra_mount(relative_path) != NULL;
+    bool spi_locked = false;
+    if (needs_spi_lock) {
+        spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+    }
     char parent_path[HTTP_SERVER_PATH_MAX];
     strlcpy(parent_path, full_path, sizeof(parent_path));
     char *slash = strrchr(parent_path, '/');
     if (!slash || slash == parent_path) {
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid path");
     }
     *slash = '\0';
 
     struct stat st = {0};
-    if (stat(parent_path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+    int stat_rc = stat(parent_path, &st);
+    bool parent_ok = (stat_rc == 0) && S_ISDIR(st.st_mode);
+    FILE *file = NULL;
+    if (parent_ok) {
+        file = fopen(full_path, "wb");
+    }
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
+    }
+    if (!parent_ok) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Parent directory not found");
     }
-
-    FILE *file = fopen(full_path, "wb");
     if (!file) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create file");
     }
 
     char *scratch = http_server_alloc_scratch_buffer();
     if (!scratch) {
+        if (needs_spi_lock) {
+            spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+        }
         fclose(file);
         unlink(full_path);
+        if (spi_locked) {
+            spi_bus_arbiter_unlock();
+        }
         httpd_resp_send_500(req);
         return ESP_ERR_NO_MEM;
     }
@@ -267,7 +342,6 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
      * on the same host cannot interleave with SDSPI polling and trigger
      * the spi_hal_setup_trans assert. We lock per-chunk (not for the whole
      * upload) so display refresh is not blocked for the whole transfer. */
-    bool needs_spi_lock = http_server_match_extra_mount(relative_path) != NULL;
 
     int remaining = req->content_len;
     while (remaining > 0) {
@@ -275,11 +349,18 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
         int received = httpd_req_recv(req, scratch, chunk);
         if (received <= 0) {
             free(scratch);
+            spi_locked = false;
+            if (needs_spi_lock) {
+                spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+            }
             fclose(file);
             unlink(full_path);
+            if (spi_locked) {
+                spi_bus_arbiter_unlock();
+            }
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Upload failed");
         }
-        bool spi_locked = false;
+        spi_locked = false;
         if (needs_spi_lock) {
             spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
         }
@@ -289,8 +370,15 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
         }
         if (written != (size_t)received) {
             free(scratch);
+            spi_locked = false;
+            if (needs_spi_lock) {
+                spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+            }
             fclose(file);
             unlink(full_path);
+            if (spi_locked) {
+                spi_bus_arbiter_unlock();
+            }
             return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Upload failed");
         }
         /* Yield so the IDLE task on this single-core target can run and
@@ -301,7 +389,7 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
     }
 
     free(scratch);
-    bool spi_locked = false;
+    spi_locked = false;
     if (needs_spi_lock) {
         spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
     }
@@ -326,12 +414,23 @@ static esp_err_t files_delete_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid path");
     }
 
+    bool needs_spi_lock = http_server_match_extra_mount(relative_path) != NULL;
+    bool spi_locked = false;
+    if (needs_spi_lock) {
+        spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+    }
     struct stat st = {0};
-    if (stat(full_path, &st) != 0) {
+    int stat_rc = stat(full_path, &st);
+    int rc = -1;
+    if (stat_rc == 0) {
+        rc = S_ISDIR(st.st_mode) ? rmdir(full_path) : unlink(full_path);
+    }
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
+    }
+    if (stat_rc != 0) {
         return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Path not found");
     }
-
-    int rc = S_ISDIR(st.st_mode) ? rmdir(full_path) : unlink(full_path);
     if (rc != 0) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Delete failed");
     }
@@ -359,18 +458,34 @@ static esp_err_t files_mkdir_handler(httpd_req_t *req)
 
     char full_path[HTTP_SERVER_PATH_MAX];
     esp_err_t err = http_server_resolve_storage_path(path_item->valuestring, full_path, sizeof(full_path));
+    bool needs_spi_lock = http_server_match_extra_mount(path_item->valuestring) != NULL;
     cJSON_Delete(root);
     if (err != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid path");
     }
 
+    bool spi_locked = false;
+    if (needs_spi_lock) {
+        spi_locked = (spi_bus_arbiter_lock(2000) == ESP_OK);
+    }
+    int mk_rc = 0;
+    int mk_errno = 0;
     if (mk_recursive) {
         char mkdir_buf[HTTP_SERVER_PATH_MAX];
         strlcpy(mkdir_buf, full_path, sizeof(mkdir_buf));
-        if (mkdir_parents(mkdir_buf, 0775) != 0) {
-            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create directory");
+        mk_rc = mkdir_parents(mkdir_buf, 0775);
+        mk_errno = errno;
+    } else {
+        mk_rc = mkdir(full_path, 0775);
+        mk_errno = errno;
+        if (mk_rc != 0 && mk_errno == EEXIST) {
+            mk_rc = 0;
         }
-    } else if (mkdir(full_path, 0775) != 0 && errno != EEXIST) {
+    }
+    if (spi_locked) {
+        spi_bus_arbiter_unlock();
+    }
+    if (mk_rc != 0) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create directory");
     }
 

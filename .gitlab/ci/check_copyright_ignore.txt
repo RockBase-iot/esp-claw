@@ -1,4 +1,0 @@
-Add temporary copyright skip files
-components/lua_modules/lua_module_magnetometer/src/bmm350.c
-components/lua_modules/lua_module_magnetometer/src/bmm350.h
-components/lua_modules/lua_module_magnetometer/src/bmm350_defs.h

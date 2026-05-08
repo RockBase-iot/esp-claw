@@ -14,6 +14,7 @@ idf_component_register(
         "src"
     REQUIRES
         esp_http_client
+        http_reuse
         esp-tls
         freertos
         json

@@ -11,6 +11,7 @@ idf_component_register(
         claw_cap
         cap_mcp_server
         esp_http_client
+        http_reuse
         esp_netif
         json
         mdns

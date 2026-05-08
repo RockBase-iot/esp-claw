@@ -3,7 +3,7 @@ idf_component_register(
         "src/display_hal.c"
         "src/lua_module_display.c"
     INCLUDE_DIRS
-        "include"
+        "src"
     REQUIRES
         cap_lua
         display_arbiter

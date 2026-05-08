@@ -2,7 +2,7 @@ idf_component_register(
     SRCS
         "src/lua_module_event_publisher.c"
     INCLUDE_DIRS
-        "include"
+        "src"
     REQUIRES
         cap_lua
         claw_event_router

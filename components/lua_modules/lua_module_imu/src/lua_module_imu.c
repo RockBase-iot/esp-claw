@@ -17,6 +17,8 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "i2c_bus.h"
 #include "lauxlib.h"
 
@@ -25,7 +27,7 @@
 #elif CONFIG_LUA_MODULE_IMU_CHIP_ICM42670
 #include "icm42670.h"
 #elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
-#error "CONFIG_LUA_MODULE_IMU_CHIP_MPU6050 is reserved but not implemented yet"
+#include "mpu6050.h"
 #else
 #error "Unsupported IMU chip selection"
 #endif
@@ -36,20 +38,28 @@
 #define LUA_MODULE_IMU_LEGACY_NAME        "bmi270_sensor"
 #elif CONFIG_LUA_MODULE_IMU_CHIP_ICM42670
 #define LUA_MODULE_IMU_LEGACY_NAME        "icm42670_sensor"
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+#define LUA_MODULE_IMU_LEGACY_NAME        "mpu6050_sensor"
 #endif
 #define LUA_MODULE_IMU_MAX_NAME_LEN       64
+#define LUA_MODULE_IMU_DEFAULT_FREQ_HZ    400000
 
 typedef struct {
 #if CONFIG_LUA_MODULE_IMU_CHIP_BMI270
     bmi270_handle_t sensor_handle;
 #elif CONFIG_LUA_MODULE_IMU_CHIP_ICM42670
     icm42670_handle_t sensor_handle;
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+    mpu6050_dev_t sensor_handle;
+    i2c_bus_device_handle_t i2c_dev_handle;
+    bool sensor_initialized;
 #endif
     i2c_bus_handle_t i2c_bus_handle;
     char peripheral_name[LUA_MODULE_IMU_MAX_NAME_LEN];
     bool peripheral_ref_held;
     gpio_num_t int_gpio_num;
     gpio_num_t sdo_gpio_num;
+    uint8_t i2c_addr;
 } lua_module_imu_handle_t;
 
 typedef struct {
@@ -116,7 +126,7 @@ static esp_err_t lua_module_imu_configure_interrupt_pin(int int_gpio_num)
     return gpio_config(&int_pin_cfg);
 }
 
-static esp_err_t lua_module_imu_configure_sdo_pin(int sdo_gpio_num)
+static esp_err_t lua_module_imu_configure_sdo_pin(int sdo_gpio_num, int level)
 {
     if (sdo_gpio_num < 0) {
         return ESP_OK;
@@ -135,7 +145,7 @@ static esp_err_t lua_module_imu_configure_sdo_pin(int sdo_gpio_num)
         return err;
     }
 
-    return gpio_set_level((gpio_num_t)sdo_gpio_num, 0);
+    return gpio_set_level((gpio_num_t)sdo_gpio_num, level ? 1 : 0);
 }
 
 static esp_err_t lua_module_imu_open_i2c_bus(const char *peripheral_name,
@@ -242,7 +252,7 @@ static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
     handle->int_gpio_num = (gpio_num_t)cfg->int_gpio_num;
     handle->sdo_gpio_num = (gpio_num_t)cfg->sdo_gpio_num;
 
-    esp_err_t err = lua_module_imu_configure_sdo_pin(cfg->sdo_gpio_num);
+    esp_err_t err = lua_module_imu_configure_sdo_pin(cfg->sdo_gpio_num, 0);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to configure SDO pin GPIO%d: %s", cfg->sdo_gpio_num, esp_err_to_name(err));
         free(handle);
@@ -266,10 +276,7 @@ static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
                                bmi270_config_file, BMI2_GYRO_CROSS_SENS_ENABLE | BMI2_CRT_RTOSK_ENABLE);
     if (err != ESP_OK || handle->sensor_handle == NULL) {
         ESP_LOGE(TAG, "Failed to create BMI270 sensor: %s", esp_err_to_name(err));
-        if (handle->peripheral_ref_held) {
-            esp_board_periph_unref_handle(handle->peripheral_name);
-        }
-        free(handle);
+        lua_module_imu_destroy_handle(handle);
         return err != ESP_OK ? err : ESP_FAIL;
     }
 
@@ -284,21 +291,13 @@ static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
     int8_t rslt = bmi2_set_int_pin_config(&int_pin_cfg, handle->sensor_handle);
     if (rslt != BMI2_OK) {
         ESP_LOGE(TAG, "Failed to configure BMI270 INT1 pin: %d", rslt);
-        bmi270_sensor_del(&handle->sensor_handle);
-        if (handle->peripheral_ref_held) {
-            esp_board_periph_unref_handle(handle->peripheral_name);
-        }
-        free(handle);
+        lua_module_imu_destroy_handle(handle);
         return ESP_FAIL;
     }
 
     err = lua_module_imu_apply_default_runtime_config(handle->sensor_handle);
     if (err != ESP_OK) {
-        bmi270_sensor_del(&handle->sensor_handle);
-        if (handle->peripheral_ref_held) {
-            esp_board_periph_unref_handle(handle->peripheral_name);
-        }
-        free(handle);
+        lua_module_imu_destroy_handle(handle);
         return err;
     }
 
@@ -341,7 +340,7 @@ static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
     handle->int_gpio_num = (gpio_num_t)cfg->int_gpio_num;
     handle->sdo_gpio_num = (gpio_num_t)cfg->sdo_gpio_num;
 
-    esp_err_t err = lua_module_imu_configure_sdo_pin(cfg->sdo_gpio_num);
+    esp_err_t err = lua_module_imu_configure_sdo_pin(cfg->sdo_gpio_num, 0);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to configure SDO pin GPIO%d: %s", cfg->sdo_gpio_num, esp_err_to_name(err));
         free(handle);
@@ -365,30 +364,20 @@ static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
         i2c_bus_get_internal_bus_handle(handle->i2c_bus_handle);
     if (i2c_master_handle == NULL) {
         ESP_LOGE(TAG, "Failed to resolve internal I2C handle for '%s'", cfg->peripheral_name);
-        if (handle->peripheral_ref_held) {
-            esp_board_periph_unref_handle(handle->peripheral_name);
-        }
-        free(handle);
+        lua_module_imu_destroy_handle(handle);
         return ESP_FAIL;
     }
 
     err = icm42670_create(i2c_master_handle, (uint8_t)cfg->i2c_addr, &handle->sensor_handle);
     if (err != ESP_OK || handle->sensor_handle == NULL) {
         ESP_LOGE(TAG, "Failed to create ICM42670 sensor: %s", esp_err_to_name(err));
-        if (handle->peripheral_ref_held) {
-            esp_board_periph_unref_handle(handle->peripheral_name);
-        }
-        free(handle);
+        lua_module_imu_destroy_handle(handle);
         return err != ESP_OK ? err : ESP_FAIL;
     }
 
     err = lua_module_imu_apply_default_runtime_config(handle->sensor_handle);
     if (err != ESP_OK) {
-        icm42670_delete(handle->sensor_handle);
-        if (handle->peripheral_ref_held) {
-            esp_board_periph_unref_handle(handle->peripheral_name);
-        }
-        free(handle);
+        lua_module_imu_destroy_handle(handle);
         return err;
     }
 
@@ -403,20 +392,135 @@ static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
     return ESP_OK;
 }
 
-#endif // CONFIG_LUA_MODULE_IMU_CHIP_BMI270 || CONFIG_LUA_MODULE_IMU_CHIP_ICM42670
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+
+static int8_t lua_module_imu_mpu6050_read(uint8_t reg_addr,
+                                          uint8_t *data,
+                                          uint32_t len,
+                                          void *intf_ptr)
+{
+    lua_module_imu_handle_t *handle = (lua_module_imu_handle_t *)intf_ptr;
+    if (handle == NULL || handle->i2c_dev_handle == NULL) {
+        return MPU6050_E_COM_FAIL;
+    }
+
+    return (i2c_bus_read_bytes(handle->i2c_dev_handle, reg_addr, len, data) == ESP_OK) ?
+           MPU6050_OK : MPU6050_E_COM_FAIL;
+}
+
+static int8_t lua_module_imu_mpu6050_write(uint8_t reg_addr,
+                                           const uint8_t *data,
+                                           uint32_t len,
+                                           void *intf_ptr)
+{
+    lua_module_imu_handle_t *handle = (lua_module_imu_handle_t *)intf_ptr;
+    if (handle == NULL || handle->i2c_dev_handle == NULL) {
+        return MPU6050_E_COM_FAIL;
+    }
+
+    return (i2c_bus_write_bytes(handle->i2c_dev_handle, reg_addr, len, data) == ESP_OK) ?
+           MPU6050_OK : MPU6050_E_COM_FAIL;
+}
+
+static void lua_module_imu_mpu6050_delay_ms(uint32_t period_ms, void *intf_ptr)
+{
+    (void)intf_ptr;
+    if (period_ms == 0) {
+        return;
+    }
+    vTaskDelay(pdMS_TO_TICKS(period_ms));
+}
+
+static esp_err_t lua_module_imu_create_handle(const lua_imu_resolved_cfg_t *cfg,
+                                              lua_module_imu_handle_t **out_handle)
+{
+    lua_module_imu_handle_t *handle = calloc(1, sizeof(lua_module_imu_handle_t));
+    if (handle == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    snprintf(handle->peripheral_name, sizeof(handle->peripheral_name), "%s", cfg->peripheral_name);
+    handle->int_gpio_num = (gpio_num_t)cfg->int_gpio_num;
+    handle->sdo_gpio_num = (gpio_num_t)cfg->sdo_gpio_num;
+    handle->i2c_addr = (uint8_t)cfg->i2c_addr;
+
+    esp_err_t err = lua_module_imu_configure_sdo_pin(cfg->sdo_gpio_num,
+                                                     cfg->i2c_addr == MPU6050_I2C_ADDRESS_HIGH);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure AD0 pin GPIO%d: %s", cfg->sdo_gpio_num, esp_err_to_name(err));
+        free(handle);
+        return err;
+    }
+
+    err = lua_module_imu_configure_interrupt_pin(cfg->int_gpio_num);
+    if (err != ESP_OK) {
+        free(handle);
+        return err;
+    }
+
+    err = lua_module_imu_open_i2c_bus(cfg->peripheral_name, cfg->frequency,
+                                      &handle->i2c_bus_handle, &handle->peripheral_ref_held);
+    if (err != ESP_OK) {
+        free(handle);
+        return err;
+    }
+
+    handle->i2c_dev_handle = i2c_bus_device_create(handle->i2c_bus_handle, handle->i2c_addr, 0);
+    if (handle->i2c_dev_handle == NULL) {
+        ESP_LOGE(TAG, "Failed to create MPU6050 I2C device at 0x%02x", handle->i2c_addr);
+        lua_module_imu_destroy_handle(handle);
+        return ESP_FAIL;
+    }
+
+    memset(&handle->sensor_handle, 0, sizeof(handle->sensor_handle));
+    handle->sensor_handle.intf_ptr = handle;
+    handle->sensor_handle.read = lua_module_imu_mpu6050_read;
+    handle->sensor_handle.write = lua_module_imu_mpu6050_write;
+    handle->sensor_handle.delay_ms = lua_module_imu_mpu6050_delay_ms;
+
+    int8_t rslt = mpu6050_init(&handle->sensor_handle);
+    if (rslt != MPU6050_OK) {
+        ESP_LOGE(TAG, "Failed to initialize MPU6050 at 0x%02x: %d", handle->i2c_addr, rslt);
+        lua_module_imu_destroy_handle(handle);
+        return (rslt == MPU6050_E_DEV_NOT_FOUND) ? ESP_ERR_NOT_FOUND : ESP_FAIL;
+    }
+    handle->sensor_initialized = true;
+
+    *out_handle = handle;
+    if (cfg->int_gpio_num >= 0) {
+        ESP_LOGI(TAG, "MPU6050 IMU initialized on %s, INT GPIO%d, addr 0x%02x, freq %d Hz",
+                 cfg->peripheral_name, cfg->int_gpio_num, cfg->i2c_addr, cfg->frequency);
+    } else {
+        ESP_LOGI(TAG, "MPU6050 IMU initialized on %s, addr 0x%02x, freq %d Hz",
+                 cfg->peripheral_name, cfg->i2c_addr, cfg->frequency);
+    }
+    return ESP_OK;
+}
+
+#endif // CONFIG_LUA_MODULE_IMU_CHIP_BMI270 || CONFIG_LUA_MODULE_IMU_CHIP_ICM42670 || CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
 
 static void lua_module_imu_destroy_handle(lua_module_imu_handle_t *handle)
 {
     if (handle == NULL) {
         return;
     }
-    if (handle->sensor_handle != NULL) {
 #if CONFIG_LUA_MODULE_IMU_CHIP_BMI270
+    if (handle->sensor_handle != NULL) {
         bmi270_sensor_del(&handle->sensor_handle);
+    }
 #elif CONFIG_LUA_MODULE_IMU_CHIP_ICM42670
+    if (handle->sensor_handle != NULL) {
         icm42670_delete(handle->sensor_handle);
         handle->sensor_handle = NULL;
+    }
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+    if (handle->i2c_dev_handle != NULL) {
+        i2c_bus_device_delete(&handle->i2c_dev_handle);
+    }
+    handle->sensor_initialized = false;
 #endif
+    if (handle->i2c_bus_handle != NULL) {
+        i2c_bus_delete(&handle->i2c_bus_handle);
     }
     if (handle->int_gpio_num >= 0) {
         gpio_reset_pin(handle->int_gpio_num);
@@ -434,7 +538,14 @@ static lua_module_imu_ud_t *lua_module_imu_get_ud(lua_State *L, int idx)
 {
     lua_module_imu_ud_t *ud =
         (lua_module_imu_ud_t *)luaL_checkudata(L, idx, LUA_MODULE_IMU_METATABLE);
-    if (!ud || !ud->handle || !ud->handle->sensor_handle) {
+    if (!ud || !ud->handle) {
+        luaL_error(L, "imu: invalid or closed handle");
+    }
+#if CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+    if (!ud->handle->sensor_initialized) {
+#else
+    if (!ud->handle->sensor_handle) {
+#endif
         luaL_error(L, "imu: invalid or closed handle");
     }
     return ud;
@@ -535,6 +646,28 @@ static int lua_module_imu_read(lua_State *L)
     lua_setfield(L, -2, "sens_time");
     lua_pushinteger(L, int_status);
     lua_setfield(L, -2, "status");
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+    mpu6050_raw_axes_t acc = { 0 };
+    mpu6050_raw_axes_t gyro = { 0 };
+    uint8_t int_status = 0;
+    int8_t rslt = mpu6050_read_accel_gyro(&acc, &gyro, &ud->handle->sensor_handle);
+    if (rslt != MPU6050_OK) {
+        return luaL_error(L, "imu read failed: %d", rslt);
+    }
+    rslt = mpu6050_get_int_status(&int_status, &ud->handle->sensor_handle);
+    if (rslt != MPU6050_OK) {
+        return luaL_error(L, "imu read status failed: %d", rslt);
+    }
+
+    lua_newtable(L);
+    lua_module_imu_push_axes_table(L, acc.x, acc.y, acc.z);
+    lua_setfield(L, -2, "accel");
+    lua_module_imu_push_axes_table(L, gyro.x, gyro.y, gyro.z);
+    lua_setfield(L, -2, "gyro");
+    lua_pushinteger(L, (lua_Integer)esp_timer_get_time());
+    lua_setfield(L, -2, "sens_time");
+    lua_pushinteger(L, int_status);
+    lua_setfield(L, -2, "status");
 #endif
     return 1;
 }
@@ -556,6 +689,14 @@ static int lua_module_imu_read_temperature(lua_State *L)
     esp_err_t err = icm42670_get_temp_raw_value(ud->handle->sensor_handle, &temp);
     if (err != ESP_OK) {
         return luaL_error(L, "imu read_temperature failed: %s", esp_err_to_name(err));
+    }
+
+    lua_pushinteger(L, temp);
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+    int16_t temp = 0;
+    int8_t rslt = mpu6050_read_temperature_raw(&temp, &ud->handle->sensor_handle);
+    if (rslt != MPU6050_OK) {
+        return luaL_error(L, "imu read_temperature failed: %d", rslt);
     }
 
     lua_pushinteger(L, temp);
@@ -593,6 +734,14 @@ static int lua_module_imu_read_int_status(lua_State *L)
     lua_pushinteger(L, ((lua_Integer)int_status3 << 16) |
                          ((lua_Integer)int_status2 << 8) |
                          int_status0);
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+    uint8_t int_status = 0;
+    int8_t rslt = mpu6050_get_int_status(&int_status, &ud->handle->sensor_handle);
+    if (rslt != MPU6050_OK) {
+        return luaL_error(L, "imu read_int_status failed: %d", rslt);
+    }
+
+    lua_pushinteger(L, int_status);
 #endif
     return 1;
 }
@@ -742,11 +891,13 @@ static int lua_module_imu_new(lua_State *L)
         cfg.i2c_addr = BMI270_I2C_ADDRESS;
 #elif CONFIG_LUA_MODULE_IMU_CHIP_ICM42670
         cfg.i2c_addr = ICM42670_I2C_ADDRESS;
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+        cfg.i2c_addr = MPU6050_I2C_ADDRESS_LOW;
 #endif
         cfg.has_i2c_addr = true;
     }
     if (!cfg.has_frequency) {
-        cfg.frequency = 400000;
+        cfg.frequency = LUA_MODULE_IMU_DEFAULT_FREQ_HZ;
         cfg.has_frequency = true;
     }
 #if CONFIG_LUA_MODULE_IMU_CHIP_BMI270
@@ -762,6 +913,16 @@ static int lua_module_imu_new(lua_State *L)
     }
     if (cfg.i2c_addr != ICM42670_I2C_ADDRESS && cfg.i2c_addr != ICM42670_I2C_ADDRESS_1) {
         return luaL_error(L, "imu.new: unsupported ICM42670 I2C address 0x%02x", cfg.i2c_addr);
+    }
+#elif CONFIG_LUA_MODULE_IMU_CHIP_MPU6050
+    if (!cfg.has_int_gpio) {
+        cfg.int_gpio_num = -1;
+    }
+    if (!cfg.has_sdo_gpio) {
+        cfg.sdo_gpio_num = -1;
+    }
+    if (cfg.i2c_addr != MPU6050_I2C_ADDRESS_LOW && cfg.i2c_addr != MPU6050_I2C_ADDRESS_HIGH) {
+        return luaL_error(L, "imu.new: unsupported MPU6050 I2C address 0x%02x", cfg.i2c_addr);
     }
 #endif
 

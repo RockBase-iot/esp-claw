@@ -7,22 +7,34 @@
 #include "lua_module_environmental_sensor.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "cap_lua.h"
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690
 #include "bme69x.h"
 #include "bme69x_defs.h"
-#include "cap_lua.h"
 #include "esp_board_manager.h"
 #include "esp_board_periph.h"
 #include "esp_check.h"
-#include "esp_log.h"
-#include "esp_rom_sys.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "i2c_bus.h"
+#endif
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_DHT
+#include "dht.h"
+#include "driver/gpio.h"
+#endif
+#include "esp_rom_sys.h"
+#include "esp_log.h"
 #include "lauxlib.h"
 
+#define LUA_MODULE_ENVIRONMENTAL_SENSOR_NAME      "environmental_sensor"
+#define LUA_MODULE_ENVIRONMENTAL_SENSOR_TYPE_DHT  "dht"
+#define LUA_MODULE_ENVIRONMENTAL_SENSOR_TYPE_BME690 "bme690"
+
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690
 #define LUA_MODULE_BME690_METATABLE        "environmental_sensor.device"
 #define LUA_MODULE_BME690_DEFAULT_NAME     "environmental_sensor"
 #define LUA_MODULE_BME690_LEGACY_NAME      "bme690_sensor"
@@ -641,8 +653,208 @@ static int lua_module_bme690_new(lua_State *L)
     lua_setmetatable(L, -2);
     return 1;
 }
+#endif
 
-int luaopen_environmental_sensor(lua_State *L)
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_DHT
+#define LUA_MODULE_DHT_METATABLE           "environmental_sensor.dht_device"
+#define LUA_MODULE_DHT_DEFAULT_TYPE        DHT_TYPE_DHT11
+#define LUA_MODULE_DHT_PRE_READ_DELAY_US   (200 * 1000)
+
+typedef struct {
+    gpio_num_t pin;
+    dht_sensor_type_t sensor_type;
+    bool closed;
+} lua_module_dht_ud_t;
+
+static dht_sensor_type_t lua_module_dht_sensor_type_from_string(const char *sensor_type_str)
+{
+    if (!sensor_type_str || strcmp(sensor_type_str, "dht11") == 0) {
+        return DHT_TYPE_DHT11;
+    }
+    if (strcmp(sensor_type_str, "dht22") == 0 ||
+        strcmp(sensor_type_str, "am2301") == 0 ||
+        strcmp(sensor_type_str, "am2302") == 0 ||
+        strcmp(sensor_type_str, "am2321") == 0 ||
+        strcmp(sensor_type_str, "dht21") == 0) {
+        return DHT_TYPE_AM2301;
+    }
+    if (strcmp(sensor_type_str, "si7021") == 0) {
+        return DHT_TYPE_SI7021;
+    }
+    return (dht_sensor_type_t)-1;
+}
+
+static lua_module_dht_ud_t *lua_module_dht_get_ud(lua_State *L, int idx)
+{
+    lua_module_dht_ud_t *ud =
+        (lua_module_dht_ud_t *)luaL_checkudata(L, idx, LUA_MODULE_DHT_METATABLE);
+    if (ud == NULL || ud->closed) {
+        luaL_error(L, "environmental_sensor: invalid or closed dht handle");
+    }
+    return ud;
+}
+
+static esp_err_t lua_module_dht_read_float(dht_sensor_type_t sensor_type, gpio_num_t pin,
+                                           float *temperature, float *humidity)
+{
+    esp_rom_delay_us(LUA_MODULE_DHT_PRE_READ_DELAY_US);
+    return dht_read_float_data(sensor_type, pin, humidity, temperature);
+}
+
+static int lua_module_dht_close(lua_State *L)
+{
+    lua_module_dht_ud_t *ud =
+        (lua_module_dht_ud_t *)luaL_checkudata(L, 1, LUA_MODULE_DHT_METATABLE);
+    ud->closed = true;
+    return 0;
+}
+
+static int lua_module_dht_gc(lua_State *L)
+{
+    lua_module_dht_ud_t *ud =
+        (lua_module_dht_ud_t *)luaL_testudata(L, 1, LUA_MODULE_DHT_METATABLE);
+    if (ud != NULL) {
+        ud->closed = true;
+    }
+    return 0;
+}
+
+static int lua_module_dht_name(lua_State *L)
+{
+    lua_module_dht_get_ud(L, 1);
+    lua_pushstring(L, LUA_MODULE_ENVIRONMENTAL_SENSOR_TYPE_DHT);
+    return 1;
+}
+
+static int lua_module_dht_read(lua_State *L)
+{
+    lua_module_dht_ud_t *ud = lua_module_dht_get_ud(L, 1);
+    float humidity = 0;
+    float temperature = 0;
+
+    esp_err_t err = lua_module_dht_read_float(ud->sensor_type, ud->pin, &temperature, &humidity);
+    if (err != ESP_OK) {
+        return luaL_error(L, "environmental_sensor dht read failed: %s", esp_err_to_name(err));
+    }
+
+    lua_newtable(L);
+    lua_pushnumber(L, temperature);
+    lua_setfield(L, -2, "temperature");
+    lua_pushnumber(L, humidity);
+    lua_setfield(L, -2, "humidity");
+    return 1;
+}
+
+static int lua_module_dht_read_temperature(lua_State *L)
+{
+    lua_module_dht_ud_t *ud = lua_module_dht_get_ud(L, 1);
+    float humidity = 0;
+    float temperature = 0;
+
+    esp_err_t err = lua_module_dht_read_float(ud->sensor_type, ud->pin, &temperature, &humidity);
+    if (err != ESP_OK) {
+        return luaL_error(L, "environmental_sensor dht read_temperature failed: %s", esp_err_to_name(err));
+    }
+
+    lua_pushnumber(L, temperature);
+    return 1;
+}
+
+static int lua_module_dht_read_humidity(lua_State *L)
+{
+    lua_module_dht_ud_t *ud = lua_module_dht_get_ud(L, 1);
+    float humidity = 0;
+    float temperature = 0;
+
+    esp_err_t err = lua_module_dht_read_float(ud->sensor_type, ud->pin, &temperature, &humidity);
+    if (err != ESP_OK) {
+        return luaL_error(L, "environmental_sensor dht read_humidity failed: %s", esp_err_to_name(err));
+    }
+
+    lua_pushnumber(L, humidity);
+    return 1;
+}
+
+static int lua_module_dht_read_raw_method(lua_State *L)
+{
+    lua_module_dht_ud_t *ud = lua_module_dht_get_ud(L, 1);
+    int16_t humidity = 0;
+    int16_t temperature = 0;
+
+    esp_rom_delay_us(LUA_MODULE_DHT_PRE_READ_DELAY_US);
+    esp_err_t err = dht_read_data(ud->sensor_type, ud->pin, &humidity, &temperature);
+    if (err != ESP_OK) {
+        return luaL_error(L, "environmental_sensor dht read_raw failed: %s", esp_err_to_name(err));
+    }
+
+    lua_pushinteger(L, temperature);
+    lua_pushinteger(L, humidity);
+    return 2;
+}
+
+static int lua_module_dht_new(lua_State *L)
+{
+    int opts_idx = 0;
+
+    if (lua_istable(L, 1)) {
+        opts_idx = 1;
+    } else if (lua_istable(L, 2)) {
+        opts_idx = 2;
+    }
+
+    if (opts_idx == 0) {
+        return luaL_error(L, "environmental_sensor.new({ type = \"dht\", pin = <gpio> ... }) expects an options table");
+    }
+
+    lua_getfield(L, opts_idx, "pin");
+    gpio_num_t pin = (gpio_num_t)luaL_checkinteger(L, -1);
+    lua_pop(L, 1);
+
+    lua_getfield(L, opts_idx, "sensor_type");
+    const char *sensor_type_str = lua_isnoneornil(L, -1) ? NULL : luaL_checkstring(L, -1);
+    dht_sensor_type_t sensor_type = lua_module_dht_sensor_type_from_string(sensor_type_str);
+    lua_pop(L, 1);
+
+    if ((int)sensor_type < 0) {
+        return luaL_error(L, "environmental_sensor.new: invalid dht sensor_type");
+    }
+
+    lua_module_dht_ud_t *ud = (lua_module_dht_ud_t *)lua_newuserdata(L, sizeof(*ud));
+    memset(ud, 0, sizeof(*ud));
+    ud->pin = pin;
+    ud->sensor_type = sensor_type;
+
+    luaL_getmetatable(L, LUA_MODULE_DHT_METATABLE);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static void lua_module_dht_create_metatable(lua_State *L)
+{
+    if (luaL_newmetatable(L, LUA_MODULE_DHT_METATABLE)) {
+        lua_pushcfunction(L, lua_module_dht_gc);
+        lua_setfield(L, -2, "__gc");
+        lua_pushvalue(L, -1);
+        lua_setfield(L, -2, "__index");
+        lua_pushcfunction(L, lua_module_dht_read);
+        lua_setfield(L, -2, "read");
+        lua_pushcfunction(L, lua_module_dht_read_raw_method);
+        lua_setfield(L, -2, "read_raw");
+        lua_pushcfunction(L, lua_module_dht_read_temperature);
+        lua_setfield(L, -2, "read_temperature");
+        lua_pushcfunction(L, lua_module_dht_read_humidity);
+        lua_setfield(L, -2, "read_humidity");
+        lua_pushcfunction(L, lua_module_dht_name);
+        lua_setfield(L, -2, "name");
+        lua_pushcfunction(L, lua_module_dht_close);
+        lua_setfield(L, -2, "close");
+    }
+    lua_pop(L, 1);
+}
+#endif
+
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690
+static void lua_module_environmental_sensor_create_bme690_metatable(lua_State *L)
 {
     if (luaL_newmetatable(L, LUA_MODULE_BME690_METATABLE)) {
         lua_pushcfunction(L, lua_module_bme690_gc);
@@ -669,14 +881,86 @@ int luaopen_environmental_sensor(lua_State *L)
         lua_setfield(L, -2, "close");
     }
     lua_pop(L, 1);
+}
+#endif
+
+static bool lua_module_environmental_sensor_table_has_field(lua_State *L, int idx, const char *field)
+{
+    bool has_field = false;
+
+    if (!lua_istable(L, idx)) {
+        return false;
+    }
+
+    lua_getfield(L, idx, field);
+    has_field = !lua_isnoneornil(L, -1);
+    lua_pop(L, 1);
+    return has_field;
+}
+
+static int lua_module_environmental_sensor_new(lua_State *L)
+{
+    const char *backend_type = NULL;
+
+    if (lua_istable(L, 1)) {
+        lua_getfield(L, 1, "type");
+        if (lua_isstring(L, -1)) {
+            backend_type = lua_tostring(L, -1);
+        }
+        lua_pop(L, 1);
+    }
+
+    if (backend_type == NULL && lua_istable(L, 1) &&
+        lua_module_environmental_sensor_table_has_field(L, 1, "pin")) {
+        backend_type = LUA_MODULE_ENVIRONMENTAL_SENSOR_TYPE_DHT;
+    }
+
+    if (backend_type == NULL) {
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690
+        return lua_module_bme690_new(L);
+#elif CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_DHT
+        return lua_module_dht_new(L);
+#else
+        return luaL_error(L, "environmental_sensor has no enabled backend");
+#endif
+    }
+
+    if (strcmp(backend_type, LUA_MODULE_ENVIRONMENTAL_SENSOR_TYPE_BME690) == 0) {
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690
+        return lua_module_bme690_new(L);
+#else
+        return luaL_error(L, "environmental_sensor backend '%s' is not enabled in menuconfig", backend_type);
+#endif
+    }
+
+    if (strcmp(backend_type, LUA_MODULE_ENVIRONMENTAL_SENSOR_TYPE_DHT) == 0) {
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_DHT
+        return lua_module_dht_new(L);
+#else
+        return luaL_error(L, "environmental_sensor backend '%s' is not enabled in menuconfig", backend_type);
+#endif
+    }
+
+    return luaL_error(L, "environmental_sensor.new: unsupported type '%s'", backend_type);
+}
+
+int luaopen_environmental_sensor(lua_State *L)
+{
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690
+    lua_module_environmental_sensor_create_bme690_metatable(L);
+#endif
+#if CONFIG_LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_DHT
+    lua_module_dht_create_metatable(L);
+#endif
 
     lua_newtable(L);
-    lua_pushcfunction(L, lua_module_bme690_new);
+    lua_pushcfunction(L, lua_module_environmental_sensor_new);
     lua_setfield(L, -2, "new");
     return 1;
 }
 
 esp_err_t lua_module_environmental_sensor_register(void)
 {
-    return cap_lua_register_module("environmental_sensor", luaopen_environmental_sensor);
+    return cap_lua_register_module(LUA_MODULE_ENVIRONMENTAL_SENSOR_NAME,
+                                   luaopen_environmental_sensor);
 }

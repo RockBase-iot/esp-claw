@@ -514,6 +514,8 @@ void app_main(void)
                 .sd_root     = sdcard_mount_get_mount_point(),
                 .entries     = mirror_entries,
                 .entry_count = sizeof(mirror_entries) / sizeof(mirror_entries[0]),
+                .bus_lock    = sd_settings_bus_lock,
+                .bus_unlock  = sd_settings_bus_unlock,
             };
             (void)app_sd_mirror_sync(&mirror_cfg);
 
@@ -521,6 +523,8 @@ void app_main(void)
              * (and the auto-updated skills_list.json) survive a re-flash.
              * Files deleted on one side are NOT propagated, so a fresh
              * factory image cannot wipe user skills on the SD card. */
+            app_sd_mirror_set_bus_lock(sd_settings_bus_lock,
+                                       sd_settings_bus_unlock);
             (void)app_sd_mirror_sync_dir(sdcard_mount_get_mount_point(),
                                          "/fatfs/skills",
                                          "skills");

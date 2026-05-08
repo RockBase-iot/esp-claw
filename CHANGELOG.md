@@ -1,10 +1,42 @@
 # ChangeLog
 
+## 2026-05-07
+
+### Tools:
+
+* Online Flashing Tool: Supports flashing firmware with different console outputs
+
+### Change:
+
+* Merged Feishu, QQ, Telegram, WeChat, and IM attachment sources, Skills, and docs into the unified `cap_im_platform` component while keeping existing per-platform runtime group IDs and tool names.
+
 ## 2026-05-06
+
+### Feature:
+
+* Merged DHT-family single-wire sensor support into `lua_module_environmental_sensor`, allowing the same module to drive both BME690 (I2C) and DHT11/DHT22/AM2301/AM2302/AM2321/SI7021 sensors via separate Kconfig backends.
+
+* Added MPU6050 chip support to `lua_module_imu`, including a standalone MPU6050 driver (`mpu6050.c`), configurable SDO pin level for I2C address selection, and accelerometer/gyroscope read APIs.
+
+* Reorganized `lua_module_magnetometer` BMM350 driver sources into a dedicated `bmm350/` subdirectory for clearer module structure.
+
+* Added a shared `http_reuse` component that wraps `esp_http_client_init`, `esp_http_client_cleanup`, and `esp_http_client_perform` to transparently reuse persistent HTTP clients across requests to the same endpoint.
+
+* Added Kconfig options for HTTP client reuse, including feature enablement and configurable pool sizing.
+
+* Added pooled client LRU eviction and one-time retry-on-failure handling for reused connections to reduce repeated connection setup and improve robustness.
+
+* Wired `http_reuse` into `claw_core`, `cap_mcp_client`, `cap_web_search`, `cap_im_attachment`, `cap_im_feishu`, `cap_im_qq`, `cap_im_tg`, and `cap_im_wechat`.
+
+* Added an indexed session history file header for Claw memory sessions to retain recent records by offset and rebuild session JSON without scanning legacy tab-delimited lines.
 
 ### Fix:
 
 * Improved file descriptor management for WebSocket connections to reduce the issue where Web Chat did not receive reply messages. (https://github.com/espressif/esp-claw/issues/36)
+
+* Adjusted `cap_im_qq` HTTP TX buffer sizing when HTTP reuse is enabled so reused clients keep compatible buffer settings.
+
+* Fixed Feishu inbound image attachment saving to derive file extensions from the downloaded MIME type instead of assuming JPEG. 
 
 ## 2026-05-03
 
@@ -24,7 +56,7 @@
 
 * Added shared `app_claw` integration for the new Lua environmental sensor and magnetometer modules, including Kconfig, component dependencies, and Lua module registration.
 
-* Added the `lua_module_environmental_sensor` module with Lua-facing sensor APIs and a `basic_environmental_sensor.lua` example script.
+* Added the `lua_module_environmental_sensor` module with Lua-facing sensor APIs and an `environmental_read.lua` example script.
 
 * Added the `lua_module_magnetometer` module with bundled `bmm350` driver sources, Lua bindings, example scripts, and skill metadata.
 
@@ -47,6 +79,7 @@
 * Enhanced the Edge Agent web chat experience with local chat session persistence, file upload support, richer status and restart feedback, and updated configuration editing UI.
 
 * Refactored the docs online flashing workflow with a redesigned multi-step flash page, refreshed localized copy, and updated firmware metadata generation for the new tool flow.
+
 
 ### Change:
 
@@ -108,11 +141,19 @@
 
 * Reworked `cap_time` to use SNTP-based synchronization, added on-demand current time retrieval, and injected a time context provider for relative date reasoning in `claw_core`.
 
+* Added standard directory-based skill packaging with JSON frontmatter, generated skill sync tooling, and migrated shipped capability, memory, and Edge Agent skills from flat markdown files to `SKILL.md` directories.
+
+* Added Lua module build and sync tooling for generated builtin Lua module/script skills, including module docs, script source metadata, shared Lua sync helpers, and the `lua_led_strip_switch` skill.
+
+* Updated the ESP32-S3 DevKitC-1 breadboard UAC codec lifecycle to separate open/start/stop/close handling, track stream state, reuse device handles, and close devices on delete or disconnect.
+
 ### Change:
 
 * Migrated selected Basic Demo updates into Edge Agent, including app configuration handling, HTTP UI updates, Lua module wiring, and default SDK configuration changes.
 
 * Moved `dfrobot_k10` and other shipped board definitions into vendor-specific subdirectories, and relocated the LilyGO T-Display-S3 board assets from `basic_demo` to `edge_agent`.
+
+* Reorganized Lua module documentation and examples into `docs/`, `lua_scripts/test`, and `lua_scripts/lib`, replacing per-module `skills_list.json` files with generated skill sources.
 
 ### Fix:
 

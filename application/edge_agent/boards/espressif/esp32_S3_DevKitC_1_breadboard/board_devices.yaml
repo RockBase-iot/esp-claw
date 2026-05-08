@@ -43,7 +43,7 @@ devices:
     type: custom
     version: default
     dependencies:
-      espressif/usb_host_uac: "^1.3.0"
+      espressif/usb_host_uac: "^1.4.0"
     config:
       sample_rate_hz: 16000           # Sample rate in Hz
 

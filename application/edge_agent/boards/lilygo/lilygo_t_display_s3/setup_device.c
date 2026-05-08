@@ -278,7 +278,7 @@ static int display_lcd_init(void *config, int cfg_size, void **device_handle)
 
     s_lcd_handles.io_handle = io_handle;
     s_lcd_handles.panel_handle = panel_handle;
-    esp_board_device_update_config("display_lcd", (void *)&s_lcd_config);
+    esp_board_device_override_config("display_lcd", (void *)&s_lcd_config, sizeof(s_lcd_config));
     *device_handle = &s_lcd_handles;
 
     ESP_LOGI(TAG, "T-Display-S3 i80 LCD ready (%dx%d @ %d Hz)",

@@ -4,20 +4,18 @@ include("${CMAKE_SOURCE_DIR}/tools/cmake/esp_idf_patch.cmake")
 include("${CMAKE_SOURCE_DIR}/tools/cmake/flash_partition_defaults.cmake")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-set(PROJECT_VER "0.1.2")
+set(PROJECT_VER "0.2.0")
 project(edge_agent)
-include("${CMAKE_SOURCE_DIR}/tools/cmake/board_manager_patch.cmake")
-
-include("${CMAKE_SOURCE_DIR}/tools/cmake/skills_sync.cmake")
 
 fatfs_create_spiflash_image(storage fatfs_image FLASH_IN_PROJECT)
-edge_agent_enable_component_skills_sync(
+
+skill_builder_configure_skill_sync(
     TARGET fatfs_storage_bin
-    DEMO_SKILLS_DIR "${CMAKE_SOURCE_DIR}/fatfs_image/skills"
-    MANIFEST_PATH "${CMAKE_BINARY_DIR}/component_skills_manifest.json"
+    SKILL_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/fatfs_image/skills"
 )
-edge_agent_enable_component_builtin_lua_sync(
+
+lua_module_builder_configure_builtin_lua_sync(
     TARGET fatfs_storage_bin
-    OUTPUT_DIR "${CMAKE_SOURCE_DIR}/fatfs_image/scripts/builtin"
-    MANIFEST_PATH "${CMAKE_BINARY_DIR}/component_builtin_lua_manifest.json"
+    BUILTIN_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/fatfs_image/scripts/builtin"
+    DOCS_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/fatfs_image/scripts/docs"
 )

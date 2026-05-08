@@ -21,6 +21,20 @@ typedef struct {
     size_t max_file_bytes;
 } claw_skill_config_t;
 
+typedef enum {
+    CLAW_SKILL_MANAGE_MODE_READONLY = 0,
+    CLAW_SKILL_MANAGE_MODE_RUNTIME,
+} claw_skill_manage_mode_t;
+
+typedef struct {
+    const char *id;
+    const char *file;
+    const char *summary;
+    const char *const *cap_groups;
+    size_t cap_group_count;
+    claw_skill_manage_mode_t manage_mode;
+} claw_skill_catalog_entry_t;
+
 esp_err_t claw_skill_init(const claw_skill_config_t *config);
 
 esp_err_t claw_skill_reload_registry(void);
@@ -28,6 +42,8 @@ const char *claw_skill_get_skills_root_dir(void);
 
 /* Renders the skill catalog used by the prompt layer. */
 esp_err_t claw_skill_read_skills_list(char *buf, size_t size);
+esp_err_t claw_skill_render_catalog_json(char *buf, size_t size);
+esp_err_t claw_skill_get_catalog_entry(const char *skill_id, claw_skill_catalog_entry_t *out_entry);
 
 /* Loads the active skill ids for one session from persistent state. */
 esp_err_t claw_skill_load_active_skill_ids(const char *session_id,

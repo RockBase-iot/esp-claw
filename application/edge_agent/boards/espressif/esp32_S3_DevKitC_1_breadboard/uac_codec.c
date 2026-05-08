@@ -30,6 +30,7 @@ typedef struct {
     bool is_data_enabled;
     bool is_dev_enabled;
     bool is_enabled;
+    bool stream_started;
     bool disconnected;
     int size_per_second;
 } uac_codec_t;
@@ -105,6 +106,8 @@ static void uac_codec_device_callback(uac_host_device_handle_t uac_device_handle
     ESP_LOGI(TAG, "UAC %s disconnected", codec->config.is_input ? "microphone" : "speaker");
     codec->disconnected = true;
     codec->is_enabled = false;
+    codec->stream_started = false;
+    codec->size_per_second = 0;
     if (codec->dev_handle == uac_device_handle) {
         codec->dev_handle = NULL;
     }
@@ -113,7 +116,10 @@ static void uac_codec_device_callback(uac_host_device_handle_t uac_device_handle
 
 static esp_err_t uac_codec_open_device(uac_codec_t *codec)
 {
-    uac_host_device_handle_t dev_handle = NULL;
+    if (codec->dev_handle != NULL) {
+        return ESP_OK;
+    }
+
     const uac_host_device_config_t dev_config = {
         .addr = codec->config.addr,
         .iface_num = codec->config.iface_num,
@@ -123,12 +129,28 @@ static esp_err_t uac_codec_open_device(uac_codec_t *codec)
         .callback_arg = codec,
     };
 
-    ESP_RETURN_ON_ERROR(uac_host_device_open(&dev_config, &dev_handle), TAG, "failed to open UAC device");
+    ESP_RETURN_ON_ERROR(uac_host_device_open(&dev_config, &codec->dev_handle), TAG, "failed to open UAC device");
+    return ESP_OK;
+}
 
+static esp_err_t uac_codec_start_device(uac_codec_t *codec)
+{
     uac_host_dev_alt_param_t alt_param = {0};
-    esp_err_t ret = uac_host_get_device_alt_param(dev_handle, 1, &alt_param);
+    esp_err_t ret;
+
+    if (codec == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ret = uac_codec_open_device(codec);
     if (ret != ESP_OK) {
-        (void)uac_host_device_close(dev_handle);
+        return ret;
+    }
+
+    ret = uac_host_get_device_alt_param(codec->dev_handle, 1, &alt_param);
+    if (ret != ESP_OK) {
+        (void)uac_host_device_close(codec->dev_handle);
+        codec->dev_handle = NULL;
         return ret;
     }
 
@@ -151,9 +173,10 @@ static esp_err_t uac_codec_open_device(uac_codec_t *codec)
         .sample_freq = select_uac_sample_rate(&alt_param, codec->fs.sample_rate),
     };
 
-    ret = uac_host_device_start(dev_handle, &stream_config);
+    ret = uac_host_device_start(codec->dev_handle, &stream_config);
     if (ret != ESP_OK) {
-        (void)uac_host_device_close(dev_handle);
+        (void)uac_host_device_close(codec->dev_handle);
+        codec->dev_handle = NULL;
         return ret;
     }
 
@@ -161,21 +184,43 @@ static esp_err_t uac_codec_open_device(uac_codec_t *codec)
     codec->fs.bits_per_sample = stream_config.bit_resolution;
     codec->fs.channel = stream_config.channels;
     codec->size_per_second = codec->fs.sample_rate * codec->fs.bits_per_sample / 8 * codec->fs.channel;
-    codec->dev_handle = dev_handle;
     codec->disconnected = false;
+    codec->stream_started = true;
 
     if (codec->config.is_input) {
-        (void)uac_host_device_set_mute(dev_handle, false);
+        (void)uac_host_device_set_mute(codec->dev_handle, false);
         ESP_LOGI(TAG, "UAC microphone started: %" PRIu32 " Hz, %u bits, %u channels",
                  stream_config.sample_freq, stream_config.bit_resolution, stream_config.channels);
     } else {
-        (void)uac_host_device_set_volume(dev_handle, 50);
-        (void)uac_host_device_set_mute(dev_handle, false);
+        (void)uac_host_device_set_volume(codec->dev_handle, 50);
+        (void)uac_host_device_set_mute(codec->dev_handle, false);
         ESP_LOGI(TAG, "UAC speaker started: %" PRIu32 " Hz, %u bits, %u channels",
                  stream_config.sample_freq, stream_config.bit_resolution, stream_config.channels);
     }
 
     return ESP_OK;
+}
+
+static void uac_codec_stop_device(uac_codec_t *codec)
+{
+    if (codec == NULL || codec->dev_handle == NULL || !codec->stream_started) {
+        return;
+    }
+
+    (void)uac_host_device_stop(codec->dev_handle);
+    codec->stream_started = false;
+    codec->size_per_second = 0;
+}
+
+static void uac_codec_close_device(uac_codec_t *codec)
+{
+    if (codec == NULL || codec->dev_handle == NULL) {
+        return;
+    }
+
+    uac_codec_stop_device(codec);
+    (void)uac_host_device_close(codec->dev_handle);
+    codec->dev_handle = NULL;
 }
 
 static int uac_codec_try_enable(uac_codec_t *codec, bool enable)
@@ -185,11 +230,7 @@ static int uac_codec_try_enable(uac_codec_t *codec, bool enable)
     }
 
     if (!enable) {
-        if (codec->dev_handle) {
-            (void)uac_host_device_stop(codec->dev_handle);
-            (void)uac_host_device_close(codec->dev_handle);
-            codec->dev_handle = NULL;
-        }
+        uac_codec_stop_device(codec);
         codec->is_enabled = false;
         return ESP_CODEC_DEV_OK;
     }
@@ -204,7 +245,7 @@ static int uac_codec_try_enable(uac_codec_t *codec, bool enable)
         return ESP_CODEC_DEV_NOT_FOUND;
     }
 
-    esp_err_t ret = uac_codec_open_device(codec);
+    esp_err_t ret = uac_codec_start_device(codec);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "failed to start UAC %s: %s",
                  codec->config.is_input ? "microphone" : "speaker", esp_err_to_name(ret));
@@ -547,10 +588,12 @@ void uac_codec_delete_handle(dev_audio_codec_handles_t *codec_handles)
     if (codec_handles == NULL) {
         return;
     }
+    uac_codec_t *codec = (uac_codec_t *)codec_handles->codec_if;
     if (codec_handles->codec_dev) {
         esp_codec_dev_delete(codec_handles->codec_dev);
         codec_handles->codec_dev = NULL;
     }
+    uac_codec_close_device(codec);
     if (codec_handles->data_if) {
         audio_codec_delete_data_if(codec_handles->data_if);
         codec_handles->data_if = NULL;

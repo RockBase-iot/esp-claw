@@ -32,6 +32,10 @@
 #define CLAW_MEMORY_IDENTITY_FILE                "identity.md"
 #define CLAW_MEMORY_USER_FILE                    "user.md"
 #define CLAW_MEMORY_AUTO_EXTRACT_MAX_ITEMS       3
+#define CLAW_MEMORY_SESSION_HEADER_MAGIC         0x31485343u /* CSH1 */
+#define CLAW_MEMORY_SESSION_HEADER_VERSION       2
+#define CLAW_MEMORY_SESSION_RAW_HEADER_SIZE      256
+#define CLAW_MEMORY_SESSION_HEADER_SIZE          345
 
 typedef struct {
     int initialized;
@@ -72,7 +76,11 @@ void claw_memory_normalize_session_text(const char *src,
                                         char *dst,
                                         size_t dst_size,
                                         size_t max_chars);
-esp_err_t claw_memory_append_session_line(FILE *file, const char *role, const char *text);
+esp_err_t claw_memory_write_session_json_record(FILE *file,
+                                                const char *role,
+                                                const char *text,
+                                                uint32_t *out_offset,
+                                                uint32_t *out_length);
 bool line_list_contains_item(const char *list, const char *item);
 esp_err_t line_list_append_unique(char **list, const char *item);
 esp_err_t line_list_merge_unique(char **dst, const char *src);

@@ -5,10 +5,12 @@
  */
 
 #include <stdbool.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "cJSON.h"
 #include "claw_cap.h"
@@ -29,18 +31,6 @@ static const char *cap_skill_root_dir(void)
     return claw_skill_get_skills_root_dir();
 }
 
-static const char *cap_skill_list_file_path(void)
-{
-    static char path[CAP_SKILL_MAX_PATH_LEN];
-
-    const char *root_dir = cap_skill_root_dir();
-    if (!root_dir) {
-        return NULL;
-    }
-    snprintf(path, sizeof(path), "%s/skills_list.json", root_dir);
-    return path;
-}
-
 static void cap_skill_free_string_array(char **items, size_t count)
 {
     size_t i;
@@ -53,6 +43,52 @@ static void cap_skill_free_string_array(char **items, size_t count)
         free(items[i]);
     }
     free(items);
+}
+
+static bool cap_skill_cap_group_exists(cJSON *cap_groups, const char *value)
+{
+    cJSON *item = NULL;
+
+    if (!cap_groups || !value) {
+        return false;
+    }
+    cJSON_ArrayForEach(item, cap_groups) {
+        if (cJSON_IsString(item) && item->valuestring && strcmp(item->valuestring, value) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static esp_err_t cap_skill_copy_cap_groups(cJSON *dst, cJSON *src)
+{
+    cJSON *item = NULL;
+
+    if (!dst) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!src) {
+        return ESP_OK;
+    }
+    if (!cJSON_IsArray(src)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    cJSON_ArrayForEach(item, src) {
+        cJSON *copy = NULL;
+        if (!cJSON_IsString(item) || !item->valuestring || !item->valuestring[0]) {
+            return ESP_ERR_INVALID_ARG;
+        }
+        if (cap_skill_cap_group_exists(dst, item->valuestring)) {
+            continue;
+        }
+        copy = cJSON_CreateString(item->valuestring);
+        if (!copy) {
+            return ESP_ERR_NO_MEM;
+        }
+        cJSON_AddItemToArray(dst, copy);
+    }
+    return ESP_OK;
 }
 
 static esp_err_t cap_skill_sync_session_visible_groups(const char *session_id)
@@ -254,19 +290,20 @@ static esp_err_t cap_skill_write_file_text(const char *path, const char *text)
     return ESP_OK;
 }
 
-static bool cap_skill_path_is_valid(const char *path)
+static bool cap_skill_path_is_valid(const char *skill_id, const char *path)
 {
-    size_t len;
+    char expected[CAP_SKILL_MAX_PATH_LEN];
 
-    if (!path || !path[0]) {
+    if (!skill_id || !skill_id[0] || !path || !path[0]) {
         return false;
     }
-    if (path[0] == '/' || strstr(path, "..") != NULL || strchr(path, '\\') != NULL) {
+    if (path[0] == '/' || strstr(path, "..") != NULL || strchr(path, '\\') != NULL || strchr(skill_id, '/') || strchr(skill_id, '\\')) {
         return false;
     }
-
-    len = strlen(path);
-    return len > 3 && strcmp(path + len - 3, ".md") == 0;
+    if (snprintf(expected, sizeof(expected), "%s/SKILL.md", skill_id) >= (int)sizeof(expected)) {
+        return false;
+    }
+    return strcmp(path, expected) == 0;
 }
 
 static bool cap_skill_file_exists(const char *path)
@@ -276,39 +313,30 @@ static bool cap_skill_file_exists(const char *path)
     return path && stat(path, &st) == 0 && S_ISREG(st.st_mode);
 }
 
-static bool cap_skill_catalog_contains_id(cJSON *skills, const char *skill_id)
+static esp_err_t cap_skill_ensure_parent_dirs(const char *path)
 {
-    cJSON *skill = NULL;
+    char dir_path[CAP_SKILL_MAX_PATH_LEN];
+    size_t i;
 
-    cJSON_ArrayForEach(skill, skills) {
-        cJSON *id = cJSON_GetObjectItemCaseSensitive(skill, "id");
+    if (!path || !path[0]) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (snprintf(dir_path, sizeof(dir_path), "%s", path) >= (int)sizeof(dir_path)) {
+        return ESP_ERR_INVALID_SIZE;
+    }
 
-        if (cJSON_IsString(id) && id->valuestring && strcmp(id->valuestring, skill_id) == 0) {
-            return true;
+    for (i = 1; dir_path[i] != '\0'; i++) {
+        if (dir_path[i] != '/') {
+            continue;
         }
-    }
-
-    return false;
-}
-
-static int cap_skill_find_skill_index(cJSON *skills, const char *skill_id)
-{
-    int index;
-
-    if (!cJSON_IsArray(skills) || !skill_id || !skill_id[0]) {
-        return -1;
-    }
-
-    for (index = 0; index < cJSON_GetArraySize(skills); index++) {
-        cJSON *skill = cJSON_GetArrayItem(skills, index);
-        cJSON *id = cJSON_GetObjectItemCaseSensitive(skill, "id");
-
-        if (cJSON_IsString(id) && id->valuestring && strcmp(id->valuestring, skill_id) == 0) {
-            return index;
+        dir_path[i] = '\0';
+        if (mkdir(dir_path, 0755) != 0 && errno != EEXIST) {
+            return ESP_FAIL;
         }
+        dir_path[i] = '/';
     }
 
-    return -1;
+    return ESP_OK;
 }
 
 static esp_err_t cap_skill_load_catalog_json(char **out_text, cJSON **out_catalog)
@@ -323,14 +351,14 @@ static esp_err_t cap_skill_load_catalog_json(char **out_text, cJSON **out_catalo
     *out_text = NULL;
     *out_catalog = NULL;
 
-    {
-        const char *catalog_path = cap_skill_list_file_path();
-        if (!catalog_path) {
-            return ESP_ERR_INVALID_STATE;
-        }
-        err = cap_skill_read_file_dup(catalog_path, &catalog_text);
+    catalog_text = calloc(1, CAP_SKILL_MAX_CATALOG_LEN);
+    if (!catalog_text) {
+        return ESP_ERR_NO_MEM;
     }
+
+    err = claw_skill_render_catalog_json(catalog_text, CAP_SKILL_MAX_CATALOG_LEN);
     if (err != ESP_OK) {
+        free(catalog_text);
         return err;
     }
 
@@ -346,51 +374,62 @@ static esp_err_t cap_skill_load_catalog_json(char **out_text, cJSON **out_catalo
     return ESP_OK;
 }
 
-static esp_err_t cap_skill_render_catalog(cJSON *catalog, char **out_text)
+static esp_err_t cap_skill_build_runtime_markdown(const char *skill_id,
+                                                  const char *summary,
+                                                  cJSON *cap_groups_input,
+                                                  char **out_text)
 {
-    char *rendered = NULL;
+    cJSON *meta = NULL;
+    cJSON *metadata = NULL;
+    cJSON *cap_groups = NULL;
+    char *meta_text = NULL;
+    char *markdown = NULL;
 
-    if (!catalog || !out_text) {
+    if (!skill_id || !skill_id[0] || !summary || !summary[0] || !out_text) {
         return ESP_ERR_INVALID_ARG;
     }
+    *out_text = NULL;
 
-    rendered = cJSON_PrintUnformatted(catalog);
-    if (!rendered) {
+    meta = cJSON_CreateObject();
+    metadata = cJSON_CreateObject();
+    cap_groups = cJSON_CreateArray();
+    if (!meta || !metadata || !cap_groups) {
+        cJSON_Delete(meta);
+        cJSON_Delete(metadata);
+        cJSON_Delete(cap_groups);
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddStringToObject(meta, "name", skill_id);
+    cJSON_AddStringToObject(meta, "description", summary);
+    if (cap_skill_copy_cap_groups(cap_groups, cap_groups_input) != ESP_OK) {
+        cJSON_Delete(meta);
+        cJSON_Delete(metadata);
+        cJSON_Delete(cap_groups);
+        return ESP_ERR_INVALID_ARG;
+    }
+    cJSON_AddItemToObject(metadata, "cap_groups", cap_groups);
+    cJSON_AddStringToObject(metadata, "manage_mode", "runtime");
+    cJSON_AddItemToObject(meta, "metadata", metadata);
+    meta_text = cJSON_PrintUnformatted(meta);
+    cJSON_Delete(meta);
+    if (!meta_text) {
         return ESP_ERR_NO_MEM;
     }
 
-    *out_text = rendered;
+    markdown = malloc(strlen(meta_text) + strlen(skill_id) + strlen(summary) + 96);
+    if (!markdown) {
+        free(meta_text);
+        return ESP_ERR_NO_MEM;
+    }
+    snprintf(markdown,
+             strlen(meta_text) + strlen(skill_id) + strlen(summary) + 96,
+             "---\n%s\n---\n\n# %s\n\n%s\n",
+             meta_text,
+             skill_id,
+             summary);
+    free(meta_text);
+    *out_text = markdown;
     return ESP_OK;
-}
-
-static esp_err_t cap_skill_write_catalog_and_reload(const char *new_text, const char *old_text)
-{
-    esp_err_t err;
-    const char *catalog_path = NULL;
-
-    if (!new_text || !old_text) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    catalog_path = cap_skill_list_file_path();
-    if (!catalog_path) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    err = cap_skill_write_file_text(catalog_path, new_text);
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    err = claw_skill_reload_registry();
-    if (err == ESP_OK) {
-        return ESP_OK;
-    }
-
-    if (cap_skill_write_file_text(catalog_path, old_text) == ESP_OK) {
-        (void)claw_skill_reload_registry();
-    }
-
-    return err;
 }
 
 static esp_err_t cap_skill_build_catalog_result(const char *action,
@@ -709,15 +748,14 @@ static esp_err_t cap_skill_register_execute(const char *input_json,
                                             size_t output_size)
 {
     char skill_path[CAP_SKILL_MAX_PATH_LEN];
-    char *old_catalog_text = NULL;
-    char *new_catalog_text = NULL;
+    char *markdown = NULL;
     cJSON *root = NULL;
-    cJSON *catalog = NULL;
-    cJSON *skills = NULL;
     cJSON *skill_id_item = NULL;
     cJSON *file_item = NULL;
     cJSON *summary_item = NULL;
+    cJSON *cap_groups_item = NULL;
     cJSON *skill = NULL;
+    claw_skill_catalog_entry_t existing_entry;
     esp_err_t err;
 
     (void)ctx;
@@ -731,6 +769,7 @@ static esp_err_t cap_skill_register_execute(const char *input_json,
     skill_id_item = cJSON_GetObjectItemCaseSensitive(root, "skill_id");
     file_item = cJSON_GetObjectItemCaseSensitive(root, "file");
     summary_item = cJSON_GetObjectItemCaseSensitive(root, "summary");
+    cap_groups_item = cJSON_GetObjectItemCaseSensitive(root, "cap_groups");
     if (!cJSON_IsString(skill_id_item) || !skill_id_item->valuestring || !skill_id_item->valuestring[0] ||
             !cJSON_IsString(file_item) || !file_item->valuestring || !file_item->valuestring[0] ||
             !cJSON_IsString(summary_item) || !summary_item->valuestring || !summary_item->valuestring[0]) {
@@ -738,10 +777,20 @@ static esp_err_t cap_skill_register_execute(const char *input_json,
         cap_skill_write_error(output, output_size, "skill_id, file and summary are required", NULL);
         return ESP_ERR_INVALID_ARG;
     }
-
-    if (!cap_skill_path_is_valid(file_item->valuestring)) {
+    if (cap_groups_item && !cJSON_IsArray(cap_groups_item)) {
         cJSON_Delete(root);
-        cap_skill_write_error(output, output_size, "file must be a valid relative .md path", skill_id_item->valuestring);
+        cap_skill_write_error(output, output_size, "cap_groups must be an array", skill_id_item->valuestring);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!cap_skill_path_is_valid(skill_id_item->valuestring, file_item->valuestring)) {
+        cJSON_Delete(root);
+        cap_skill_write_error(output, output_size, "file must be <skill_id>/SKILL.md", skill_id_item->valuestring);
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (claw_skill_get_catalog_entry(skill_id_item->valuestring, &existing_entry) == ESP_OK) {
+        cJSON_Delete(root);
+        cap_skill_write_error(output, output_size, "duplicate skill_id", skill_id_item->valuestring);
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -759,79 +808,62 @@ static esp_err_t cap_skill_register_execute(const char *input_json,
         }
     }
     if (!cap_skill_file_exists(skill_path)) {
+        err = cap_skill_ensure_parent_dirs(skill_path);
+        if (err != ESP_OK) {
+            cJSON_Delete(root);
+            cap_skill_write_error(output, output_size, "failed to prepare skill directory", skill_id_item->valuestring);
+            return err;
+        }
+    } else {
         cJSON_Delete(root);
-        cap_skill_write_error(output, output_size, "skill markdown file not found", skill_id_item->valuestring);
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    err = cap_skill_load_catalog_json(&old_catalog_text, &catalog);
-    if (err != ESP_OK) {
-        cJSON_Delete(root);
-        cap_skill_write_error(output, output_size, "failed to load skills catalog", skill_id_item->valuestring);
-        return err;
-    }
-
-    skills = cJSON_GetObjectItemCaseSensitive(catalog, "skills");
-    if (!cJSON_IsArray(skills)) {
-        cJSON_Delete(root);
-        cJSON_Delete(catalog);
-        free(old_catalog_text);
-        cap_skill_write_error(output, output_size, "invalid skills catalog", skill_id_item->valuestring);
+        cap_skill_write_error(output, output_size, "skill markdown file already exists", skill_id_item->valuestring);
         return ESP_ERR_INVALID_STATE;
     }
-    if (cap_skill_catalog_contains_id(skills, skill_id_item->valuestring)) {
+
+    err = cap_skill_build_runtime_markdown(skill_id_item->valuestring,
+                                           summary_item->valuestring,
+                                           cap_groups_item,
+                                           &markdown);
+    if (err != ESP_OK) {
         cJSON_Delete(root);
-        cJSON_Delete(catalog);
-        free(old_catalog_text);
-        cap_skill_write_error(output, output_size, "duplicate skill_id", skill_id_item->valuestring);
-        return ESP_ERR_INVALID_ARG;
+        cap_skill_write_error(output, output_size, "failed to build skill markdown", skill_id_item->valuestring);
+        return err;
+    }
+
+    err = cap_skill_write_file_text(skill_path, markdown);
+    if (err != ESP_OK) {
+        free(markdown);
+        cJSON_Delete(root);
+        cap_skill_write_error(output, output_size, "failed to write skill markdown", skill_id_item->valuestring);
+        return err;
+    }
+    free(markdown);
+
+    err = claw_skill_reload_registry();
+    if (err != ESP_OK) {
+        remove(skill_path);
+        (void)claw_skill_reload_registry();
+        cJSON_Delete(root);
+        cap_skill_write_error(output, output_size, "failed to reload skill registry", skill_id_item->valuestring);
+        return err;
     }
 
     skill = cJSON_CreateObject();
     if (!skill) {
         cJSON_Delete(root);
-        cJSON_Delete(catalog);
-        free(old_catalog_text);
         cap_skill_write_error(output, output_size, "out of memory", skill_id_item->valuestring);
         return ESP_ERR_NO_MEM;
     }
     cJSON_AddStringToObject(skill, "id", skill_id_item->valuestring);
     cJSON_AddStringToObject(skill, "file", file_item->valuestring);
     cJSON_AddStringToObject(skill, "summary", summary_item->valuestring);
-    cJSON_AddItemToArray(skills, skill);
-
-    err = cap_skill_render_catalog(catalog, &new_catalog_text);
-    if (err != ESP_OK) {
-        cJSON_Delete(root);
-        cJSON_Delete(catalog);
-        free(old_catalog_text);
-        cap_skill_write_error(output, output_size, "failed to render skills catalog", skill_id_item->valuestring);
-        return err;
-    }
-
-    err = cap_skill_write_catalog_and_reload(new_catalog_text, old_catalog_text);
-    free(new_catalog_text);
-    cJSON_Delete(catalog);
-    free(old_catalog_text);
-    if (err != ESP_OK) {
-        cJSON_Delete(root);
-        if (err == ESP_ERR_INVALID_ARG || err == ESP_ERR_INVALID_STATE) {
-            cap_skill_write_error(output, output_size, "failed to reload skills catalog", skill_id_item->valuestring);
-        } else {
-            cap_skill_write_error(output, output_size, "failed to register skill", skill_id_item->valuestring);
+    cJSON_AddStringToObject(skill, "manage_mode", "runtime");
+    if (cap_groups_item) {
+        cJSON *cap_groups_out = cJSON_Duplicate(cap_groups_item, true);
+        if (cap_groups_out) {
+            cJSON_AddItemToObject(skill, "cap_groups", cap_groups_out);
         }
-        return err;
     }
-
-    skill = cJSON_CreateObject();
-    if (!skill) {
-        cJSON_Delete(root);
-        cap_skill_write_error(output, output_size, "out of memory", skill_id_item->valuestring);
-        return ESP_ERR_NO_MEM;
-    }
-    cJSON_AddStringToObject(skill, "id", skill_id_item->valuestring);
-    cJSON_AddStringToObject(skill, "file", file_item->valuestring);
-    cJSON_AddStringToObject(skill, "summary", summary_item->valuestring);
 
     cJSON_Delete(root);
     return cap_skill_build_catalog_result(CAP_SKILL_REGISTER, skill, NULL, output, output_size);
@@ -842,14 +874,12 @@ static esp_err_t cap_skill_unregister_execute(const char *input_json,
                                               char *output,
                                               size_t output_size)
 {
-    char *old_catalog_text = NULL;
-    char *new_catalog_text = NULL;
+    char skill_path[CAP_SKILL_MAX_PATH_LEN];
+    char *old_markdown = NULL;
     cJSON *root = NULL;
-    cJSON *catalog = NULL;
-    cJSON *skills = NULL;
     cJSON *skill_id_item = NULL;
     const char *skill_id = NULL;
-    int skill_index;
+    claw_skill_catalog_entry_t entry;
     esp_err_t err;
 
     (void)ctx;
@@ -863,51 +893,57 @@ static esp_err_t cap_skill_unregister_execute(const char *input_json,
     }
 
     skill_id = skill_id_item->valuestring;
-    err = cap_skill_load_catalog_json(&old_catalog_text, &catalog);
+    err = claw_skill_get_catalog_entry(skill_id, &entry);
     if (err != ESP_OK) {
         cJSON_Delete(root);
-        cap_skill_write_error(output, output_size, "failed to load skills catalog", skill_id);
-        return err;
-    }
-
-    skills = cJSON_GetObjectItemCaseSensitive(catalog, "skills");
-    if (!cJSON_IsArray(skills)) {
-        cJSON_Delete(root);
-        cJSON_Delete(catalog);
-        free(old_catalog_text);
-        cap_skill_write_error(output, output_size, "invalid skills catalog", skill_id);
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    skill_index = cap_skill_find_skill_index(skills, skill_id);
-    if (skill_index < 0) {
-        cJSON_Delete(root);
-        cJSON_Delete(catalog);
-        free(old_catalog_text);
         cap_skill_write_error(output, output_size, "skill not found", skill_id);
-        return ESP_ERR_NOT_FOUND;
+        return err;
     }
-    cJSON_DeleteItemFromArray(skills, skill_index);
+    if (entry.manage_mode != CLAW_SKILL_MANAGE_MODE_RUNTIME) {
+        cJSON_Delete(root);
+        cap_skill_write_error(output, output_size, "skill is readonly and cannot be unregistered", skill_id);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
 
-    err = cap_skill_render_catalog(catalog, &new_catalog_text);
+    {
+        const char *root_dir = cap_skill_root_dir();
+        if (!root_dir) {
+            cJSON_Delete(root);
+            cap_skill_write_error(output, output_size, "skill storage is not initialized", skill_id);
+            return ESP_ERR_INVALID_STATE;
+        }
+        if (snprintf(skill_path, sizeof(skill_path), "%s/%s", root_dir, entry.file) >= (int)sizeof(skill_path)) {
+            cJSON_Delete(root);
+            cap_skill_write_error(output, output_size, "file path is too long", skill_id);
+            return ESP_ERR_INVALID_SIZE;
+        }
+    }
+    err = cap_skill_read_file_dup(skill_path, &old_markdown);
     if (err != ESP_OK) {
         cJSON_Delete(root);
-        cJSON_Delete(catalog);
-        free(old_catalog_text);
-        cap_skill_write_error(output, output_size, "failed to render skills catalog", skill_id);
+        cap_skill_write_error(output, output_size, "failed to read skill markdown", skill_id);
         return err;
     }
+    if (remove(skill_path) != 0) {
+        free(old_markdown);
+        cJSON_Delete(root);
+        cap_skill_write_error(output, output_size, "failed to delete skill markdown", skill_id);
+        return ESP_FAIL;
+    }
 
-    err = cap_skill_write_catalog_and_reload(new_catalog_text, old_catalog_text);
-    free(new_catalog_text);
-    cJSON_Delete(catalog);
-    free(old_catalog_text);
-    cJSON_Delete(root);
+    err = claw_skill_reload_registry();
     if (err != ESP_OK) {
-        cap_skill_write_error(output, output_size, "failed to unregister skill", skill_id);
+        if (cap_skill_write_file_text(skill_path, old_markdown) == ESP_OK) {
+            (void)claw_skill_reload_registry();
+        }
+        free(old_markdown);
+        cJSON_Delete(root);
+        cap_skill_write_error(output, output_size, "failed to reload skill registry", skill_id);
         return err;
     }
 
+    free(old_markdown);
+    cJSON_Delete(root);
     return cap_skill_build_catalog_result(CAP_SKILL_UNREGISTER, NULL, skill_id, output, output_size);
 }
 
@@ -916,7 +952,7 @@ static const claw_cap_descriptor_t s_skill_descriptors[] = {
         .id = "list_skill",
         .name = "list_skill",
         .family = "skill",
-        .description = "List all registered skills from skills_list",
+        .description = "List all skills discovered from markdown files under the skills root directory.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         /* The skills catalog is already injected into prompt context, so keep this for non-LLM callers only. */
         .cap_flags = 0,
@@ -927,18 +963,21 @@ static const claw_cap_descriptor_t s_skill_descriptors[] = {
         .id = "register_skill",
         .name = "register_skill",
         .family = "skill",
-        .description = "Register one skill into skills_list",
+        .description = "Create one runtime-managed skill markdown file and reload the in-memory skill registry.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json =
-        "{\"type\":\"object\",\"properties\":{\"skill_id\":{\"type\":\"string\"},\"file\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"}},\"required\":[\"skill_id\",\"file\",\"summary\"]}",
+        "{\"type\":\"object\",\"properties\":{\"skill_id\":{\"type\":\"string\"},"
+        "\"file\":{\"type\":\"string\",\"pattern\":\"^[^/]+/SKILL\\\\.md$\"},\"summary\":{\"type\":\"string\"},"
+        "\"cap_groups\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},"
+        "\"required\":[\"skill_id\",\"file\",\"summary\"]}",
         .execute = cap_skill_register_execute,
     },
     {
         .id = "unregister_skill",
         .name = "unregister_skill",
         .family = "skill",
-        .description = "Remove one skill from skills_list",
+        .description = "Delete one runtime-managed skill markdown file and reload the in-memory skill registry.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json =
@@ -949,7 +988,8 @@ static const claw_cap_descriptor_t s_skill_descriptors[] = {
         .id = "activate_skill",
         .name = "activate_skill",
         .family = "skill",
-        .description = "Activate one or more skills from skill_ids and load their skill documentation into the prompt. When multiple skills are needed, activate all required skills in one call whenever possible.",
+        .description = "Activate one or more skills from skill_ids and load their skill documentation into the prompt. "
+                       "When multiple skills are needed, activate all required skills in one call whenever possible.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json =
@@ -960,11 +1000,14 @@ static const claw_cap_descriptor_t s_skill_descriptors[] = {
         .id = "deactivate_skill",
         .name = "deactivate_skill",
         .family = "skill",
-        .description = "Deactivate one or more skills from skill_ids, or use all=true to clear active skills and remove their skill documentation from the prompt. When multiple skills are needed, deactivate all required skills in one call whenever possible.",
+        .description = "Deactivate one or more skills from skill_ids, or use all=true to clear active skills and "
+                       "remove their skill documentation from the prompt. When multiple skills are needed, "
+                       "deactivate all required skills in one call whenever possible.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json =
-        "{\"type\":\"object\",\"properties\":{\"skill_ids\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1},\"all\":{\"type\":\"boolean\"}}}",
+        "{\"type\":\"object\",\"properties\":{\"skill_ids\":{\"type\":\"array\","
+        "\"items\":{\"type\":\"string\"},\"minItems\":1},\"all\":{\"type\":\"boolean\"}}}",
         .execute = cap_skill_deactivate_execute,
     },
 };

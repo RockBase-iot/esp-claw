@@ -42,7 +42,7 @@ Today the code falls into four areas:
     - claw_memory/ Structured memory
     - claw_skill/ Skills — skill metadata and loading
   - claw_capabilities/ **Capability**
-    - cap_im_*/ IM (Feishu, QQ, Telegram, WeChat)
+    - cap_im_platform/ Unified IM platform component (Feishu, QQ, Telegram, WeChat groups)
     - cap_mcp_*/ MCP protocol (MCP client, MCP server)
     - cap_lua/ Lua runtime management
     - cap_skill_mgr/ Managed interface wrapper for `claw_skill`
@@ -90,12 +90,12 @@ All runtime data lives under the FATFS mount `/fatfs`:
     - soul.md Persona
     - identity.md Identity
   - skills/
-    - skills_list.json Skills manifest (id, file, summary, cap_groups)
-    - *.md Skill documents
+    - skill_id/
+      - SKILL.md Skill metadata and body
+      - scripts/ Skill-bundled scripts (optional)
   - scripts/
-    - hello.lua Factory sample script
-    - audio_fft_2.lua Audio capture and spectrum-analysis sample
-    - mcpwm_servo.lua Servo PWM control sample
+    - builtin/ Built-in Lua test scripts and libraries
+    - docs/ Built-in Lua module docs
     - *.lua Custom Lua scripts
   - router_rules/
     - router_rules.json Automation rules

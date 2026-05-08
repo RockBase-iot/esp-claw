@@ -1,10 +1,10 @@
 idf_component_register(
     SRCS
         "src/lua_module_magnetometer.c"
-        "src/bmm350.c"
+        "src/bmm350/bmm350.c"
     INCLUDE_DIRS
-        "include"
         "src"
+        "src/bmm350"
     REQUIRES
         cap_lua
         esp_board_manager

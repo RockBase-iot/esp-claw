@@ -140,9 +140,6 @@ void claw_memory_normalize_session_text(const char *src,
             char ch = (char)*cur++;
 
             src = (const char *)cur;
-            if (ch == '\r' || ch == '\n' || ch == '\t') {
-                ch = ' ';
-            }
             dst[off++] = ch;
             chars++;
             continue;
@@ -160,14 +157,30 @@ void claw_memory_normalize_session_text(const char *src,
     dst[off] = '\0';
 }
 
-esp_err_t claw_memory_append_session_line(FILE *file, const char *role, const char *text)
+esp_err_t claw_memory_write_session_json_record(FILE *file,
+                                                const char *role,
+                                                const char *text,
+                                                uint32_t *out_offset,
+                                                uint32_t *out_length)
 {
     char *normalized = NULL;
+    cJSON *record = NULL;
+    char *record_text = NULL;
     size_t max_chars = s_memory.max_message_chars;
     size_t normalized_size;
+    size_t record_len;
+    long offset;
+    esp_err_t err = ESP_OK;
 
-    if (!file || !role || !text) {
+    if (!file || !role || !text || !out_offset || !out_length) {
         return ESP_ERR_INVALID_ARG;
+    }
+    *out_offset = 0;
+    *out_length = 0;
+
+    offset = ftell(file);
+    if (offset < 0 || (uint64_t)offset > UINT32_MAX) {
+        return ESP_FAIL;
     }
 
     normalized_size = claw_memory_text_buffer_size(max_chars);
@@ -177,9 +190,47 @@ esp_err_t claw_memory_append_session_line(FILE *file, const char *role, const ch
     }
 
     claw_memory_normalize_session_text(text, normalized, normalized_size, max_chars);
-    fprintf(file, "%s\t%s\n", role, normalized);
+
+    record = cJSON_CreateObject();
+    if (!record) {
+        err = ESP_ERR_NO_MEM;
+        goto cleanup;
+    }
+    if (!cJSON_AddStringToObject(record, "role", role) ||
+            !cJSON_AddStringToObject(record, "content", normalized)) {
+        err = ESP_ERR_NO_MEM;
+        goto cleanup;
+    }
+
+    record_text = cJSON_PrintUnformatted(record);
+    if (!record_text) {
+        err = ESP_ERR_NO_MEM;
+        goto cleanup;
+    }
+
+    record_len = strlen(record_text);
+    if (record_len + 1 > UINT32_MAX) {
+        err = ESP_ERR_INVALID_SIZE;
+        goto cleanup;
+    }
+    if (fwrite(record_text, 1, record_len, file) != record_len ||
+            fputc('\n', file) == EOF) {
+        err = ESP_FAIL;
+        goto cleanup;
+    }
+
+    *out_offset = (uint32_t)offset;
+    *out_length = (uint32_t)(record_len + 1);
+
+cleanup:
+    if (record_text) {
+        cJSON_free(record_text);
+    }
+    if (record) {
+        cJSON_Delete(record);
+    }
     free(normalized);
-    return ESP_OK;
+    return err;
 }
 
 bool line_list_contains_item(const char *list, const char *item)

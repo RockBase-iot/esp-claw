@@ -36,7 +36,9 @@ static const char *TAG = "claw_core";
 #define CLAW_CORE_DEFAULT_REQUEST_Q       4
 #define CLAW_CORE_DEFAULT_RESPONSE_Q      4
 #define CLAW_CORE_DEFAULT_TOOL_ITERATIONS 10
+#ifndef CLAW_CORE_LOG_SNIPPET_LEN
 #define CLAW_CORE_LOG_SNIPPET_LEN         96
+#endif
 #define CLAW_CORE_TOOL_SUMMARY_MAX_LEN    768
 
 typedef struct {
@@ -138,6 +140,29 @@ static char *dup_printf(const char *fmt, ...)
 static const char *log_snippet(const char *text)
 {
     return text ? text : "";
+}
+
+static int log_snippet_len(const char *text)
+{
+    if (!text) {
+        return 0;
+    }
+#if CLAW_CORE_LOG_SNIPPET_LEN == 0
+    return (int)strlen(text);
+#else
+    size_t len = strlen(text);
+    return (int)(len > CLAW_CORE_LOG_SNIPPET_LEN ? CLAW_CORE_LOG_SNIPPET_LEN : len);
+#endif
+}
+
+static const char *log_snippet_suffix(const char *text)
+{
+#if CLAW_CORE_LOG_SNIPPET_LEN == 0
+    (void)text;
+    return "";
+#else
+    return text && strlen(text) > CLAW_CORE_LOG_SNIPPET_LEN ? "..." : "";
+#endif
 }
 
 static const char *context_kind_to_string(claw_core_context_kind_t kind)
@@ -806,47 +831,51 @@ static esp_err_t append_tool_array_json(cJSON *tools, const char *json_text)
 
 static char *build_current_turn_prompt(const claw_core_request_t *request)
 {
-    size_t total_len;
+#define CLAW_CORE_TURN_PROMPT_FMT \
+    "## Current Turn Context\n" \
+    "- request_id: %" PRIu32 "\n" \
+    "- source_cap: %s\n" \
+    "- source_channel: %s\n" \
+    "- source_chat_id: %s\n" \
+    "- source_sender_id: %s\n" \
+    "- source_message_id: %s\n"
+#define CLAW_CORE_TURN_PROMPT_ARGS(req) \
+    (req)->request_id, \
+    (req)->source_cap ? (req)->source_cap : "(unknown)", \
+    (req)->source_channel ? (req)->source_channel : "(unknown)", \
+    (req)->source_chat_id ? (req)->source_chat_id : "(unknown)", \
+    (req)->source_sender_id ? (req)->source_sender_id : "(unknown)", \
+    (req)->source_message_id ? (req)->source_message_id : "(none)"
+
+    int needed;
     char *text = NULL;
 
     if (!request) {
-        return NULL;
+        text = NULL;
+        goto cleanup;
     }
 
-    static const char *k_behavior_note =
-        "The agent result will be automatically sent to the user. "
-        "so it is generally not need to activate cap_im_xx to return messages.\n";
+    needed = snprintf(NULL, 0, CLAW_CORE_TURN_PROMPT_FMT, CLAW_CORE_TURN_PROMPT_ARGS(request));
+    if (needed < 0) {
+        ESP_LOGE(TAG, "failed to size current turn prompt");
+        text = NULL;
+        goto cleanup;
+    }
 
-    total_len = 256 + strlen(k_behavior_note);
-    total_len += request->source_cap ? strlen(request->source_cap) : 0;
-    total_len += request->source_channel ? strlen(request->source_channel) : 0;
-    total_len += request->source_chat_id ? strlen(request->source_chat_id) : 0;
-    total_len += request->source_sender_id ? strlen(request->source_sender_id) : 0;
-    total_len += request->source_message_id ? strlen(request->source_message_id) : 0;
-
-    text = calloc(1, total_len);
+    text = calloc(1, (size_t)needed + 1);
     if (!text) {
-        return NULL;
+        goto cleanup;
     }
 
-    snprintf(text,
-             total_len,
-             "## Current Turn Context\n"
-             "- request_id: %" PRIu32 "\n"
-             "- source_cap: %s\n"
-             "- source_channel: %s\n"
-             "- source_chat_id: %s\n"
-             "- source_sender_id: %s\n"
-             "- source_message_id: %s\n"
-             "\n## Behavior Notes\n"
-             "%s",
-             request->request_id,
-             request->source_cap ? request->source_cap : "(unknown)",
-             request->source_channel ? request->source_channel : "(unknown)",
-             request->source_chat_id ? request->source_chat_id : "(unknown)",
-             request->source_sender_id ? request->source_sender_id : "(unknown)",
-             request->source_message_id ? request->source_message_id : "(none)",
-             k_behavior_note);
+    if (snprintf(text, (size_t)needed + 1, CLAW_CORE_TURN_PROMPT_FMT, CLAW_CORE_TURN_PROMPT_ARGS(request)) < 0) {
+        ESP_LOGE(TAG, "failed to build current turn prompt");
+        free(text);
+        text = NULL;
+    }
+
+cleanup:
+#undef CLAW_CORE_TURN_PROMPT_ARGS
+#undef CLAW_CORE_TURN_PROMPT_FMT
     return text;
 }
 
@@ -949,10 +978,11 @@ static void claw_core_finish_from_plain_text(uint32_t request_id,
     free(response->error_message);
     response->error_message = NULL;
 
-    ESP_LOGI(TAG, "completion request=%" PRIu32 " status=done raw=%.96s%s",
+    ESP_LOGI(TAG, "completion request=%" PRIu32 " status=done raw=%.*s%s",
              request_id,
+             log_snippet_len(text),
              log_snippet(text),
-             strlen(text) > CLAW_CORE_LOG_SNIPPET_LEN ? "..." : "");
+             log_snippet_suffix(text));
 }
 
 static char *claw_core_build_session_failure_trace(const char *error_message,
@@ -989,13 +1019,12 @@ static esp_err_t append_tool_results_message(cJSON *runtime_messages,
         cJSON *tool_message = NULL;
         esp_err_t err;
 
-        ESP_LOGI(TAG, "tool_call request=%" PRIu32 " name=%s args=%.96s%s",
+        ESP_LOGI(TAG, "tool_call request=%" PRIu32 " name=%s args=%.*s%s",
                  request->request_id,
                  response->tool_calls[i].name ? response->tool_calls[i].name : "(null)",
+                 log_snippet_len(response->tool_calls[i].arguments_json),
                  log_snippet(response->tool_calls[i].arguments_json),
-                 response->tool_calls[i].arguments_json &&
-                 strlen(response->tool_calls[i].arguments_json) > CLAW_CORE_LOG_SNIPPET_LEN ?
-                 "..." : "");
+                 log_snippet_suffix(response->tool_calls[i].arguments_json));
 
         err = claw_core_call_cap(response->tool_calls[i].name,
                                  response->tool_calls[i].arguments_json,
@@ -1008,12 +1037,13 @@ static esp_err_t append_tool_results_message(cJSON *runtime_messages,
             return ESP_ERR_NO_MEM;
         }
 
-        ESP_LOGI(TAG, "tool_result request=%" PRIu32 " name=%s err=%s output=%.96s%s",
+        ESP_LOGI(TAG, "tool_result request=%" PRIu32 " name=%s err=%s output=%.*s%s",
                  request->request_id,
                  response->tool_calls[i].name ? response->tool_calls[i].name : "(null)",
                  esp_err_to_name(err),
+                 log_snippet_len(tool_output),
                  log_snippet(tool_output),
-                 strlen(tool_output) > CLAW_CORE_LOG_SNIPPET_LEN ? "..." : "");
+                 log_snippet_suffix(tool_output));
 
         if (tool_summary && tool_summary_size > 0 && response->tool_calls[i].name) {
             esp_err_t summary_err = append_tool_summary_line(tool_summary,

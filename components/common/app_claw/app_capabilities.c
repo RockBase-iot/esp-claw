@@ -403,6 +403,8 @@ static esp_err_t app_cap_prepare_lua(const app_claw_config_t *config,
     char path_temp[96];
     snprintf(path_temp, sizeof(path_temp), "%s/builtin", paths->lua_root_dir);
     cap_lua_add_package_path_dir(path_temp);
+    snprintf(path_temp, sizeof(path_temp), "%s/builtin/lib", paths->lua_root_dir);
+    cap_lua_add_package_path_dir(path_temp);
 
     return app_lua_modules_register(config, paths->fatfs_base_path);
 }
@@ -411,6 +413,9 @@ static esp_err_t app_cap_register_lua(const app_claw_config_t *config,
                                       const app_claw_storage_paths_t *paths)
 {
     (void)config;
+    ESP_RETURN_ON_ERROR(cap_lua_set_skill_root_dir(paths->skills_root_dir),
+                        TAG,
+                        "Failed to set Lua skill root dir");
     return cap_lua_register_group(paths->lua_root_dir);
 }
 #endif

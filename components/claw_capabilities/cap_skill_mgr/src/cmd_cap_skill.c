@@ -204,10 +204,10 @@ void register_cap_skill(void)
 {
     skill_args.list = arg_lit0("l", "list", "List active skills for one session");
     skill_args.catalog = arg_lit0(NULL, "catalog", "Print the skills catalog JSON");
-    skill_args.register_skill = arg_str0("r", "register", "<skill_id>", "Register one skill in the catalog");
-    skill_args.unregister_skill = arg_str0("u", "unregister", "<skill_id>", "Remove one skill from the catalog");
-    skill_args.file = arg_str0("f", "file", "<file.md>", "Skill markdown path relative to <storage_root>/skills");
-    skill_args.summary = arg_str0(NULL, "summary", "<summary>", "Skill summary for catalog registration");
+    skill_args.register_skill = arg_str0("r", "register", "<skill_id>", "Create one runtime-managed skill markdown file");
+    skill_args.unregister_skill = arg_str0("u", "unregister", "<skill_id>", "Delete one runtime-managed skill markdown file");
+    skill_args.file = arg_str0("f", "file", "<skill_id>/SKILL.md", "Runtime skill markdown path to create under <storage_root>/skills");
+    skill_args.summary = arg_str0(NULL, "summary", "<summary>", "Skill summary written into the markdown metadata");
     skill_args.activate = arg_str0("a", "activate", "<skill_id>", "Activate one skill");
     skill_args.deactivate = arg_str0("d", "deactivate", "<skill_id>", "Deactivate one skill");
     skill_args.clear = arg_lit0(NULL, "clear", "Clear all active skills for one session");
@@ -219,7 +219,7 @@ void register_cap_skill(void)
         .help = "Skill operations.\n"
         "Examples:\n"
         " skill --catalog\n"
-        " skill --register weather_v2 --file weather_v2.md --summary \"Get forecast and alerts\"\n"
+        " skill --register weather_v2 --file weather_v2/SKILL.md --summary \"Get forecast and alerts\"\n"
         " skill --unregister weather_v2\n"
         " skill --list --session default\n"
         " skill --activate weather --session default\n"

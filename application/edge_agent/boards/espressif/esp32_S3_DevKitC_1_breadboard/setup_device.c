@@ -511,7 +511,7 @@ static int audio_dac_init(void *config, int cfg_size, void **device_handle)
         return ESP_ERR_NO_MEM;
     }
     *device_handle = codec_handles;
-    esp_board_device_update_config("audio_dac", (void *)&esp_bmgr_fake_audio_dac_cfg);
+    esp_board_device_override_config("audio_dac", (void *)&esp_bmgr_fake_audio_dac_cfg, sizeof(esp_bmgr_fake_audio_dac_cfg));
     ESP_LOGI(TAG, "UAC speaker initialized, codec_handles: %p", codec_handles);
     return ESP_OK;
 }
@@ -557,7 +557,7 @@ static int audio_adc_init(void *config, int cfg_size, void **device_handle)
         return ESP_ERR_NO_MEM;
     }
     *device_handle = codec_handles;
-    esp_board_device_update_config("audio_adc", (void *)&esp_bmgr_fake_audio_adc_cfg);
+    esp_board_device_override_config("audio_adc", (void *)&esp_bmgr_fake_audio_adc_cfg, sizeof(esp_bmgr_fake_audio_adc_cfg));
     ESP_LOGI(TAG, "UAC microphone initialized, codec_handles: %p", codec_handles);
     return ESP_OK;
 }

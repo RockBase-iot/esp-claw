@@ -97,8 +97,7 @@ static esp_err_t cap_time_build_prompt_block(char *output, size_t output_size)
 
     written = snprintf(output, output_size,
                        "- current_local_time: %s\n"
-                       "- unix_timestamp: %lld\n"
-                       "- note: Use this device time context for relative date reasoning such as today, tomorrow, tonight, and next week.",
+                       "- unix_timestamp: %lld\n",
                        formatted_time, (long long)tv.tv_sec);
     if (written < 0 || (size_t)written >= output_size) {
         return ESP_ERR_INVALID_SIZE;

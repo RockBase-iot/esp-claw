@@ -13,8 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bmm350.h"
-#include "bmm350_defs.h"
+#include "bmm350/bmm350.h"
+#include "bmm350/bmm350_defs.h"
 #include "cap_lua.h"
 #include "driver/gpio.h"
 #include "esp_board_manager.h"

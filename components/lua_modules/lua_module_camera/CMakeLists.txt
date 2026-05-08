@@ -3,7 +3,7 @@ idf_component_register(
         "src/lua_module_camera.c"
         "src/lua_module_camera_service.c"
     INCLUDE_DIRS
-        "include"
+        "src"
     REQUIRES
         cap_lua
         esp_new_jpeg

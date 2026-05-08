@@ -1,8 +1,25 @@
+set(imu_srcs
+    "src/lua_module_imu.c"
+)
+
+set(imu_include_dirs
+    "src"
+)
+
+if(CONFIG_LUA_MODULE_IMU_CHIP_MPU6050)
+    list(APPEND imu_srcs
+        "src/mpu6050/mpu6050.c"
+    )
+    list(APPEND imu_include_dirs
+        "src/mpu6050"
+    )
+endif()
+
 idf_component_register(
     SRCS
-        "src/lua_module_imu.c"
+        ${imu_srcs}
     INCLUDE_DIRS
-        "include"
+        ${imu_include_dirs}
     REQUIRES
         cap_lua
         esp_board_manager

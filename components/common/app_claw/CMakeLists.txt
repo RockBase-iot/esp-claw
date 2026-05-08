@@ -1,11 +1,3 @@
-set(app_claw_requires
-    claw_cap
-    claw_core
-    claw_event_router
-    claw_memory
-    claw_skill
-    freertos
-)
 
 set(app_claw_srcs
     "app_claw.c"
@@ -15,7 +7,6 @@ set(app_claw_srcs
 
 if(CONFIG_APP_CLAW_ENABLE_CLI)
     list(APPEND app_claw_srcs "app_claw_cli.c")
-    list(APPEND app_claw_requires console json)
 endif()
 
 if(CONFIG_APP_CLAW_ENABLE_EMOTE)
@@ -207,6 +198,4 @@ idf_component_register(
         ${app_claw_srcs}
     INCLUDE_DIRS
         "include"
-    REQUIRES
-        ${app_claw_requires}
 )
