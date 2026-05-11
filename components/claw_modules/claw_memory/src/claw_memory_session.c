@@ -438,7 +438,7 @@ esp_err_t claw_memory_async_extract_init(const claw_memory_config_t *config)
 
     if (!llm->api_key || !llm->api_key[0] ||
         !llm->model || !llm->model[0] ||
-        !llm->profile || !llm->profile[0]) {
+        !llm->backend_type || !llm->backend_type[0]) {
         ESP_LOGI(TAG, "Async memory extract disabled: LLM config incomplete");
         return ESP_OK;
     }
@@ -447,13 +447,16 @@ esp_err_t claw_memory_async_extract_init(const claw_memory_config_t *config)
                                 &(claw_llm_runtime_config_t) {
                                     .api_key = llm->api_key,
                                     .backend_type = llm->backend_type,
-                                    .profile = llm->profile,
                                     .model = llm->model,
                                     .base_url = llm->base_url,
                                     .auth_type = llm->auth_type,
+                                    .max_tokens_field = llm->max_tokens_field,
                                     .timeout_ms = llm->timeout_ms,
                                     .max_tokens = llm->max_tokens,
                                     .image_max_bytes = llm->image_max_bytes,
+                                    .supports_tools = llm->supports_tools,
+                                    .supports_vision = llm->supports_vision,
+                                    .image_remote_url_only = llm->image_remote_url_only,
                                 },
                                 &error_message);
     if (err != ESP_OK) {

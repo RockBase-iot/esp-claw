@@ -10,14 +10,16 @@
 typedef struct {
     const char *api_key;
     const char *backend_type;
-    const char *profile;
-    const char *provider;
     const char *model;
     const char *base_url;
     const char *auth_type;
+    const char *max_tokens_field;
     uint32_t timeout_ms;
     uint32_t max_tokens;
     size_t image_max_bytes;
+    bool supports_tools;
+    bool supports_vision;
+    bool image_remote_url_only;
 } claw_core_llm_config_t;
 
 typedef claw_llm_tool_call_t claw_core_llm_tool_call_t;

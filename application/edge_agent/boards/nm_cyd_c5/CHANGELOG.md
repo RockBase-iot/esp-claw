@@ -1,5 +1,93 @@
 # Changelog
 
+## [2026-05-11]
+
+合并上游 `espressif/master`（`8dc62b4`），同步 WebIM 稳定性增强、LLM 配置去 profile 化、硬件 Lua 模块命名标准化等 8 项核心变更。
+
+> 上游涉及前端心跳机制、LLM 运行时精简、驱动组件重命名、新板卡支持等，详见下方分类记录。
+
+---
+
+### Added
+
+- **WebIM 心跳机制与设备重启确认**
+  - `http_server_webim_api.c` 新增 WebSocket 异步广播作业队列（`webim_ws_broadcast_job_t`），支持多客户端并发推送且自动清理断连 fd。
+  - 前端新增 `RestartConfirmModal` 组件，设备重启前弹出二次确认，防止误操作导致会话中断。
+  - `WebImPage.tsx` 集成心跳保活逻辑，降低长连接被中间设备（路由器/NAT）切断的概率。
+  - 关联提交：`f95614d`、`8dc04a9`
+
+- **LLM 请求体 UTF-8 清理层**
+  - `claw_llm_http_transport.c` 新增 `sanitize_utf8_body_copy()`，在 HTTP 发送前扫描并替换无效 UTF-8 序列为空格。
+  - 解决因 Lua 脚本输出、SD 卡日志或传感器数据混入非法字节导致 LLM API 返回 HTTP 400 的问题。
+  - 该逻辑从 OpenAI Compatible 后端下沉至通用传输层，所有后端（Anthropic、Custom、OpenAI）自动受益。
+  - 关联提交：`e3dcdd3`、`31c458b`
+
+- **GitHub PR 同步机器人**
+  - 新增 `.github/workflows/pr_approved.yml`，当 PR 获得批准时自动触发同步通知。
+  - 关联提交：`9117a2b`
+
+---
+
+### Changed
+
+- **移除 LLM Profile 预置配置**
+  - 删除 `claw_llm_runtime.c` 中硬编码的 `s_profiles[]` 表（OpenAI/Qwen 等预设），LLM 配置完全由用户自定义。
+  - `app_config.c` 大幅重构（+384 行），新增遗留预设迁移逻辑（`app_config_legacy_llm_preset_t`），旧配置自动升级为新格式。
+  - 所有 LLM 后端（Anthropic、Custom、OpenAI Compatible）移除 `profile` 参数依赖，改为直接从 `claw_llm_runtime_config_t` 读取。
+  - 前端 `LlmPage.tsx` 与 `SetupWizardPage.tsx` 重新设计：移除 profile 下拉框，改为直接填写 base_url、model、api_key 等字段。
+  - `settings_store.c/h` 新增 `settings_store_get_string()` 等接口，支撑更灵活的持久化读写。
+  - 关联提交：`f924ff3`
+
+- **硬件 Lua 模块统一重命名为 Lua Driver**
+  - 将 6 个硬件外设相关模块从 `lua_module_xxx` 重命名为 `lua_driver_xxx`，语义更清晰：
+    | 旧名称 | 新名称 |
+    | :--- | :--- |
+    | `lua_module_adc` | `lua_driver_adc` |
+    | `lua_module_gpio` | `lua_driver_gpio` |
+    | `lua_module_i2c` | `lua_driver_i2c` |
+    | `lua_module_mcpwm` | `lua_driver_mcpwm` |
+    | `lua_module_touch` | `lua_driver_touch` |
+    | `lua_module_uart` | `lua_driver_uart` |
+  - `app_claw/Kconfig` 新增 "Hardware peripheral drivers (lua_driver)" 独立分区，默认全部启用。
+  - `app_lua_modules.c` 和 `idf_component.yml` 同步更新依赖路径。
+  - `lua_module_builder` 文档与生成脚本适配新前缀。
+  - 关联提交：`7f0be3f`
+
+- **前端页面重构与状态管理增强**
+  - `StatusPage.tsx` 功能拆分：状态展示精简，部分配置入口迁移至 `BasicPage`、`CapabilitiesPage`、`SearchPage`、`SkillsPage`。
+  - `App.tsx` 全局状态管理重构，适配重启确认流程。
+  - `ConfigBlocks.tsx` 配置块组件通用化，支持更多表单类型。
+  - 多语言（`en.ts`、`zh-cn.ts`）补充新词条约 40+ 条。
+  - 关联提交：`8dc04a9`
+
+- **app_config 配置系统增强**
+  - 支持更多 NVS 字段的动态读写。
+  - 新增配置合法性校验与默认值回退机制。
+  - 关联提交：`f924ff3`
+
+---
+
+### Fixed
+
+- **IMU 模块编译兼容性**
+  - `lua_module_imu.c` 修复 MPU6050 驱动在部分编译优化级别下的寄存器读取异常。
+  - 关联提交：`7f0be3f`（同批重构中修复）
+
+- **燃料计组件依赖声明**
+  - `lua_module_fuel_gauge/idf_component.yml` 补充缺失的公共依赖声明。
+  - 清理 `test/fuel_gauge_read.lua` 中的调试打印代码。
+  - 关联提交：`7f0be3f`（同批重构中修复）
+
+---
+
+### Migration Notes
+
+1. **LLM 配置迁移**：由于移除了 profile 预设，原有依赖 `profile` 字段的自定义代码需改为直接操作 `claw_llm_runtime_config_t` 的 `base_url`、`model`、`api_key` 等字段。`app_config` 会自动将旧 NVS 数据升级为新格式，无需手动干预。
+2. **Lua Driver 引用更新**：若自定义组件或脚本通过旧名称 `lua_module_adc` 等引用硬件驱动，请更新为 `lua_driver_adc` 等新前缀。`cap_lua` 的能力描述文档已同步更新。
+3. **前端构建**：`edge_agent/components/http_server/frontend_source/` 有大幅更新，合并后需重新执行 `pnpm install && pnpm build` 以生成新的 `index.html.gz`。
+
+---
+
 ## [2026-05-07]
 
 合并上游 `espressif/master`（`582022f`），适配官方重大架构重构，更新 NM-CYD-C5 技能与构建配置以支持最新框架。

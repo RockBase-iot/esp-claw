@@ -23,12 +23,16 @@ typedef struct {
     char wifi_password[APP_CONFIG_STR_LEN];
     char llm_api_key[APP_CONFIG_STR_LEN];
     char llm_backend_type[32];
-    char llm_profile[32];
     char llm_model[64];
     char llm_base_url[APP_CONFIG_STR_LEN];
     char llm_auth_type[32];
     char llm_timeout_ms[16];
     char llm_max_tokens[16];
+    char llm_default_image_max_bytes[16];
+    char llm_max_tokens_field[32];
+    char llm_supports_tools[8];
+    char llm_supports_vision[8];
+    char llm_image_remote_url_only[8];
     char qq_app_id[32];
     char qq_app_secret[APP_CONFIG_STR_LEN];
     char feishu_app_id[64];

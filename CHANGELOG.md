@@ -1,14 +1,35 @@
 # ChangeLog
 
+## 2026-05-09
+
+### Fix:
+
+* LLM HTTP transport (`claw_llm_http_post_json`): copy and sanitize JSON request bodies so invalid UTF-8 sequences are replaced before POST, avoiding stack/client issues on malformed input. (https://github.com/espressif/esp-claw/pull/58, Thanks @yuzheyi.)
+
+## 2026-05-08
+
+### Refactor:
+
+* **Breaking change**: Removed the LLM Profile concept. You may need to update your LLM configuration accordingly.
+  * A forward compatibility transition has been added for now and will be removed in a future release.
+
 ## 2026-05-07
 
 ### Tools:
 
-* Online Flashing Tool: Supports flashing firmware with different console outputs
+* Online Flashing Tool: Supported flashing firmware with different console outputs
+
+### Fix:
+
+* Added WebSocket heartbeat support to Web Chat for improved reliability. (https://github.com/espressif/esp-claw/issues/36)
 
 ### Change:
 
 * Merged Feishu, QQ, Telegram, WeChat, and IM attachment sources, Skills, and docs into the unified `cap_im_platform` component while keeping existing per-platform runtime group IDs and tool names.
+
+### Refactor:
+
+* Renamed six hardware-peripheral Lua modules from `lua_module_*` to `lua_driver_*` (adc, gpio, i2c, mcpwm, touch, uart) to distinguish low-level drivers from higher-level modules. Updated directory names, source filenames, all internal symbols, Kconfig options (`APP_CLAW_LUA_MODULE_*` → `APP_CLAW_LUA_DRIVER_*`), CMake dependencies, `idf_component.yml` entries, and documentation references.
 
 ## 2026-05-06
 

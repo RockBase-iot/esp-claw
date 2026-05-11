@@ -22,7 +22,7 @@ import {
 import { LanguageSwitcher } from '../components/layout/LanguageSwitcher';
 import { Banner } from '../components/ui/Banner';
 import { Button } from '../components/ui/Button';
-import { SelectInput, TextInput } from '../components/ui/FormField';
+import { TextInput } from '../components/ui/FormField';
 import { t } from '../i18n';
 import { appConfig, ensureConfigGroups, patchConfigLocal } from '../state/config';
 import { pushToast } from '../state/toast';
@@ -43,8 +43,13 @@ type SetupWizardPageProps = {
   onRestartRequest: (targetTab: TabId) => void;
 };
 
-type ProviderKey = 'openai' | 'bailian' | 'deepseek' | 'anthropic' | 'compatible';
-type CompatibleKind = 'openai' | 'claude';
+type ProviderKey =
+  | 'openai'
+  | 'bailian'
+  | 'deepseek'
+  | 'anthropic'
+  | 'openai_compatible'
+  | 'anthropic_compatible';
 type PlatformId = 'wechat' | 'feishu' | 'qq' | 'telegram';
 
 type LlmForm = {
@@ -53,9 +58,13 @@ type LlmForm = {
   llm_timeout_ms: string;
   llm_max_tokens: string;
   llm_backend_type: string;
-  llm_profile: string;
   llm_base_url: string;
   llm_auth_type: string;
+  llm_default_image_max_bytes: string;
+  llm_max_tokens_field: string;
+  llm_supports_tools: string;
+  llm_supports_vision: string;
+  llm_image_remote_url_only: string;
 };
 
 type ImForm = {
@@ -77,42 +86,93 @@ type SearchForm = {
 
 type ProviderPreset = {
   llm_backend_type: string;
-  llm_profile: string;
   llm_base_url: string;
   llm_auth_type: string;
+  llm_default_image_max_bytes: string;
+  llm_max_tokens_field: string;
+  llm_supports_tools: string;
+  llm_supports_vision: string;
+  llm_image_remote_url_only: string;
   llm_model: string;
 };
 
-const PROVIDER_PRESETS: Record<Exclude<ProviderKey, 'compatible'>, ProviderPreset> = {
+const PROVIDER_PRESETS: Record<ProviderKey, ProviderPreset> = {
   openai: {
     llm_backend_type: 'openai_compatible',
-    llm_profile: 'openai',
     llm_base_url: 'https://api.openai.com/v1',
     llm_auth_type: 'bearer',
+    llm_default_image_max_bytes: '524288',
+    llm_max_tokens_field: 'max_completion_tokens',
+    llm_supports_tools: 'true',
+    llm_supports_vision: 'true',
+    llm_image_remote_url_only: 'false',
     llm_model: 'gpt-5.4',
   },
   bailian: {
     llm_backend_type: 'openai_compatible',
-    llm_profile: 'qwen_compatible',
     llm_base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     llm_auth_type: 'bearer',
+    llm_default_image_max_bytes: '524288',
+    llm_max_tokens_field: 'max_tokens',
+    llm_supports_tools: 'true',
+    llm_supports_vision: 'true',
+    llm_image_remote_url_only: 'false',
     llm_model: 'qwen3.6-plus',
   },
   deepseek: {
     llm_backend_type: 'openai_compatible',
-    llm_profile: 'custom_openai_compatible',
     llm_base_url: 'https://api.deepseek.com',
     llm_auth_type: 'bearer',
+    llm_default_image_max_bytes: '524288',
+    llm_max_tokens_field: 'max_completion_tokens',
+    llm_supports_tools: 'true',
+    llm_supports_vision: 'true',
+    llm_image_remote_url_only: 'false',
     llm_model: 'deepseek-v4-pro',
   },
   anthropic: {
-    llm_backend_type: 'anthropic',
-    llm_profile: 'anthropic',
+    llm_backend_type: 'anthropic_compatible',
     llm_base_url: 'https://api.anthropic.com/v1',
     llm_auth_type: 'none',
+    llm_default_image_max_bytes: '524288',
+    llm_max_tokens_field: 'max_tokens',
+    llm_supports_tools: 'true',
+    llm_supports_vision: 'true',
+    llm_image_remote_url_only: 'false',
+    llm_model: 'claude-sonnet-4-6',
+  },
+  openai_compatible: {
+    llm_backend_type: 'openai_compatible',
+    llm_base_url: 'https://api.openai.com/v1',
+    llm_auth_type: 'bearer',
+    llm_default_image_max_bytes: '524288',
+    llm_max_tokens_field: 'max_completion_tokens',
+    llm_supports_tools: 'true',
+    llm_supports_vision: 'true',
+    llm_image_remote_url_only: 'false',
+    llm_model: 'gpt-5.4',
+  },
+  anthropic_compatible: {
+    llm_backend_type: 'anthropic_compatible',
+    llm_base_url: 'https://api.anthropic.com/v1',
+    llm_auth_type: 'none',
+    llm_default_image_max_bytes: '524288',
+    llm_max_tokens_field: 'max_tokens',
+    llm_supports_tools: 'true',
+    llm_supports_vision: 'true',
+    llm_image_remote_url_only: 'false',
     llm_model: 'claude-sonnet-4-6',
   },
 };
+
+const PRESET_BUTTONS: ProviderKey[] = [
+  'openai',
+  'bailian',
+  'deepseek',
+  'anthropic',
+  'openai_compatible',
+  'anthropic_compatible',
+];
 
 const PLATFORM_ORDER: PlatformId[] = ['wechat', 'feishu', 'qq', 'telegram'];
 const WECHAT_DEFAULT_CDN_BASE_URL = 'https://novac2c.cdn.weixin.qq.com/c2c';
@@ -124,9 +184,13 @@ function llmFromConfig(config: Partial<AppConfig>): LlmForm {
     llm_timeout_ms: config.llm_timeout_ms ?? '',
     llm_max_tokens: config.llm_max_tokens ?? '',
     llm_backend_type: config.llm_backend_type ?? '',
-    llm_profile: config.llm_profile ?? '',
     llm_base_url: config.llm_base_url ?? '',
     llm_auth_type: config.llm_auth_type ?? '',
+    llm_default_image_max_bytes: config.llm_default_image_max_bytes ?? '',
+    llm_max_tokens_field: config.llm_max_tokens_field ?? '',
+    llm_supports_tools: config.llm_supports_tools ?? 'false',
+    llm_supports_vision: config.llm_supports_vision ?? 'false',
+    llm_image_remote_url_only: config.llm_image_remote_url_only ?? 'false',
   };
 }
 
@@ -152,22 +216,47 @@ function searchFromConfig(config: Partial<AppConfig>): SearchForm {
 }
 
 function detectProvider(form: LlmForm): ProviderKey {
-  for (const key of Object.keys(PROVIDER_PRESETS) as Exclude<ProviderKey, 'compatible'>[]) {
+  for (const key of ['openai', 'bailian', 'deepseek', 'anthropic'] as ProviderKey[]) {
     const preset = PROVIDER_PRESETS[key];
     if (
       preset.llm_backend_type === form.llm_backend_type.trim() &&
-      preset.llm_profile === form.llm_profile.trim() &&
       preset.llm_base_url === form.llm_base_url.trim() &&
-      preset.llm_auth_type === form.llm_auth_type.trim()
+      preset.llm_auth_type === form.llm_auth_type.trim() &&
+      preset.llm_max_tokens_field === form.llm_max_tokens_field.trim()
     ) {
       return key;
     }
   }
-  return 'compatible';
+  if (
+    form.llm_backend_type.trim() === 'anthropic_compatible' &&
+    form.llm_base_url.trim() === PROVIDER_PRESETS.anthropic_compatible.llm_base_url &&
+    form.llm_auth_type.trim() === PROVIDER_PRESETS.anthropic_compatible.llm_auth_type &&
+    form.llm_max_tokens_field.trim() === PROVIDER_PRESETS.anthropic_compatible.llm_max_tokens_field
+  ) {
+    return 'anthropic_compatible';
+  }
+  return 'openai_compatible';
 }
 
-function detectCompatibleKind(form: LlmForm): CompatibleKind {
-  return form.llm_backend_type.trim() === 'anthropic' ? 'claude' : 'openai';
+function isAdvancedProvider(key: ProviderKey): boolean {
+  return key === 'openai_compatible' || key === 'anthropic_compatible';
+}
+
+function providerLabel(key: ProviderKey): string {
+  switch (key) {
+    case 'openai':
+      return t('llmProviderOpenai') as string;
+    case 'bailian':
+      return t('setupLlmProviderBailian') as string;
+    case 'deepseek':
+      return t('llmProviderDeepSeek') as string;
+    case 'anthropic':
+      return t('llmProviderAnthropic') as string;
+    case 'openai_compatible':
+      return t('llmProviderOpenaiCompatible') as string;
+    case 'anthropic_compatible':
+      return t('llmProviderAnthropicCompatible') as string;
+  }
 }
 
 function selectedPlatformsFromForm(form: ImForm): PlatformId[] {
@@ -388,7 +477,6 @@ export const SetupWizardPage: Component<SetupWizardPageProps> = (props) => {
   const [imForm, setImForm] = createStore<ImForm>(imFromConfig({}));
   const [searchForm, setSearchForm] = createStore<SearchForm>(searchFromConfig({}));
   const [provider, setProvider] = createSignal<ProviderKey>('openai');
-  const [compatibleKind, setCompatibleKind] = createSignal<CompatibleKind>('openai');
   const [selectedPlatforms, setSelectedPlatforms] = createSignal<PlatformId[]>([]);
   const [wechatAdvancedOpen, setWechatAdvancedOpen] = createSignal(false);
   const isWechatConfigured = createMemo(() => isWechatConfiguredLikeIm(imForm));
@@ -406,14 +494,12 @@ export const SetupWizardPage: Component<SetupWizardPageProps> = (props) => {
           nextLlm.llm_api_key,
           nextLlm.llm_model,
           nextLlm.llm_backend_type,
-          nextLlm.llm_profile,
           nextLlm.llm_base_url,
         ].some((value) => value.trim().length > 0);
         setLlmForm(nextLlm);
         setImForm(nextIm);
         setSearchForm(searchFromConfig(config));
         setProvider(hasAnyLlmConfig ? detectProvider(nextLlm) : 'openai');
-        setCompatibleKind(detectCompatibleKind(nextLlm));
         setSelectedPlatforms(selectedPlatformsFromForm(nextIm));
         setWechatAdvancedOpen(
           !!(nextIm.wechat_token || nextIm.wechat_base_url || nextIm.wechat_account_id),
@@ -440,35 +526,18 @@ export const SetupWizardPage: Component<SetupWizardPageProps> = (props) => {
     PLATFORM_ORDER.filter((id) => !selectedPlatforms().includes(id)),
   );
 
-  const applyPreset = (key: Exclude<ProviderKey, 'compatible'>) => {
+  const applyPreset = (key: ProviderKey) => {
     const preset = PROVIDER_PRESETS[key];
+    setProvider(key);
     setLlmForm('llm_backend_type', preset.llm_backend_type);
-    setLlmForm('llm_profile', preset.llm_profile);
     setLlmForm('llm_base_url', preset.llm_base_url);
     setLlmForm('llm_auth_type', preset.llm_auth_type);
+    setLlmForm('llm_default_image_max_bytes', preset.llm_default_image_max_bytes);
+    setLlmForm('llm_max_tokens_field', preset.llm_max_tokens_field);
+    setLlmForm('llm_supports_tools', preset.llm_supports_tools);
+    setLlmForm('llm_supports_vision', preset.llm_supports_vision);
+    setLlmForm('llm_image_remote_url_only', preset.llm_image_remote_url_only);
     setLlmForm('llm_model', preset.llm_model);
-  };
-
-  const applyCompatibleKind = (kind: CompatibleKind) => {
-    setCompatibleKind(kind);
-    if (kind === 'claude') {
-      setLlmForm('llm_backend_type', 'anthropic');
-      setLlmForm('llm_profile', 'anthropic');
-      setLlmForm('llm_auth_type', 'none');
-    } else {
-      setLlmForm('llm_backend_type', 'openai_compatible');
-      setLlmForm('llm_profile', 'custom_openai_compatible');
-      setLlmForm('llm_auth_type', 'bearer');
-    }
-  };
-
-  const handleProviderChange = (key: ProviderKey) => {
-    setProvider(key);
-    if (key === 'compatible') {
-      applyCompatibleKind(detectCompatibleKind(llmForm));
-      return;
-    }
-    applyPreset(key);
   };
 
   const next = () => setStep((value) => Math.min(value + 1, steps().length - 1));
@@ -498,9 +567,9 @@ export const SetupWizardPage: Component<SetupWizardPageProps> = (props) => {
       [llmForm.llm_base_url, t('llmBaseUrl') as string],
     ];
 
-    if (provider() === 'compatible') {
+    if (isAdvancedProvider(provider())) {
       requiredFields.push([llmForm.llm_backend_type, t('llmBackend') as string]);
-      requiredFields.push([llmForm.llm_profile, t('llmProfile') as string]);
+      requiredFields.push([llmForm.llm_max_tokens_field, t('llmMaxTokensField') as string]);
     }
 
     const missing = requiredFields
@@ -523,9 +592,13 @@ export const SetupWizardPage: Component<SetupWizardPageProps> = (props) => {
       llm_timeout_ms: llmForm.llm_timeout_ms.trim(),
       llm_max_tokens: llmForm.llm_max_tokens.trim(),
       llm_backend_type: llmForm.llm_backend_type.trim(),
-      llm_profile: llmForm.llm_profile.trim(),
       llm_base_url: llmForm.llm_base_url.trim(),
       llm_auth_type: llmForm.llm_auth_type.trim(),
+      llm_default_image_max_bytes: llmForm.llm_default_image_max_bytes.trim(),
+      llm_max_tokens_field: llmForm.llm_max_tokens_field.trim(),
+      llm_supports_tools: llmForm.llm_supports_tools,
+      llm_supports_vision: llmForm.llm_supports_vision,
+      llm_image_remote_url_only: llmForm.llm_image_remote_url_only,
     });
   };
 
@@ -866,17 +939,25 @@ export const SetupWizardPage: Component<SetupWizardPageProps> = (props) => {
               <Switch>
                 <Match when={step() === 0}>
                   <div class="grid gap-4 sm:grid-cols-2">
-                    <SelectInput
-                      label={t('llmProvider')}
-                      value={provider()}
-                      onChange={(event) => handleProviderChange(event.currentTarget.value as ProviderKey)}
-                    >
-                      <option value="openai">{t('llmProviderOpenai') as string}</option>
-                      <option value="bailian">{t('setupLlmProviderBailian') as string}</option>
-                      <option value="deepseek">{t('llmProviderDeepSeek') as string}</option>
-                      <option value="anthropic">{t('setupLlmProviderClaude') as string}</option>
-                      <option value="compatible">{t('setupLlmProviderCompatible') as string}</option>
-                    </SelectInput>
+                    <div class="sm:col-span-2 flex flex-col gap-2">
+                      <div class="text-[0.8rem] text-[var(--color-text-secondary)] font-medium">
+                        {t('llmFillDefaults') as string}
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        <For each={PRESET_BUTTONS}>
+                          {(key) => (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              active={provider() === key}
+                              onClick={() => applyPreset(key)}
+                            >
+                              {providerLabel(key)}
+                            </Button>
+                          )}
+                        </For>
+                      </div>
+                    </div>
                     <TextInput
                       label={t('llmModel')}
                       value={llmForm.llm_model}
@@ -889,24 +970,30 @@ export const SetupWizardPage: Component<SetupWizardPageProps> = (props) => {
                       onInput={(event) => setLlmForm('llm_api_key', event.currentTarget.value)}
                     />
 
-                    <Show when={provider() === 'compatible'}>
+                    <Show when={isAdvancedProvider(provider())}>
                       <>
-                        <SelectInput
-                          label={t('setupLlmCompatibleMode')}
-                          value={compatibleKind()}
-                          onChange={(event) =>
-                            applyCompatibleKind(event.currentTarget.value as CompatibleKind)
+                        <TextInput
+                          label={t('llmBackend')}
+                          placeholder={t('llmBackendPlaceholder') as string}
+                          value={llmForm.llm_backend_type}
+                          onInput={(event) =>
+                            setLlmForm('llm_backend_type', event.currentTarget.value)
                           }
-                        >
-                          <option value="openai">{t('setupLlmCompatibleOpenai') as string}</option>
-                          <option value="claude">{t('setupLlmCompatibleClaude') as string}</option>
-                        </SelectInput>
+                        />
                         <TextInput
                           type="url"
                           label={t('llmBaseUrl')}
                           placeholder={t('llmBaseUrlPlaceholder') as string}
                           value={llmForm.llm_base_url}
                           onInput={(event) => setLlmForm('llm_base_url', event.currentTarget.value)}
+                        />
+                        <TextInput
+                          label={t('llmMaxTokensField')}
+                          placeholder={t('llmMaxTokensFieldPlaceholder') as string}
+                          value={llmForm.llm_max_tokens_field}
+                          onInput={(event) =>
+                            setLlmForm('llm_max_tokens_field', event.currentTarget.value)
+                          }
                         />
                       </>
                     </Show>

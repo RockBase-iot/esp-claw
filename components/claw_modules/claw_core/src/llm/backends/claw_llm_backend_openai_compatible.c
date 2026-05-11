@@ -235,6 +235,11 @@ static esp_err_t build_chat_body(const openai_compatible_backend_ctx_t *ctx,
     messages = NULL;
 
     if (request->tools_json && request->tools_json[0]) {
+        if (!profile->supports_tools) {
+            cJSON_Delete(body);
+            *out_error_message = dup_printf("Selected backend does not support tool calls");
+            return ESP_ERR_NOT_SUPPORTED;
+        }
         cJSON *tools = cJSON_Parse(request->tools_json);
 
         if (!tools || !cJSON_IsArray(tools)) {
@@ -278,7 +283,7 @@ static esp_err_t openai_compatible_init(const claw_llm_runtime_config_t *config,
         return ESP_ERR_INVALID_ARG;
     }
 
-    base_url = (config->base_url && config->base_url[0]) ? config->base_url : profile->default_base_url;
+    base_url = config->base_url;
     auth_type = (config->auth_type && config->auth_type[0]) ? config->auth_type : "bearer";
     if (!base_url || !base_url[0]) {
         *out_error_message = dup_printf("LLM base_url is empty");
@@ -295,9 +300,9 @@ static esp_err_t openai_compatible_init(const claw_llm_runtime_config_t *config,
     ctx->model = strdup(config->model);
     ctx->base_url = strdup(base_url);
     ctx->auth_type = strdup(auth_type);
-    ctx->timeout_ms = config->timeout_ms ? config->timeout_ms : profile->default_timeout_ms;
+    ctx->timeout_ms = config->timeout_ms;
     ctx->max_tokens = config->max_tokens;
-    ctx->image_max_bytes = config->image_max_bytes ? config->image_max_bytes : profile->default_image_max_bytes;
+    ctx->image_max_bytes = config->image_max_bytes;
     if (!ctx->api_key || !ctx->model || !ctx->base_url || !ctx->auth_type) {
         *out_error_message = dup_printf("Out of memory copying backend config");
         free(ctx->api_key);
@@ -524,15 +529,30 @@ static void openai_compatible_deinit(void *backend_ctx)
     free(ctx);
 }
 
+static const claw_llm_backend_vtable_t s_openai_compatible_vtable = {
+    .id = CLAW_LLM_BACKEND_OPENAI_COMPATIBLE_ID,
+    .init = openai_compatible_init,
+    .chat = openai_compatible_chat,
+    .infer_media = openai_compatible_infer_media,
+    .deinit = openai_compatible_deinit,
+};
+
+static const claw_llm_backend_registration_t s_openai_compatible_registration = {
+    .id = CLAW_LLM_BACKEND_OPENAI_COMPATIBLE_ID,
+    .vtable = &s_openai_compatible_vtable,
+    .defaults = {
+        .auth_type = CLAW_LLM_BACKEND_OPENAI_COMPATIBLE_AUTH_TYPE,
+        .chat_path = CLAW_LLM_BACKEND_OPENAI_COMPATIBLE_CHAT_PATH,
+        .max_tokens_field = CLAW_LLM_BACKEND_OPENAI_COMPATIBLE_DEFAULT_MAX_TOKENS_FIELD,
+    },
+};
+
 const claw_llm_backend_vtable_t *claw_llm_backend_openai_compatible_vtable(void)
 {
-    static const claw_llm_backend_vtable_t vtable = {
-        .id = "openai_compatible",
-        .init = openai_compatible_init,
-        .chat = openai_compatible_chat,
-        .infer_media = openai_compatible_infer_media,
-        .deinit = openai_compatible_deinit,
-    };
+    return &s_openai_compatible_vtable;
+}
 
-    return &vtable;
+const claw_llm_backend_registration_t *claw_llm_backend_openai_compatible_registration(void)
+{
+    return &s_openai_compatible_registration;
 }

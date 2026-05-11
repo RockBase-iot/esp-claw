@@ -641,7 +641,7 @@ static esp_err_t anthropic_init(const claw_llm_runtime_config_t *config,
         return ESP_ERR_INVALID_ARG;
     }
 
-    base_url = (config->base_url && config->base_url[0]) ? config->base_url : profile->default_base_url;
+    base_url = config->base_url;
     if (!base_url || !base_url[0]) {
         *out_error_message = dup_printf("LLM base_url is empty");
         return ESP_ERR_INVALID_ARG;
@@ -656,9 +656,9 @@ static esp_err_t anthropic_init(const claw_llm_runtime_config_t *config,
     ctx->api_key = strdup(config->api_key);
     ctx->model = strdup(config->model);
     ctx->base_url = strdup(base_url);
-    ctx->timeout_ms = config->timeout_ms ? config->timeout_ms : profile->default_timeout_ms;
+    ctx->timeout_ms = config->timeout_ms;
     ctx->max_tokens = config->max_tokens;
-    ctx->image_max_bytes = config->image_max_bytes ? config->image_max_bytes : profile->default_image_max_bytes;
+    ctx->image_max_bytes = config->image_max_bytes;
     if (!ctx->api_key || !ctx->model || !ctx->base_url) {
         free(ctx->api_key);
         free(ctx->model);
@@ -901,15 +901,30 @@ static void anthropic_deinit(void *backend_ctx)
     free(ctx);
 }
 
+static const claw_llm_backend_vtable_t s_anthropic_vtable = {
+    .id = CLAW_LLM_BACKEND_ANTHROPIC_ID,
+    .init = anthropic_init,
+    .chat = anthropic_chat,
+    .infer_media = anthropic_infer_media,
+    .deinit = anthropic_deinit,
+};
+
+static const claw_llm_backend_registration_t s_anthropic_registration = {
+    .id = CLAW_LLM_BACKEND_ANTHROPIC_ID,
+    .vtable = &s_anthropic_vtable,
+    .defaults = {
+        .auth_type = CLAW_LLM_BACKEND_ANTHROPIC_AUTH_TYPE,
+        .chat_path = CLAW_LLM_BACKEND_ANTHROPIC_CHAT_PATH,
+        .max_tokens_field = CLAW_LLM_BACKEND_ANTHROPIC_DEFAULT_MAX_TOKENS_FIELD,
+    },
+};
+
 const claw_llm_backend_vtable_t *claw_llm_backend_anthropic_vtable(void)
 {
-    static const claw_llm_backend_vtable_t vtable = {
-        .id = "anthropic",
-        .init = anthropic_init,
-        .chat = anthropic_chat,
-        .infer_media = anthropic_infer_media,
-        .deinit = anthropic_deinit,
-    };
+    return &s_anthropic_vtable;
+}
 
-    return &vtable;
+const claw_llm_backend_registration_t *claw_llm_backend_anthropic_registration(void)
+{
+    return &s_anthropic_registration;
 }

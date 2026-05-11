@@ -6,5 +6,3 @@
 #pragma once
 
 #include "llm/claw_llm_runtime.h"
-
-const claw_llm_backend_vtable_t *claw_llm_backend_custom_vtable(void);

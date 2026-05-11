@@ -67,6 +67,12 @@ static const char *APP_STARTUP_EVENT_KEY = "boot_completed";
     APP_SYSTEM_PROMPT_COMMON \
     APP_SYSTEM_PROMPT_SUFFIX
 
+static bool app_claw_bool_is_true(const char *value)
+{
+    return value &&
+           (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 || strcmp(value, "yes") == 0);
+}
+
 esp_err_t app_claw_ui_start(void)
 {
 #if defined(CONFIG_APP_CLAW_ENABLE_EMOTE)
@@ -99,13 +105,16 @@ static esp_err_t init_memory(const app_claw_config_t *config,
         .llm = {
             .api_key = config->llm_api_key,
             .backend_type = config->llm_backend_type,
-            .profile = config->llm_profile,
             .model = config->llm_model,
             .base_url = config->llm_base_url,
             .auth_type = config->llm_auth_type,
+            .max_tokens_field = config->llm_max_tokens_field,
             .timeout_ms = (uint32_t)strtoul(config->llm_timeout_ms, NULL, 10),
             .max_tokens = (uint32_t)strtoul(config->llm_max_tokens, NULL, 10),
-            .image_max_bytes = 0,
+            .image_max_bytes = (size_t)strtoul(config->llm_default_image_max_bytes, NULL, 10),
+            .supports_tools = app_claw_bool_is_true(config->llm_supports_tools),
+            .supports_vision = app_claw_bool_is_true(config->llm_supports_vision),
+            .image_remote_url_only = app_claw_bool_is_true(config->llm_image_remote_url_only),
         },
 #if CONFIG_APP_CLAW_MEMORY_MODE_FULL
         .enable_async_extract_stage_note = true,
@@ -133,31 +142,6 @@ static esp_err_t init_skills(const app_claw_storage_paths_t *paths)
     return ESP_OK;
 }
 
-static const char *app_llm_provider_name(const app_claw_config_t *config)
-{
-    if (!config) {
-        return "unknown";
-    }
-
-    if ((config->llm_backend_type[0] && strcmp(config->llm_backend_type, "anthropic") == 0) ||
-        (config->llm_profile[0] && strcmp(config->llm_profile, "anthropic") == 0)) {
-        return "Anthropic";
-    }
-    if (config->llm_profile[0] &&
-        (strcmp(config->llm_profile, "qwen") == 0 ||
-         strcmp(config->llm_profile, "qwen_compatible") == 0)) {
-        return "Qwen Compatible";
-    }
-    if (config->llm_base_url[0] &&
-        strcmp(config->llm_base_url, "https://api.deepseek.com") == 0) {
-        return "DeepSeek";
-    }
-    if (config->llm_profile[0] && strcmp(config->llm_profile, "openai") == 0) {
-        return "OpenAI";
-    }
-    return "Custom";
-}
-
 static esp_err_t app_claw_publish_startup_event(void)
 {
     static const char *payload_json =
@@ -176,7 +160,7 @@ static bool app_llm_is_configured(const app_claw_config_t *config)
     return config &&
            config->llm_api_key[0] &&
            config->llm_model[0] &&
-           config->llm_profile[0];
+           config->llm_backend_type[0];
 }
 
 #if CONFIG_APP_CLAW_CAP_SCHEDULER && CONFIG_APP_CLAW_CAP_TIME
@@ -269,12 +253,16 @@ esp_err_t app_claw_start(const app_claw_config_t *config,
 
     core_config.api_key = config->llm_api_key;
     core_config.backend_type = config->llm_backend_type;
-    core_config.profile = config->llm_profile;
     core_config.model = config->llm_model;
     core_config.base_url = config->llm_base_url;
     core_config.auth_type = config->llm_auth_type;
+    core_config.max_tokens_field = config->llm_max_tokens_field;
     core_config.timeout_ms = (uint32_t)strtoul(config->llm_timeout_ms, NULL, 10);
     core_config.max_tokens = (uint32_t)strtoul(config->llm_max_tokens, NULL, 10);
+    core_config.image_max_bytes = (size_t)strtoul(config->llm_default_image_max_bytes, NULL, 10);
+    core_config.supports_tools = app_claw_bool_is_true(config->llm_supports_tools);
+    core_config.supports_vision = app_claw_bool_is_true(config->llm_supports_vision);
+    core_config.image_remote_url_only = app_claw_bool_is_true(config->llm_image_remote_url_only);
     core_config.system_prompt = APP_SYSTEM_PROMPT;
 #if CONFIG_APP_CLAW_MEMORY_MODE_FULL
     core_config.append_session_turn = claw_memory_append_session_turn_callback;
@@ -293,16 +281,15 @@ esp_err_t app_claw_start(const app_claw_config_t *config,
     core_config.max_context_providers = 8;
 
     if (!llm_enabled) {
-        ESP_LOGW(TAG, "LLM is not fully configured. Provider=%s profile=%s model=%s. "
-                      "The demo will start without claw_core; ask, auto-route-to-agent, and image analysis stay disabled until LLM API key, profile, and model are set.",
-                 app_llm_provider_name(config),
-                 config->llm_profile[0] ? config->llm_profile : "(empty)",
+        ESP_LOGW(TAG, "LLM is not fully configured. backend=%s base_url=%s model=%s. "
+                      "The demo will start without claw_core; ask, auto-route-to-agent, and image analysis stay disabled until LLM API key, backend type, and model are set.",
+                 config->llm_backend_type[0] ? config->llm_backend_type : "(empty)",
+                 config->llm_base_url[0] ? config->llm_base_url : "(empty)",
                  config->llm_model[0] ? config->llm_model : "(empty)");
     } else {
-        ESP_LOGI(TAG, "Starting LLM provider=%s profile=%s backend=%s model=%s",
-                 app_llm_provider_name(config),
-                 config->llm_profile,
+        ESP_LOGI(TAG, "Starting LLM backend=%s base_url=%s model=%s",
                  config->llm_backend_type[0] ? config->llm_backend_type : "(default)",
+                 config->llm_base_url[0] ? config->llm_base_url : "(empty)",
                  config->llm_model);
         ESP_RETURN_ON_ERROR(claw_core_init(&core_config), TAG, "Failed to init claw_core");
         ESP_RETURN_ON_ERROR(claw_core_add_context_provider(&claw_memory_profile_provider),

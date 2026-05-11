@@ -40,13 +40,8 @@ typedef struct {
 } claw_media_prepared_t;
 
 typedef struct {
-    const char *id;
-    const char *default_backend_type;
-    const char *default_base_url;
     const char *chat_path;
     const char *max_tokens_field;
-    uint32_t default_timeout_ms;
-    size_t default_image_max_bytes;
     bool supports_tools;
     bool supports_vision;
     bool image_remote_url_only;
@@ -55,13 +50,16 @@ typedef struct {
 typedef struct {
     const char *api_key;
     const char *backend_type;
-    const char *profile;
     const char *model;
     const char *base_url;
     const char *auth_type;
+    const char *max_tokens_field;
     uint32_t timeout_ms;
     uint32_t max_tokens;
     size_t image_max_bytes;
+    bool supports_tools;
+    bool supports_vision;
+    bool image_remote_url_only;
 } claw_llm_runtime_config_t;
 
 typedef struct {

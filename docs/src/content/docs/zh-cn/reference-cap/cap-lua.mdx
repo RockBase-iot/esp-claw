@@ -36,7 +36,7 @@ LLM 决策 → 生成 Lua 代码 → lua_write_script 保存 → lua_run_script 
 
 ### 3. 快速原型与扩展接口
 
-对于不熟悉 C 开发的用户，Lua 脚本提供了一种无需重新编译固件即可扩展设备行为的方式。通过 `lua_module_*` 机制注册的原生模块，可以将任意外设能力以简洁的 Lua API 暴露出来。
+对于不熟悉 C 开发的用户，Lua 脚本提供了一种无需重新编译固件即可扩展设备行为的方式。通过 `lua_module_*` / `lua_driver_*` 机制注册的原生模块，可以将任意外设能力以简洁的 Lua API 暴露出来。
 
 ## Lua 运行时概述
 
@@ -60,7 +60,7 @@ ESP-Claw 使用 Lua 解释器，通过 `cap_lua_runtime_*` 系列函数初始化
 ```c
 // 应在应用初始化阶段（cap_lua_register_group 之前）注册模块
 lua_module_display_register();   // 注册 display 模块
-lua_module_gpio_register();      // 注册 gpio 模块
+lua_driver_gpio_register();      // 注册 gpio 模块
 // ...
 cap_lua_register_group();        // 之后锁定
 ```
@@ -194,4 +194,4 @@ running -> stopped
   **推荐工作流：** 对于控制外设的脚本（如持续动画），使用 `lua_run_script_async` 提交，LLM 可以立即告知用户「已启动」，随后用 `lua_get_async_job` 确认完成状态，而不会因等待脚本执行而阻塞 Agent 循环。
 </Aside>
 
-<LinkCard title="Lua 扩展模块" href="./lua-modules" description="lua_module_* 的注册机制、如何实现自定义模块，以及 display 模块完整分析" />
+<LinkCard title="Lua 扩展模块" href="./lua-modules" description="lua_module_* / lua_driver_* 的注册机制、如何实现自定义模块，以及 display 模块完整分析" />

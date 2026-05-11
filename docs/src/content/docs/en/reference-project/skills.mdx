@@ -33,7 +33,7 @@ Skills live on disk under `/fatfs/skills` by default. Use the Web config file ma
 </FileTree>
 
 <Aside type="tip">
-  Component-provided Skill files live under each component's source `skills/` directory and are bundled into the FATFS image at build time.
+  The Skill files included with `cap_*`, `lua_module_*`, and `lua_driver_*` components are located in the `skills/` directory of the component's source code and are bundled into the FATFS image during build.
 </Aside>
 
 ### Metadata
@@ -116,6 +116,55 @@ With optional fields:
 - `Error: param is required` — add `param`, then retry
 - `Error: invalid state` — device not ready; tell the user to try later
 ``````
+
+#### Lua module Skills
+
+`lua_module_*` / `lua_driver_*` Skills target **LLM-authored Lua**, not JSON tool calls like `cap_*` docs. Provide precise API references instead of generic prose.
+
+**Lua module Skill docs should cover:**
+
+| Element | Purpose |
+|---------|---------|
+| Hardware summary | What it drives, which pins or buses |
+| Init story | Whether `require` has side effects, extra setup steps |
+| Full API table | Parameters, returns, short Lua snippets per function |
+| Usage rules | Rate limits, dependencies (“initialize `board_manager` first”) |
+| Failure modes | Cases that raise Lua errors |
+
+``````markdown
+# myled
+
+Controls a single LED connected to GPIO 2.
+
+## Setup
+
+No explicit init required. The module configures GPIO 2 on first `require`.
+
+## API
+
+### `myled.set(on)`
+
+Turns the LED on or off.
+
+- `on`: boolean
+
+```lua
+local myled = require("myled")
+myled.set(true)   -- on
+myled.set(false)  -- off
+```
+
+### `myled.get()` → boolean
+
+Returns the current LED state.
+
+## Rules
+
+- The module only controls GPIO 2; there is no parameter to change the pin.
+- Do not call `myled.set` more than once per 50 ms.
+``````
+
+The `lua_module_display` Skill is a good model: it spells out each drawing helper, optional table fields, return values, and constraints such as “text is ASCII-only”—all mandatory context for code-generating models.
 
 ### One Skill or many?
 

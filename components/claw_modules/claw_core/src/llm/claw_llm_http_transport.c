@@ -80,6 +80,70 @@ static char *dup_printf(const char *fmt, ...)
     return buf;
 }
 
+static char *sanitize_utf8_body_copy(const char *body)
+{
+    size_t src = 0;
+    size_t dst = 0;
+    size_t len = 0;
+    char *sanitized = NULL;
+
+    if (!body) {
+        return NULL;
+    }
+
+    len = strlen(body);
+    sanitized = calloc(1, len + 1);
+    if (!sanitized) {
+        return NULL;
+    }
+
+    while (body[src]) {
+        unsigned char c = (unsigned char)body[src];
+
+        if (c < 0x80) {
+            sanitized[dst++] = body[src++];
+        } else if (c >= 0xC2 && c <= 0xDF) {
+            if (body[src + 1] && ((unsigned char)body[src + 1] & 0xC0) == 0x80) {
+                sanitized[dst++] = body[src++];
+                sanitized[dst++] = body[src++];
+            } else {
+                sanitized[dst++] = ' ';
+                src++;
+            }
+        } else if (c >= 0xE0 && c <= 0xEF) {
+            if (body[src + 1] && body[src + 2] &&
+                    ((unsigned char)body[src + 1] & 0xC0) == 0x80 &&
+                    ((unsigned char)body[src + 2] & 0xC0) == 0x80) {
+                sanitized[dst++] = body[src++];
+                sanitized[dst++] = body[src++];
+                sanitized[dst++] = body[src++];
+            } else {
+                sanitized[dst++] = ' ';
+                src++;
+            }
+        } else if (c >= 0xF0 && c <= 0xF4) {
+            if (body[src + 1] && body[src + 2] && body[src + 3] &&
+                    ((unsigned char)body[src + 1] & 0xC0) == 0x80 &&
+                    ((unsigned char)body[src + 2] & 0xC0) == 0x80 &&
+                    ((unsigned char)body[src + 3] & 0xC0) == 0x80) {
+                sanitized[dst++] = body[src++];
+                sanitized[dst++] = body[src++];
+                sanitized[dst++] = body[src++];
+                sanitized[dst++] = body[src++];
+            } else {
+                sanitized[dst++] = ' ';
+                src++;
+            }
+        } else {
+            sanitized[dst++] = ' ';
+            src++;
+        }
+    }
+
+    sanitized[dst] = '\0';
+    return sanitized;
+}
+
 static esp_err_t response_buffer_init(response_buffer_t *buffer)
 {
     if (!buffer) {
@@ -220,6 +284,7 @@ esp_err_t claw_llm_http_post_json(const claw_llm_http_json_request_t *request,
     esp_http_client_config_t config = {0};
     esp_http_client_handle_t client = NULL;
     char *auth_header_value = NULL;
+    char *sanitized_body = NULL;
     int status_code = 0;
     esp_err_t err;
 
@@ -233,11 +298,18 @@ esp_err_t claw_llm_http_post_json(const claw_llm_http_json_request_t *request,
         return ESP_ERR_INVALID_ARG;
     }
 
+    sanitized_body = sanitize_utf8_body_copy(request->body);
+    if (!sanitized_body) {
+        *out_error_message = dup_printf("Out of memory sanitizing HTTP request body");
+        ESP_LOGE(TAG, "OOM sanitizing HTTP request body");
+        return ESP_ERR_NO_MEM;
+    }
+
     err = response_buffer_init(&buffer);
     if (err != ESP_OK) {
         *out_error_message = dup_printf("Out of memory allocating HTTP buffer");
         ESP_LOGE(TAG, "OOM allocating HTTP response buffer");
-        return err;
+        goto cleanup;
     }
 
     config.url = request->url;
@@ -274,7 +346,7 @@ esp_err_t claw_llm_http_post_json(const claw_llm_http_json_request_t *request,
             esp_http_client_set_header(client, header->name, header->value);
         }
     }
-    esp_http_client_set_post_field(client, request->body, (int)strlen(request->body));
+    esp_http_client_set_post_field(client, sanitized_body, (int)strlen(sanitized_body));
 
     ESP_LOGD(TAG, "POST %s", request->url);
     err = esp_http_client_perform(client);
@@ -306,6 +378,7 @@ esp_err_t claw_llm_http_post_json(const claw_llm_http_json_request_t *request,
 
 cleanup:
     free(auth_header_value);
+    free(sanitized_body);
     if (client) {
         esp_http_client_cleanup(client);
     }

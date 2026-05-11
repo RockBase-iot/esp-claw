@@ -551,8 +551,8 @@ static void ass_paint_status(void)
 
     // ----- LLM block -----
     if (s_state.settings_valid) {
-        const char *profile = ass_present(s_state.settings.llm_profile)
-                              ? s_state.settings.llm_profile : "(unset)";
+        const char *profile = ass_present(s_state.settings.llm_backend_type)
+                              ? s_state.settings.llm_backend_type : "(unset)";
         bool llm_ok = ass_present(s_state.settings.llm_api_key) &&
                       ass_present(s_state.settings.llm_model);
         ass_paint_status_kv(&y, "LLM:", profile,

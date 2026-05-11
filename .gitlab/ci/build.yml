@@ -129,3 +129,11 @@ build_application_edge_agent:
       - EXAMPLE_BOARD: esp_SensairShuttle
         EXAMPLE_TARGET: esp32c5
         EXAMPLE_BOARD_BRAND: "espressif"
+
+      - EXAMPLE_BOARD: xingzhi_395
+        EXAMPLE_TARGET: esp32p4
+        EXAMPLE_BOARD_BRAND: "Nologo.Tech"
+
+      - EXAMPLE_BOARD: waveshare_esp32_p4_nano
+        EXAMPLE_TARGET: esp32p4
+        EXAMPLE_BOARD_BRAND: "waveshare"

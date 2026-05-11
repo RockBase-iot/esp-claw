@@ -1,5 +1,6 @@
 import {
   createSignal,
+  createEffect,
   Show,
   type Component,
   type JSX,
@@ -49,6 +50,8 @@ export const StaticConfigBlock: ParentComponent<StaticConfigBlockProps> = (props
 type CollapsibleConfigBlockProps = {
   title: string;
   defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   class?: string;
   /** Rendered to the right of the title, before the chevron; clicks do not toggle the block. */
   headerEnd?: JSX.Element;
@@ -58,7 +61,20 @@ type CollapsibleConfigBlockProps = {
 export const CollapsibleConfigBlock: ParentComponent<CollapsibleConfigBlockProps> = (props) => {
   const [open, setOpen] = createSignal(props.defaultOpen ?? true);
 
-  const toggle = () => setOpen((v) => !v);
+  createEffect(() => {
+    if (props.open !== undefined) {
+      setOpen(props.open);
+    }
+  });
+
+  const applyOpen = (next: boolean) => {
+    if (props.open === undefined) {
+      setOpen(next);
+    }
+    props.onOpenChange?.(next);
+  };
+
+  const toggle = () => applyOpen(!open());
 
   return (
     <div class={props.class}>

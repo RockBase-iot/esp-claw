@@ -1,6 +1,6 @@
 ---
-title: Lua extension modules (`lua_module_*`)
-description: How `lua_module_*` components register, how to author them, and a full gpio module walkthrough.
+title: Lua extension modules (`lua_module_*` / `lua_driver_*`)
+description: How `lua_module_*` and `lua_driver_*` components register with `cap_lua`, how to author your own, and a full `display` walkthrough.
 ---
 
 import LinkToSource from '@/components/LinkToSource.astro';
@@ -8,15 +8,26 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Overview
 
-`lua_module_*` components are ESP-Claw's **bridge from hardware peripherals or reusable Lua libraries to Lua scripts**.
-C-backed modules register standard Lua C modules (`lua_CFunction` style) through `cap_lua_register_module`, then scripts load them with `require("module_name")`.
+`lua_module_*` and `lua_driver_*` components are ESP-Claw's **bridge from hardware to Lua**. `lua_driver_*` wraps low-level peripheral drivers (ADC, GPIO, I2C, MCPWM, Touch, UART), while `lua_module_*` covers higher-level modules. Each component is a standard Lua C library (`lua_CFunction` style), registered through `cap_lua_register_module`, then loaded in scripts via `require("module_name")`.
 Pure Lua modules may provide only managed resources such as `lib/`, `test/`, and `README.md`.
 
 ## Built-in modules
 
+#### `lua_driver_*` (hardware peripheral drivers)
+
 | Module | Component | Purpose |
 |--------|-----------|---------|
-| `adc` | `lua_module_adc` | ADC sampling |
+| `adc` | `lua_driver_adc` | ADC sampling |
+| `gpio` | `lua_driver_gpio` | GPIO reads/writes and direction |
+| `i2c` | `lua_driver_i2c` | I2C bus scan and per-device read/write |
+| `mcpwm` | `lua_driver_mcpwm` | Generic PWM output (frequency/duty control) |
+| `touch` | `lua_driver_touch` | Capacitive touch key reads |
+| `uart` | `lua_driver_uart` | UART serial I/O (polling read/write) |
+
+#### `lua_module_*` (higher-level modules)
+
+| Module | Component | Purpose |
+|--------|-----------|---------|
 | `audio` | `lua_module_audio` | PCM/WAV playback/recording and spectrum analysis |
 | `board_manager` | `lua_module_board_manager` | Board initialization and peripheral handle lookup |
 | `button` | `lua_module_button` | Button events and callbacks |
@@ -29,8 +40,6 @@ Pure Lua modules may provide only managed resources such as `lib/`, `test/`, and
 | `esp_heap` | `lua_module_esp_heap` | Heap introspection |
 | `event_publisher` | `lua_module_event_publisher` | Publish events from Lua into the Event Router |
 | `lib_fuel_gauge` | `lua_module_fuel_gauge` | Pure-Lua battery fuel-gauge library for BQ27220/MAX17048 and similar chips |
-| `gpio` | `lua_module_gpio` | GPIO reads/writes and direction |
-| `i2c` | `lua_module_i2c` | I2C bus scan and per-device read/write |
 | `imu` | `lua_module_imu` | IMU accelerometer and gyroscope reads |
 | `ir` | `lua_module_ir` | IR receive, learn, and transmit |
 | `knob` | `lua_module_knob` | Rotary encoder / knob events |
@@ -38,13 +47,10 @@ Pure Lua modules may provide only managed resources such as `lib/`, `test/`, and
 | `lcd_touch` | `lua_module_lcd_touch` | Touch coordinates |
 | `led_strip` | `lua_module_led_strip` | Addressable strips such as WS2812 |
 | `magnetometer` | `lua_module_magnetometer` | Magnetometer / compass reads |
-| `mcpwm` | `lua_module_mcpwm` | Generic PWM output (frequency/duty control) |
 | `ssd1306` | `lua_module_ssd1306` | Pure-Lua SSD1306 I2C OLED driver |
 | `storage` | `lua_module_storage` | Filesystem operations |
 | `system` | `lua_module_system` | Time, uptime, IP, memory, and Wi-Fi status |
 | `arg_schema` | `lua_module_system` | Pure-Lua argument normalization helper |
-| `touch` | `lua_module_touch` | Capacitive touch key reads |
-| `uart` | `lua_module_uart` | UART serial I/O (polling read/write) |
 
 <Aside type="note" title="Module conditional compilation">
     In `edge_agent`, every module is controlled by Kconfig. When the firmware is not built with a module's component, Lua scripts cannot use that module.
@@ -52,7 +58,7 @@ Pure Lua modules may provide only managed resources such as `lib/`, `test/`, and
 
 ## Registration flow
 
-Each `lua_module_*` ships exactly one registrar named `lua_module_<name>_register()`:
+Each `lua_module_*` / `lua_driver_*` ships exactly one registrar named `lua_module_<name>_register()` or `lua_driver_<name>_register()`:
 
 ```c
 // lua_module_display/src/lua_module_display.h
@@ -76,14 +82,14 @@ esp_err_t lua_module_display_register(void)
 ```c
 // app_claw.c or equivalent init
 #include "lua_module_display.h"
-#include "lua_module_gpio.h"
+#include "lua_driver_gpio.h"
 #include "lua_module_delay.h"
 #include "cap_lua.h"
 
 void app_lua_modules_init(void)
 {
     lua_module_display_register();
-    lua_module_gpio_register();
+    lua_driver_gpio_register();
     lua_module_delay_register();
     // …other modules…
 
@@ -228,6 +234,8 @@ myled.set(false)  -- off
 `lib/` stores reusable Lua libraries. `lib/abc.lua` is an implementation library, not a directly runnable program.
 Public library functions must be documented in the same-name `lib/abc.md`. Every synced `lib/*.lua` must have a same-name Markdown document.
 
+Just like `cap_*` modules, **each `lua_module_*` / `lua_driver_*` should ship a Skill** so the LLM knows how to call it from generated scripts.
+
 ## Build sync rules
 
 The build system collects managed `lua_module_*` resources and syncs them into the application filesystem image.
@@ -276,6 +284,8 @@ lua_module_gpio/
 int luaopen_gpio(lua_State *L);
 esp_err_t lua_module_gpio_register(void);
 ```
+
+Unlike `cap_*` Skills, `lua_module_*` / `lua_driver_*` Skills **do not** bind a dedicated capability group (there is no `lua_module` group). They attach to **`cap_lua`** instead.
 
 ### API table
 

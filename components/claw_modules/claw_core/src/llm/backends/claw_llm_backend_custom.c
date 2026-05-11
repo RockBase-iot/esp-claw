@@ -8,10 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
-    const claw_llm_backend_vtable_t *delegate;
-    void *delegate_ctx;
-} custom_backend_ctx_t;
+#include "llm/backends/claw_llm_backend_anthropic.h"
+#include "llm/backends/claw_llm_backend_openai_compatible.h"
 
 typedef struct custom_backend_registration_node {
     claw_llm_custom_backend_registration_t registration;
@@ -20,18 +18,65 @@ typedef struct custom_backend_registration_node {
 
 static custom_backend_registration_node_t *s_registrations = NULL;
 
-static const claw_llm_backend_vtable_t *find_custom_backend(const char *id)
+typedef const claw_llm_backend_registration_t *(*builtin_backend_registration_getter_t)(void);
+
+static const claw_llm_backend_registration_t *find_builtin_backend_registration(const char *id)
+{
+    static const builtin_backend_registration_getter_t getters[] = {
+        claw_llm_backend_openai_compatible_registration,
+        claw_llm_backend_anthropic_registration,
+    };
+    size_t i;
+
+    if (!id || !id[0]) {
+        return NULL;
+    }
+
+    for (i = 0; i < sizeof(getters) / sizeof(getters[0]); i++) {
+        const claw_llm_backend_registration_t *registration = getters[i]();
+
+        if (registration && registration->id && strcmp(registration->id, id) == 0) {
+            return registration;
+        }
+    }
+
+    return NULL;
+}
+
+static const claw_llm_backend_registration_t *find_custom_backend_registration(const char *id)
 {
     custom_backend_registration_node_t *node = s_registrations;
 
+    if (!id || !id[0]) {
+        return NULL;
+    }
+
     while (node) {
         if (strcmp(node->registration.id, id) == 0) {
-            return node->registration.vtable;
+            return &node->registration;
         }
         node = node->next;
     }
 
     return NULL;
+}
+
+const claw_llm_backend_registration_t *claw_llm_find_backend_registration(const char *id)
+{
+    const claw_llm_backend_registration_t *registration = find_builtin_backend_registration(id);
+
+    if (registration) {
+        return registration;
+    }
+
+    return find_custom_backend_registration(id);
+}
+
+const claw_llm_backend_vtable_t *claw_llm_find_custom_backend(const char *id)
+{
+    const claw_llm_backend_registration_t *registration = find_custom_backend_registration(id);
+
+    return registration ? registration->vtable : NULL;
 }
 
 esp_err_t claw_llm_register_custom_backend(const claw_llm_custom_backend_registration_t *registration)
@@ -41,7 +86,7 @@ esp_err_t claw_llm_register_custom_backend(const claw_llm_custom_backend_registr
     if (!registration || !registration->id || !registration->vtable) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (find_custom_backend(registration->id)) {
+    if (claw_llm_find_backend_registration(registration->id)) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -54,96 +99,4 @@ esp_err_t claw_llm_register_custom_backend(const claw_llm_custom_backend_registr
     node->next = s_registrations;
     s_registrations = node;
     return ESP_OK;
-}
-
-static esp_err_t custom_backend_init(const claw_llm_runtime_config_t *config,
-                                     const claw_llm_model_profile_t *profile,
-                                     void **out_backend_ctx,
-                                     char **out_error_message)
-{
-    custom_backend_ctx_t *ctx;
-    const claw_llm_backend_vtable_t *delegate;
-    esp_err_t err;
-
-    if (!config || !config->profile || !out_backend_ctx || !out_error_message) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    delegate = find_custom_backend(config->profile);
-    if (!delegate) {
-        *out_error_message = strdup("No custom backend is registered for the selected profile");
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    ctx = calloc(1, sizeof(*ctx));
-    if (!ctx) {
-        *out_error_message = strdup("Out of memory allocating custom backend");
-        return ESP_ERR_NO_MEM;
-    }
-
-    ctx->delegate = delegate;
-    err = delegate->init(config, profile, &ctx->delegate_ctx, out_error_message);
-    if (err != ESP_OK) {
-        free(ctx);
-        return err;
-    }
-
-    *out_backend_ctx = ctx;
-    return ESP_OK;
-}
-
-static esp_err_t custom_backend_chat(void *backend_ctx,
-                                     const claw_llm_model_profile_t *profile,
-                                     const claw_llm_chat_request_t *request,
-                                     claw_llm_response_t *out_response,
-                                     char **out_error_message)
-{
-    custom_backend_ctx_t *ctx = (custom_backend_ctx_t *)backend_ctx;
-
-    if (!ctx || !ctx->delegate || !ctx->delegate->chat) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    return ctx->delegate->chat(ctx->delegate_ctx, profile, request, out_response, out_error_message);
-}
-
-static esp_err_t custom_backend_infer_media(void *backend_ctx,
-                                            const claw_llm_model_profile_t *profile,
-                                            const claw_llm_media_request_t *request,
-                                            char **out_text,
-                                            char **out_error_message)
-{
-    custom_backend_ctx_t *ctx = (custom_backend_ctx_t *)backend_ctx;
-
-    if (!ctx || !ctx->delegate || !ctx->delegate->infer_media) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    return ctx->delegate->infer_media(ctx->delegate_ctx, profile, request, out_text, out_error_message);
-}
-
-static void custom_backend_deinit(void *backend_ctx)
-{
-    custom_backend_ctx_t *ctx = (custom_backend_ctx_t *)backend_ctx;
-
-    if (!ctx) {
-        return;
-    }
-    if (ctx->delegate && ctx->delegate->deinit) {
-        ctx->delegate->deinit(ctx->delegate_ctx);
-    }
-    free(ctx);
-}
-
-const claw_llm_backend_vtable_t *claw_llm_backend_custom_vtable(void)
-{
-    static const claw_llm_backend_vtable_t vtable = {
-        .id = "custom",
-        .init = custom_backend_init,
-        .chat = custom_backend_chat,
-        .infer_media = custom_backend_infer_media,
-        .deinit = custom_backend_deinit,
-    };
-
-    return &vtable;
 }

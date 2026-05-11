@@ -87,14 +87,16 @@ typedef esp_err_t (*claw_core_call_cap_fn)(const char *cap_name,
 typedef struct {
     const char *api_key;
     const char *backend_type;
-    const char *profile;
-    const char *provider;
     const char *model;
     const char *base_url;
     const char *auth_type;
+    const char *max_tokens_field;
     uint32_t timeout_ms;
     uint32_t max_tokens;
     size_t image_max_bytes;
+    bool supports_tools;
+    bool supports_vision;
+    bool image_remote_url_only;
     const char *system_prompt;
     claw_core_append_session_turn_fn append_session_turn;
     void *append_session_turn_user_ctx;

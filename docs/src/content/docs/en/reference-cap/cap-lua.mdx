@@ -36,7 +36,7 @@ That yields fully local, low-latency responses without network or model cost.
 
 ### 3. Rapid prototyping / extension surface
 
-Users who do not ship C firmware can still extend behavior via Lua. Native modules registered as `lua_module_*` expose peripherals through small Lua APIs.
+Users who do not ship C firmware can still extend behavior via Lua. Native modules registered as `lua_module_*` / `lua_driver_*` expose peripherals through small Lua APIs.
 
 ## Lua runtime sketch
 
@@ -60,7 +60,7 @@ Writable `cap_lua` runtime scripts must live under the Script Base Dir. In `edge
 ```c
 // During app init (before cap_lua_register_group)
 lua_module_display_register();   // register display
-lua_module_gpio_register();      // register gpio
+lua_driver_gpio_register();      // register gpio
 // ...
 cap_lua_register_group();        // then lock
 ```
@@ -194,4 +194,4 @@ The `cap_lua` Skill instructs the model to check and stop running Lua async jobs
   **Suggested workflow:** For peripheral-heavy scripts (continuous animation), submit with `lua_run_script_async` so the LLM can tell the user “started” immediately, then poll `lua_get_async_job` without stalling the Agent loop on a long script.
 </Aside>
 
-<LinkCard title="Lua extension modules" href="./lua-modules" description="How `lua_module_*` registers, how to build your own, and a deep dive on `display`" />
+<LinkCard title="Lua extension modules" href="./lua-modules" description="How `lua_module_*` / `lua_driver_*` registers, how to build your own, and a deep dive on `display`" />

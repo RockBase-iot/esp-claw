@@ -3,12 +3,16 @@ export type AppConfig = {
   wifi_password: string;
   llm_api_key: string;
   llm_backend_type: string;
-  llm_profile: string;
   llm_model: string;
   llm_base_url: string;
   llm_auth_type: string;
   llm_timeout_ms: string;
   llm_max_tokens: string;
+  llm_default_image_max_bytes: string;
+  llm_max_tokens_field: string;
+  llm_supports_tools: string;
+  llm_supports_vision: string;
+  llm_image_remote_url_only: string;
   qq_app_id: string;
   qq_app_secret: string;
   feishu_app_id: string;
@@ -42,12 +46,16 @@ export const GROUP_FIELDS: Record<ConfigGroup, (keyof AppConfig)[]> = {
   llm: [
     'llm_api_key',
     'llm_backend_type',
-    'llm_profile',
     'llm_model',
     'llm_base_url',
     'llm_auth_type',
     'llm_timeout_ms',
     'llm_max_tokens',
+    'llm_default_image_max_bytes',
+    'llm_max_tokens_field',
+    'llm_supports_tools',
+    'llm_supports_vision',
+    'llm_image_remote_url_only',
   ],
   im: [
     'qq_app_id',

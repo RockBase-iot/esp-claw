@@ -1433,7 +1433,7 @@ esp_err_t claw_core_init(const claw_core_config_t *config)
     uint32_t response_queue_len;
 
     if (!config || !config->system_prompt || !config->api_key || !config->model ||
-            (!(config->profile && config->profile[0]) && !(config->provider && config->provider[0]))) {
+            !(config->backend_type && config->backend_type[0])) {
         return ESP_ERR_INVALID_ARG;
     }
     if (s_core && s_core->initialized) {
@@ -1504,14 +1504,16 @@ esp_err_t claw_core_init(const claw_core_config_t *config)
 
     llm_config.api_key = config->api_key;
     llm_config.backend_type = config->backend_type;
-    llm_config.profile = config->profile;
-    llm_config.provider = config->provider;
     llm_config.model = config->model;
     llm_config.base_url = config->base_url;
     llm_config.auth_type = config->auth_type;
+    llm_config.max_tokens_field = config->max_tokens_field;
     llm_config.timeout_ms = config->timeout_ms;
     llm_config.max_tokens = config->max_tokens;
     llm_config.image_max_bytes = config->image_max_bytes;
+    llm_config.supports_tools = config->supports_tools;
+    llm_config.supports_vision = config->supports_vision;
+    llm_config.image_remote_url_only = config->image_remote_url_only;
     err = claw_core_llm_init(&llm_config, &llm_error);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "LLM init failed: %s", llm_error ? llm_error : esp_err_to_name(err));

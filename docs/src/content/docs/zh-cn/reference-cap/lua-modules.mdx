@@ -1,6 +1,6 @@
 ---
-title: Lua 扩展模块（lua_module_*）
-description: lua_module_* 组件的注册机制、实现方式，以及 gpio 模块的完整分析。
+title: Lua 扩展模块（lua_module_* / lua_driver_*）
+description: lua_module_* 与 lua_driver_* 组件的注册机制、实现方式，以及 display 模块的完整分析。
 ---
 
 import LinkToSource from '@/components/LinkToSource.astro';
@@ -8,15 +8,26 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## 概述
 
-`lua_module_*` 是 ESP-Claw 中**将硬件外设能力或可复用 Lua 库暴露给 Lua 脚本**的扩展机制。
-C-backed 模块通过 `cap_lua_register_module` 注册标准 Lua C 模块（`lua_CFunction` 格式），脚本中可用 `require("module_name")` 加载。
+`lua_module_*` 与 `lua_driver_*` 是 ESP-Claw 中**将硬件外设能力暴露给 Lua 脚本**的扩展机制。`lua_driver_*` 封装底层外设驱动（ADC、GPIO、I2C、MCPWM、Touch、UART），`lua_module_*` 涵盖更高层的功能模块。每个组件本质上是一个标准 Lua C 模块（`lua_CFunction` 格式），通过 `cap_lua_register_module` 注册后，在 Lua 脚本中可以用 `require("module_name")` 加载。
 纯 Lua 模块也可以只提供 `lib/`、`test/`、`README.md` 等。
 
 ## 内置模块总览
 
+#### `lua_driver_*`（硬件外设驱动）
+
 | 模块名 | 组件目录 | 说明 |
 |--------|----------|------|
-| `adc` | `lua_module_adc` | ADC 采样 |
+| `adc` | `lua_driver_adc` | ADC 采样 |
+| `gpio` | `lua_driver_gpio` | GPIO 读写、方向配置 |
+| `i2c` | `lua_driver_i2c` | I2C 总线扫描与设备读写 |
+| `mcpwm` | `lua_driver_mcpwm` | 通用 PWM 输出（频率/占空比控制） |
+| `touch` | `lua_driver_touch` | 电容触摸按键数据读取 |
+| `uart` | `lua_driver_uart` | UART 串口收发（polling 读写） |
+
+#### `lua_module_*`（高层功能模块）
+
+| 模块名 | 组件目录 | 说明 |
+|--------|----------|------|
 | `audio` | `lua_module_audio` | 音频播放/录制（PCM/WAV）与频谱分析 |
 | `board_manager` | `lua_module_board_manager` | 板级初始化与外设句柄获取 |
 | `button` | `lua_module_button` | 按键事件注册与回调 |
@@ -29,8 +40,6 @@ C-backed 模块通过 `cap_lua_register_module` 注册标准 Lua C 模块（`lua
 | `esp_heap` | `lua_module_esp_heap` | 堆内存查询 |
 | `event_publisher` | `lua_module_event_publisher` | 从 Lua 脚本向 Event Router 发布事件 |
 | `lib_fuel_gauge` | `lua_module_fuel_gauge` | 纯 Lua 电池电量计库，支持 BQ27220/MAX17048 等 |
-| `gpio` | `lua_module_gpio` | GPIO 读写、方向配置 |
-| `i2c` | `lua_module_i2c` | I2C 总线扫描与设备读写 |
 | `imu` | `lua_module_imu` | IMU 加速度计与陀螺仪数据读取 |
 | `ir` | `lua_module_ir` | 红外接收、学习与发送 |
 | `knob` | `lua_module_knob` | 旋钮/旋转编码器事件读取 |
@@ -38,13 +47,10 @@ C-backed 模块通过 `cap_lua_register_module` 注册标准 Lua C 模块（`lua
 | `lcd_touch` | `lua_module_lcd_touch` | 触摸屏坐标读取 |
 | `led_strip` | `lua_module_led_strip` | WS2812 等可寻址 LED 灯带控制 |
 | `magnetometer` | `lua_module_magnetometer` | 磁力计/指南针数据读取 |
-| `mcpwm` | `lua_module_mcpwm` | 通用 PWM 输出（频率/占空比控制） |
 | `ssd1306` | `lua_module_ssd1306` | 纯 Lua SSD1306 I2C OLED 驱动 |
 | `storage` | `lua_module_storage` | 文件系统操作 |
 | `system` | `lua_module_system` | 时间、运行时长、IP、内存与 Wi-Fi 状态查询 |
 | `arg_schema` | `lua_module_system` | 纯 Lua 参数归一化辅助库 |
-| `touch` | `lua_module_touch` | 电容触摸按键数据读取 |
-| `uart` | `lua_module_uart` | UART 串口收发（polling 读写） |
 
 <Aside type="note" title="模块条件编译">
     每个模块在 `edge_agent` 中受 Kconfig 条件编译控制，当固件中没有编译包含该模块的组件时，Lua 脚本中不允许使用该模块。
@@ -52,7 +58,7 @@ C-backed 模块通过 `cap_lua_register_module` 注册标准 Lua C 模块（`lua
 
 ## 注册机制
 
-每个 `lua_module_*` 组件对外只暴露一个注册函数，命名规则为 `lua_module_<name>_register()`：
+每个 `lua_module_*` / `lua_driver_*` 组件对外只暴露一个注册函数，命名规则为 `lua_module_<name>_register()` 或 `lua_driver_<name>_register()`：
 
 ```c
 // lua_module_display/src/lua_module_display.h
@@ -76,14 +82,14 @@ esp_err_t lua_module_display_register(void)
 ```c
 // app_claw.c 或类似初始化文件
 #include "lua_module_display.h"
-#include "lua_module_gpio.h"
+#include "lua_driver_gpio.h"
 #include "lua_module_delay.h"
 #include "cap_lua.h"
 
 void app_lua_modules_init(void)
 {
     lua_module_display_register();
-    lua_module_gpio_register();
+    lua_driver_gpio_register();
     lua_module_delay_register();
     // ... 其他模块 ...
 
@@ -228,6 +234,8 @@ myled.set(false)  -- 熄灭
 `lib/` 用于保存可复用 Lua 库。`lib/abc.lua` 是实现库，不是可直接运行的程序。
 公开库函数必须在同名 `lib/abc.md` 中说明。每个被同步的 `lib/*.lua` 都必须有同名 Markdown 文档。
 
+`lua_module_*` / `lua_driver_*` 与 `cap_*` 一样，**强烈建议**为每个组件提供配套的 Skill 文档，告诉 LLM 如何在 Lua 脚本中正确使用该模块。
+
 ## 构建同步规则
 
 构建系统会收集 `lua_module_*` 的受管资源并同步到应用文件系统镜像。
@@ -276,6 +284,8 @@ lua_module_gpio/
 int luaopen_gpio(lua_State *L);
 esp_err_t lua_module_gpio_register(void);
 ```
+
+与 `cap_*` 的 Skill 不同，`lua_module_*` / `lua_driver_*` 的 Skill 绑定的 `cap_groups` **不是自己的 Group**（lua_module 没有独立的 Capability Group），而是绑定到 **`cap_lua`**：
 
 ### API 表
 

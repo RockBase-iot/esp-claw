@@ -64,14 +64,16 @@ esp_err_t claw_core_llm_init(const claw_core_llm_config_t *config, char **out_er
 
     runtime_config.api_key = config->api_key;
     runtime_config.backend_type = config->backend_type;
-    runtime_config.profile = (config->profile && config->profile[0]) ?
-                             config->profile : config->provider;
     runtime_config.model = config->model;
     runtime_config.base_url = config->base_url;
     runtime_config.auth_type = config->auth_type;
+    runtime_config.max_tokens_field = config->max_tokens_field;
     runtime_config.timeout_ms = config->timeout_ms;
     runtime_config.max_tokens = config->max_tokens;
     runtime_config.image_max_bytes = config->image_max_bytes;
+    runtime_config.supports_tools = config->supports_tools;
+    runtime_config.supports_vision = config->supports_vision;
+    runtime_config.image_remote_url_only = config->image_remote_url_only;
     err = claw_llm_runtime_init(&s_runtime, &runtime_config, out_error_message);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "init: runtime init failed err=0x%x", err);
