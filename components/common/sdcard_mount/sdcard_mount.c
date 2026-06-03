@@ -190,21 +190,45 @@ esp_err_t sdcard_mount_init(void)
     const char *mp = (cfg->mount_point && cfg->mount_point[0])
                      ? cfg->mount_point : "/sdcard";
     const char *sub_type = cfg->sub_type ? cfg->sub_type : "(null)";
+
+    /* For "sdmmc" sub-type the board manager already mounted the filesystem
+     * during esp_board_manager_init() via dev_fs_fat_sub_sdmmc_init().
+     * The SPI workaround below (and the sub_cfg.spi union access) only
+     * applies to "spi" boards — reading spi fields on an sdmmc config
+     * reinterprets slot_flags as a pointer and causes a LoadProhibited
+     * crash in strlen(). */
+    if (cfg->sub_type && strcmp(cfg->sub_type, "sdmmc") == 0) {
+        /* Verify the board manager actually mounted the FS. */
+        uint64_t total = 0, freeb = 0;
+        if (esp_vfs_fat_info(mp, &total, &freeb) == ESP_OK) {
+            strlcpy(s_mount_point, mp, sizeof(s_mount_point));
+            s_mounted = true;
+            ESP_LOGI(TAG, "SDMMC SD card already mounted at %s by board manager, total=%llu KiB, free=%llu KiB",
+                     s_mount_point,
+                     (unsigned long long)(total / 1024),
+                     (unsigned long long)(freeb / 1024));
+            return ESP_OK;
+        }
+        ESP_LOGW(TAG, "SDMMC fs_sdcard configured but not mounted (board manager may have failed)");
+        return ESP_FAIL;
+    }
+
+    /* From here on we only support sub_type "spi". */
+    if (!cfg->sub_type || strcmp(cfg->sub_type, "spi") != 0) {
+        ESP_LOGW(TAG, "unsupported sub_type '%s' (expected 'spi' or 'sdmmc')",
+                 sub_type);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
     const char *bus_name = cfg->sub_cfg.spi.spi_bus_name
                            ? cfg->sub_cfg.spi.spi_bus_name : "(null)";
     ESP_LOGI(TAG, "fs_sdcard cfg: mount=%s sub_type=%s spi_bus=%s cs_gpio=%d freq_khz=%d",
              mp, sub_type, bus_name, cfg->sub_cfg.spi.cs_gpio_num,
              (int)cfg->frequency);
 
-    /* Direct dispatch — see the comment above. We only support sub_type "spi"
-     * here; that is the only flavour the NM-CYD boards expose. Boards with an
-     * SDMMC slot are unaffected by the entry-name collision because the
-     * "sdmmc" name is unique. */
-    if (!cfg->sub_type || strcmp(cfg->sub_type, "spi") != 0) {
-        ESP_LOGW(TAG, "unsupported sub_type '%s' (expected 'spi')",
-                 sub_type);
-        return ESP_ERR_NOT_SUPPORTED;
-    }
+    /* Direct dispatch — see the comment above. Boards with an SDMMC slot
+     * are handled above; the "sdmmc" sub_type name is unique so the
+     * entry-name collision workaround does not apply. */
 
     void *raw_handle = NULL;
     int rc = -1;
@@ -328,12 +352,16 @@ void sdcard_mount_force_unmount(void)
         if (spi_locked) {
             spi_bus_arbiter_unlock();
         }
-        /* Drop our reference on the shared SPI bus that try_mount() acquired. */
+        /* Drop our reference on the shared SPI bus that try_mount() acquired.
+         * Only SPI sub-type boards use this path; SDMMC boards have no SPI
+         * peripheral reference (sub_cfg is a union — reading .spi on an
+         * sdmmc config would reinterpret unrelated fields). */
         void *cfg_void = NULL;
         if (esp_board_manager_get_device_config(SDCARD_DEVICE_NAME, &cfg_void) == ESP_OK
                 && cfg_void) {
             const dev_fs_fat_config_t *cfg = (const dev_fs_fat_config_t *)cfg_void;
-            if (cfg->sub_cfg.spi.spi_bus_name && cfg->sub_cfg.spi.spi_bus_name[0]) {
+            if (cfg->sub_type && strcmp(cfg->sub_type, "spi") == 0
+                    && cfg->sub_cfg.spi.spi_bus_name && cfg->sub_cfg.spi.spi_bus_name[0]) {
                 esp_board_periph_unref_handle(cfg->sub_cfg.spi.spi_bus_name);
             }
         }

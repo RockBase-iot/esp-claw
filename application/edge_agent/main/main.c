@@ -466,12 +466,25 @@ void app_main(void)
         ESP_LOGW(TAG, "status screen init failed: %s", esp_err_to_name(splash_err));
     }
 
-    esp_err_t boot_err = app_boot_button_init(28, on_boot_button_pressed, NULL);
-    if (boot_err != ESP_OK) {
-        ESP_LOGW(TAG, "BOOT button init failed: %s", esp_err_to_name(boot_err));
-    }
+    esp_board_info_t board_info = {0};
+    bool has_xpt2046_touch = false;
+    if (esp_board_manager_get_board_info(&board_info) == ESP_OK && board_info.name != NULL) {
+        esp_err_t boot_err = ESP_OK;
+        if (strcmp(board_info.name, "nm_cyd_c5") == 0)
+        {
+            has_xpt2046_touch = true;
+            boot_err = app_boot_button_init(28, on_boot_button_pressed, NULL);
+        }
+        else if (strcmp(board_info.name, "nm_display_28inch") == 0)
+        {
+            boot_err = app_boot_button_init(0, on_boot_button_pressed, NULL);
+        }
+        if (boot_err != ESP_OK) {
+            ESP_LOGW(TAG, "BOOT button init failed: %s", esp_err_to_name(boot_err));
+        }
+    } 
 
-    {
+    if (has_xpt2046_touch) {
         app_touch_xpt2046_config_t tcfg = {
             .host = SPI2_HOST,
             .cs_gpio = 1,

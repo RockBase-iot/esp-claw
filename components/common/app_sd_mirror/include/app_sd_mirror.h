@@ -71,6 +71,17 @@ void app_sd_mirror_set_bus_lock(app_sd_mirror_bus_lock_fn lock,
 esp_err_t app_sd_mirror_sync(const app_sd_mirror_config_t *config);
 
 /**
+ * @brief Force-copy one FATFS file to a matching SD-relative path.
+ *
+ * This is intended for narrow migrations where a firmware-owned file must
+ * replace a stale SD mirror entry before the normal bidirectional directory
+ * sync runs. Missing parent directories on SD are created automatically.
+ */
+esp_err_t app_sd_mirror_push_file_to_sd(const char *sd_root,
+                                        const char *fatfs_path,
+                                        const char *sd_relpath);
+
+/**
  * @brief Bidirectionally mirror an entire directory tree (recursive, regular
  *        files only) between FATFS and SD using the same per-file newer-mtime
  *        rule used by app_sd_mirror_sync().

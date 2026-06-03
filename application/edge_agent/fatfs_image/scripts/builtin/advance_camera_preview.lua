@@ -2,6 +2,7 @@
 local camera = require("camera")
 local display = require("display")
 local delay = require("delay")
+local image = require("image")
 
 local FRAME_TIMEOUT_MS = 1000
 local FRAME_INTERVAL_MS = 30
@@ -59,23 +60,37 @@ if not info_ok then
 end
 
 local pixel_format = tostring(info_or_err.pixel_format)
-
-if pixel_format ~= "RGBP" and pixel_format ~= "RGBR" then
-    print("[camera_preview_demo] ERROR: preview only supports RGB565/RGB565X, got " .. pixel_format)
-    close_camera()
-    cleanup_display()
-    return
-end
-
 local width = display.width
 local height = display.height
-local x = 0
-local y = 0
 
 local function draw_frame(frame)
-    local frame_ptr = frame:ptr()
-    display.draw_rgb565_fit(x, y, info_or_err.width, info_or_err.height, width, height, frame_ptr)
+    local draw_src = frame
+    local resized = nil
+    local info = frame:info()
+    if info.pixel_format ~= "JPEG" and info.pixel_format ~= "MJPG" and info.width > 0 and info.height > 0 then
+        local ratio = math.min(width / info.width, height / info.height)
+        local target_w = math.max(1, math.floor(info.width * ratio))
+        local target_h = math.max(1, math.floor(info.height * ratio))
+        resized = image.resize(frame, {
+            width = target_w,
+            height = target_h,
+            format = image.RGB565,
+            filter = "nearest",
+        })
+        draw_src = resized:data()
+    end
+    display.draw_pixels(0, 0, draw_src, {
+        mode = "fit",
+        width = resized and resized:info().width or info.width,
+        height = resized and resized:info().height or info.height,
+        dst_width = width,
+        dst_height = height,
+        format = "rgb565",
+    })
     display.present()
+    if resized then
+        resized:release()
+    end
 end
 
 print(string.format(
@@ -85,23 +100,37 @@ print(string.format(
 
 display.begin_frame({ clear = true, color = "black" })
 
+local MAX_CONSECUTIVE_ERRORS = 5
+local consecutive_errors = 0
+
 while true do
     local frame_ok, frame_or_err = pcall(camera.get_frame, FRAME_TIMEOUT_MS)
     if not frame_ok then
-        print("[camera_preview_demo] ERROR: " .. tostring(frame_or_err))
-        break
+        consecutive_errors = consecutive_errors + 1
+        print(string.format("[camera_preview_demo] WARN: get_frame failed (%d/%d): %s",
+            consecutive_errors, MAX_CONSECUTIVE_ERRORS, tostring(frame_or_err)))
+        if consecutive_errors >= MAX_CONSECUTIVE_ERRORS then
+            print("[camera_preview_demo] ERROR: too many consecutive get_frame failures, stopping")
+            break
+        end
+        delay.delay_ms(FRAME_INTERVAL_MS)
+    else
+        consecutive_errors = 0
+
+        local draw_ok, draw_err = pcall(draw_frame, frame_or_err)
+
+        -- The camera frame is an image.frame userdata; it must be released with
+        -- frame:release() so the underlying V4L2 buffer is returned to the
+        -- driver. (There is no camera.release_frame helper.)
+        pcall(frame_or_err.release, frame_or_err)
+
+        if not draw_ok then
+            print("[camera_preview_demo] ERROR: draw failed: " .. tostring(draw_err))
+            break
+        end
+
+        delay.delay_ms(FRAME_INTERVAL_MS)
     end
-
-    local draw_ok, draw_err = pcall(draw_frame, frame_or_err)
-
-    pcall(camera.release_frame, frame_or_err)
-
-    if not draw_ok then
-        print("[camera_preview_demo] ERROR: draw failed: " .. tostring(draw_err))
-        break
-    end
-
-    delay.delay_ms(FRAME_INTERVAL_MS)
 end
 
 close_camera()

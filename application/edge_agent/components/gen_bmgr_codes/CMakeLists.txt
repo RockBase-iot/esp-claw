@@ -1,6 +1,6 @@
 # Board information output
 message(STATUS "Selected Board: nm_display_28inch")
-message(STATUS "Board Path: D:/code/pony/IoT/esp-claw/application/edge_agent/boards/rockbase-iot/nm_display_28inch")
+message(STATUS "Board Path: E:/github/esp-claw/application/edge_agent/boards/rockbase-iot/nm_display_28inch")
 
 idf_component_register(
     SRC_DIRS "." "../../boards/rockbase-iot/nm_display_28inch"

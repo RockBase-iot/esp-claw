@@ -1,4 +1,0 @@
-board: nm_cyd_c5
-chip: esp32c5
-description: "NM-CYD-C5 Cheap Yellow Display (ESP32-C5, 2.8 inch 320x240 ST7789 + XPT2046 touch)"
-manufacturer: "RockBase-IoT"

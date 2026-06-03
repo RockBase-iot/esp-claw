@@ -9,7 +9,18 @@ local FRAME_TIMEOUT_MS = 3000
 local FRAME_INTERVAL_MS = 30
 local SCRIPT_ARGS = rawget(_G, "args") or {}
 local PREVIEW_FRAME_COUNT = tonumber(SCRIPT_ARGS.frames) or 300 -- Set to 0 for continuous preview.
-local DEFAULT_FORMATS = { "JPEG", "RGBR", "RGBP", "YUYV", "UYVY", "YU12" }
+-- Prefer native RGB565 formats to avoid JPEG decode overhead in preview.
+-- IMPORTANT: list the big-endian variant ("RGBR" = V4L2_PIX_FMT_RGB565X) before
+-- the little-endian one ("RGBP" = V4L2_PIX_FMT_RGB565). Many DVP sensors (e.g.
+-- OV5640) emit RGB565 big-endian natively; without the optional hardware byte
+-- swap (CONFIG_ESP_VIDEO_ENABLE_SWAP_BYTE) the driver streams those native
+-- bytes unchanged. Requesting "RGBP" then mislabels big-endian data as
+-- little-endian, so display.draw_image swaps the bytes and the preview shows
+-- corrupted (rainbow) colours. Asking for the sensor-native endianness first
+-- keeps the FOURCC label consistent with the actual byte order. The list still
+-- falls back to "RGBP" for genuinely little-endian sensors that don't expose
+-- "RGBR".
+local DEFAULT_FORMATS = { "RGBR", "RGBP", "YUYV", "UYVY", "JPEG", "YU12" }
 
 local camera_started = false
 local display_started = false
@@ -47,20 +58,41 @@ local function camera_format_list()
 end
 
 local function draw_preview_frame(frame, lcd_w, lcd_h)
-    -- Camera is landscape (800x600), LCD is landscape (320x240) but mounted
-    -- rotated so we need CCW 90-degree rotation. Resize to portrait dims first,
-    -- then rotate to get the final landscape image.
-    local portrait <close> = image.resize(frame, {
-        width = lcd_h,   -- portrait width = lcd height (240)
-        height = lcd_w,  -- portrait height = lcd width  (320)
-        format = image.RGB565,
-        filter = "nearest",
-    })
-    local landscape <close> = image.rotate_ccw90(portrait)
+    -- Convert non-JPEG camera frames to RGB565 little-endian through the image
+    -- module before drawing. The image module correctly handles the sensor's
+    -- native byte order (OV5640 emits RGB565 big-endian / "RGBR"), producing a
+    -- properly byte-ordered RGB565LE frame. Passing the raw big-endian camera
+    -- frame straight to display.draw_image renders it as a corrupted rainbow
+    -- pattern, so we mirror the proven take_picture pipeline here. The resize
+    -- also pre-scales to fit the LCD, which keeps per-frame work low.
+    local draw_src = frame
+    local resized = nil
+    local info = frame:info()
+    local fmt = info.pixel_format
+    if fmt ~= "JPEG" and fmt ~= "MJPG" and info.width > 0 and info.height > 0 then
+        local ratio = math.min(lcd_w / info.width, lcd_h / info.height)
+        local target_w = math.max(1, math.floor(info.width * ratio))
+        local target_h = math.max(1, math.floor(info.height * ratio))
+        resized = image.resize(frame, {
+            width = target_w, height = target_h,
+            format = image.RGB565, filter = "nearest",
+        })
+        draw_src = resized:data()
+    end
     display.begin_frame({ clear = true, color = "black" })
-    local draw_w, draw_h = display.draw_image(0, 0, landscape, { mode = "fit", width = lcd_w, height = lcd_h })
+    local draw_w, draw_h = display.draw_pixels(0, 0, draw_src, {
+        mode = "fit",
+        width = resized and resized:info().width or info.width,
+        height = resized and resized:info().height or info.height,
+        dst_width = lcd_w,
+        dst_height = lcd_h,
+        format = "rgb565",
+    })
     display.present()
     display.end_frame()
+    if resized then
+        resized:release()
+    end
     return draw_w, draw_h
 end
 

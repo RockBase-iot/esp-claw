@@ -256,6 +256,41 @@ esp_err_t app_sd_mirror_sync(const app_sd_mirror_config_t *config)
     return ESP_OK;
 }
 
+esp_err_t app_sd_mirror_push_file_to_sd(const char *sd_root,
+                                        const char *fatfs_path,
+                                        const char *sd_relpath)
+{
+    char sd_path[SD_MIRROR_PATH_MAX];
+    struct stat st_root;
+    struct stat st_fat;
+    bool spi_locked;
+
+    if (!sd_root || !sd_root[0] || !fatfs_path || !fatfs_path[0] ||
+            !sd_relpath || !sd_relpath[0]) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    spi_locked = sd_bus_lock();
+    bool sd_root_ok = (stat(sd_root, &st_root) == 0) && S_ISDIR(st_root.st_mode);
+    sd_bus_unlock(spi_locked);
+    if (!sd_root_ok) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (stat(fatfs_path, &st_fat) != 0 || !S_ISREG(st_fat.st_mode)) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (snprintf(sd_path, sizeof(sd_path), "%s/%s", sd_root, sd_relpath) >= (int)sizeof(sd_path)) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    ESP_LOGI(TAG, "force FATFS->SD %s", sd_relpath);
+    spi_locked = sd_bus_lock();
+    esp_err_t err = copy_file(fatfs_path, sd_path, st_fat.st_mtime);
+    sd_bus_unlock(spi_locked);
+    return err;
+}
+
 /* Build "<base>/<name>" into out (size cap). Returns false if it overflows. */
 static bool join_path(char *out, size_t out_size, const char *base, const char *name)
 {

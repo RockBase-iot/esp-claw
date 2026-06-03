@@ -62,6 +62,16 @@ esp_err_t app_boot_button_init(int gpio_num,
     if (gpio_num < 0) {
         return ESP_ERR_INVALID_ARG;
     }
+#if CONFIG_IDF_TARGET_ESP32S3
+    /* On ESP32-S3 modules with in-package octal flash/PSRAM, GPIO 26-37 are
+     * the SPI0/1 pins wired to the flash and PSRAM. Reconfiguring them at
+     * runtime (especially with CONFIG_SPIRAM_XIP_FROM_PSRAM enabled) hangs the
+     * CPU and causes a TG1WDT watchdog reset. Refuse such pins outright. */
+    if (gpio_num >= 26 && gpio_num <= 37) {
+        ESP_LOGE(TAG, "GPIO%d is a flash/PSRAM pin, refusing to use as BOOT button", gpio_num);
+        return ESP_ERR_INVALID_ARG;
+    }
+#endif
     s_btn.gpio = gpio_num;
     s_btn.cb = cb;
     s_btn.cb_ctx = user_ctx;
@@ -80,7 +90,7 @@ esp_err_t app_boot_button_init(int gpio_num,
     }
 
     BaseType_t ok = xTaskCreate(app_boot_button_task, "boot_btn",
-                                2048, NULL, 2, NULL);
+                                4096, NULL, 2, NULL);
     if (ok != pdPASS) {
         return ESP_ERR_NO_MEM;
     }

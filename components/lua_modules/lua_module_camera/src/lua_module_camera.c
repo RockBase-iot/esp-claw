@@ -558,8 +558,12 @@ static int lua_module_camera_close(lua_State *L)
     if (err != ESP_OK) {
         uint32_t borrowed_count = 0;
         if (err == ESP_ERR_INVALID_STATE && camera_get_borrowed_count(&borrowed_count) == ESP_OK && borrowed_count > 0) {
-            return luaL_error(L, "camera close failed: %" PRIu32 " image frame(s) still hold camera buffers; "
-                              "release all frame views first", borrowed_count);
+            /* luaL_error() routes through lua_pushvfstring(), which does NOT
+             * understand the length modifiers in PRIu32 ("%lu" on this target),
+             * so format the count as a plain int to avoid an
+             * "invalid option '%l'" error masking the real message. */
+            return luaL_error(L, "camera close failed: %d image frame(s) still hold camera buffers; "
+                              "release all frame views first", (int)borrowed_count);
         }
         return luaL_error(L, "camera close failed: %s", esp_err_to_name(err));
     }

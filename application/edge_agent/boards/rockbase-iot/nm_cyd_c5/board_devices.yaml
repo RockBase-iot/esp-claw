@@ -1,7 +1,9 @@
 version: 1.0.0
 # Devices Configuration for NM-CYD-C5 (ESP32-C5)
-
 devices:
+
+  # 2.8" 320x240 ST7789 LCD wired over the shared SPI bus.
+  # Default rotation puts the screen in landscape (long side horizontal).
   - name: display_lcd
     chip: st7789
     type: display_lcd
@@ -20,7 +22,7 @@ devices:
         spi_mode: 0
         pclk_hz: 40000000
       lcd_panel_config:
-        reset_gpio_num: -1
+        reset_gpio_num: -1            # RST tied to the board RST pin
         data_endian: LCD_RGB_DATA_ENDIAN_BIG
         vendor_config: NULL
     peripherals:
@@ -34,6 +36,8 @@ devices:
     peripherals:
       - name: ledc_backlight
 
+  # On-board WS2812 RGB LED on GPIO27.
+  # init_skip keeps this as metadata only; scripts create/release runtime driver.
   - name: led_strip
     chip: ws2812
     type: custom
@@ -47,18 +51,26 @@ devices:
       gpio_num: 27
       max_leds: 1
 
+  # SD-card slot wired on the shared SPI2 bus (CS=10).
+  # init_skip defers probing until mount is explicitly requested.
   - name: fs_sdcard
     type: fs_fat
     sub_type: spi
     version: default
     init_skip: true
     config:
+      mount_point: "/sdcard"
+      vfs_config:
+        format_if_mount_failed: false
+        max_files: 5
+        allocation_unit_size: 16384
       sub_config:
         cs_gpio_num: 10
         frequency: SDMMC_FREQ_DEFAULT
     peripherals:
       - name: spi_display
 
+  # XPT2046 resistive touch metadata entry on shared SPI2 bus.
   - name: lcd_touch
     chip: xpt2046
     type: custom

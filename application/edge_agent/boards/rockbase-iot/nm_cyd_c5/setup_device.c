@@ -1,3 +1,10 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Custom device hooks for the NM-CYD-C5 board (ESP32-C5).
+ */
 #include <string.h>
 
 #include "esp_check.h"

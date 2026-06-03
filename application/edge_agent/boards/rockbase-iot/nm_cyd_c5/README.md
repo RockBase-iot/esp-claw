@@ -1,6 +1,6 @@
 # RockBase-iot NM-CYD-C5
 
-ESP-Claw board package for the [RockBase-iot NM-CYD-C5](https://github.com/RockBase-iot/NM-CYD-C5), an ESP32-C5 Cheap Yellow Display style board with dual-band Wi-Fi 6, BLE 5, Thread/Zigbee radio support, 16 MB flash, 8 MB PSRAM, and a 2.8 inch LCD.
+ESP-Claw board package for the [RockBase-iot NM-CYD-C5](https://github.com/RockBase-iot/NM-CYD-C5), an ESP32-C5 Cheap Yellow Display style board with 16 MB flash, 8 MB PSRAM, 2.8 inch ST7789 LCD, XPT2046 touch wiring, WS2812 RGB LED, microSD slot, and LP-UART GPS header.
 
 ## Hardware Overview
 
@@ -9,7 +9,7 @@ ESP-Claw board package for the [RockBase-iot NM-CYD-C5](https://github.com/RockB
 | SoC | ESP32-C5-WROOM-1, RISC-V @ 240 MHz |
 | Flash / PSRAM | 16 MB flash, 8 MB quad PSRAM |
 | Display | 2.8 inch ST7789 TFT LCD, 320x240 logical landscape resolution |
-| Touch | XPT2046 resistive touch controller on the shared SPI2 bus |
+| Touch | XPT2046 resistive touch controller on shared SPI2 bus |
 | Storage | microSD slot on shared SPI2 bus |
 | RGB LED | Single WS2812 pixel on GPIO27 |
 | GPS connector | LP-UART P5, intended for NM-ATGM336H style NMEA GPS modules |
@@ -25,7 +25,7 @@ ESP-Claw board package for the [RockBase-iot NM-CYD-C5](https://github.com/RockB
 | SPI MOSI | GPIO7 |
 | LCD CS | GPIO23 |
 | LCD DC | GPIO24 |
-| LCD reset | Board reset (`-1`) |
+| LCD reset | Board reset (-1) |
 | Backlight PWM | GPIO25 |
 | Touch CS | GPIO1 |
 | microSD CS | GPIO10 |
@@ -38,17 +38,15 @@ ESP-Claw board package for the [RockBase-iot NM-CYD-C5](https://github.com/RockB
 
 ## ESP-Claw Device Coverage
 
-Defined in `board_devices.yaml`:
+Defined in board_devices.yaml:
 
-- `display_lcd`: ST7789 over SPI2, 320x240, 40 MHz, landscape orientation (`swap_xy: true`, `mirror_y: true`).
-- `lcd_brightness`: LEDC backlight control on GPIO25, active high, 5 kHz.
-- `led_strip`: metadata-only WS2812 entry on GPIO27. Runtime scripts create and release the LED strip driver on demand to avoid RMT channel leaks.
-- `fs_sdcard`: metadata-only SPI microSD entry on the shared SPI bus, CS=GPIO10. It is `init_skip: true` so mounting is explicit and does not block LCD use when no card is inserted.
-- `lcd_touch`: metadata-only XPT2046 entry, CS=GPIO1. The shared SPI wiring is reserved for future or custom touch drivers.
-- `gps_uart`: metadata-only NMEA UART entry, RX=GPIO4, TX=GPIO5, 9600 baud.
-- `buttons`: metadata-only BOOT button entry on GPIO0.
-
-The board also ships Lua helpers in the ESP-Claw FATFS image for screen display, backlight, RGB LED, and GPS usage. XPT2046 touch is reserved in metadata; scripts that need input should provide a BOOT-button fallback unless SPI touch support is enabled.
+- display_lcd: ST7789 over SPI2, 320x240, 40 MHz, landscape orientation.
+- lcd_brightness: LEDC backlight control on GPIO25.
+- led_strip: metadata-only WS2812 entry on GPIO27, runtime created on demand.
+- fs_sdcard: metadata-only SPI microSD entry on shared SPI bus, CS=GPIO10.
+- lcd_touch: metadata-only XPT2046 entry, CS=GPIO1.
+- gps_uart: metadata-only NMEA UART entry, RX=GPIO4, TX=GPIO5, 9600 baud.
+- buttons: metadata-only BOOT button entry on GPIO0.
 
 ## Build And Flash
 
@@ -60,20 +58,35 @@ idf.py build
 idf.py -p <PORT> flash monitor
 ```
 
+## Web Flasher
+
+You can flash NM-CYD-C5 firmware from [NM Webflasher](https://flash.nmiot.net).
+Select ESP Claw project and choose nm-cyd-c5 device.
+
+## Built-in Lua Demos
+
+The board ships demo scripts in FATFS image, including:
+
+- nm_cyd_c5_backlight
+- nm_cyd_c5_screen
+- nm_cyd_c5_rgb
+- nm_cyd_c5_gps
+
+Example:
+
+```text
+run_lua_script script="nm_cyd_c5_gps"
+```
+
 ## Validation Checklist
 
-Use this list when preparing or reviewing a PR for this board:
-
-- `idf.py bmgr --customer-path ./boards -b nm_cyd_c5` generates board-manager code without YAML errors.
-- `idf.py build` completes for target `esp32c5`.
-- Device boots into the ESP-Claw agent loop.
-- Captive portal loads and can save Wi-Fi / LLM / IM settings.
-- `display_lcd` initializes and renders the ESP-Claw mascot or a Lua display demo.
-- Backlight responds through `display.brightness(...)` or the `nm_cyd_c5_backlight` Lua script.
-- `nm_cyd_c5_screen` can show color/text/message/clear modes on the LCD.
-- `nm_cyd_c5_rgb` can set solid colors, blink, and run a short rainbow on GPIO27.
-- `nm_cyd_c5_gps` can read NMEA sentences from a GPS module on P5 if connected.
-- SD card mount is tested manually if a card is inserted.
+- idf.py bmgr --customer-path ./boards -b nm_cyd_c5 succeeds without YAML errors.
+- idf.py build completes for target esp32c5.
+- display_lcd initializes and renders UI/demo content.
+- Backlight responds through display.brightness(...) or nm_cyd_c5_backlight.
+- nm_cyd_c5_rgb controls the WS2812 LED.
+- nm_cyd_c5_gps reads NMEA from P5 GPS module when attached.
+- SD card mount is tested manually when a card is inserted.
 
 ## PR Summary Template
 
