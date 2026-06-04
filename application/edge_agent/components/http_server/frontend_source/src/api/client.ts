@@ -368,3 +368,30 @@ export async function sendWebimMessage(chatId: string, text: string, files: stri
     'Failed to send Web IM message',
   );
 }
+
+export type LogoStatus = {
+  active: boolean;
+  exists: boolean;
+  size: number;
+  path: string;
+};
+
+export async function fetchLogoStatus() {
+  return request<LogoStatus>('/api/logo', undefined, 'Failed to load logo status');
+}
+
+export async function uploadLogo(file: File) {
+  return request<{ ok?: boolean }>(
+    '/api/logo',
+    { method: 'POST', body: file },
+    'Failed to upload logo',
+  );
+}
+
+export async function deleteLogo() {
+  return request<{ ok?: boolean }>(
+    '/api/logo',
+    { method: 'DELETE' },
+    'Failed to delete logo',
+  );
+}

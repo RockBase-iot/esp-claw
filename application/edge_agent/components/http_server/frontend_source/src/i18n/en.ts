@@ -26,6 +26,7 @@ export const en = {
   navLuaModules: 'Lua Modules',
   navFiles: 'Files',
   navWebIm: 'Web Chat',
+  navLogo: 'Logo',
 
   webimDesc: 'Interact with ESP-Claw in real time via WebSocket.',
   webimSend: 'Send',
@@ -311,6 +312,21 @@ export const en = {
   setupWechatLoginRequired: 'WeChat was added. Complete the QR login before continuing.',
   setupRestartBanner: 'Setup is complete. A device restart is required for all changes to take effect.',
   setupRestartNow: 'Restart Now',
+
+  // Logo page
+  logoPageTitle: 'Custom Logo',
+  logoPageDesc: 'Upload or generate an SVG logo to display on the device LCD, replacing the idle animation.',
+  logoStatusActive: 'Active',
+  logoStatusInactive: 'No custom logo',
+  logoUploadBtn: 'Upload SVG',
+  logoDeleteBtn: 'Delete Logo',
+  logoPreviewLabel: 'Preview',
+  logoFileLabel: 'File Size',
+  logoUploadSuccess: 'Logo uploaded and displayed',
+  logoUploadError: 'Failed to upload logo',
+  logoDeleteSuccess: 'Logo deleted, emote restored',
+  logoDeleteError: 'Failed to delete logo',
+  logoNoPreview: 'No custom logo set. Upload an SVG file to preview.',
 };
 
 export type Dict = typeof en;

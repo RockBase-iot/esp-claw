@@ -26,6 +26,7 @@ const CapabilitiesPage = lazy(() =>
 );
 const SkillsPage = lazy(() => import('./pages/SkillsPage').then((mod) => ({ default: mod.SkillsPage })));
 const FilesPage = lazy(() => import('./pages/FilesPage').then((mod) => ({ default: mod.FilesPage })));
+const LogoPage = lazy(() => import('./pages/LogoPage').then((mod) => ({ default: mod.LogoPage })));
 const WebImPage = lazy(() => import('./pages/WebImPage').then((mod) => ({ default: mod.WebImPage })));
 const SetupWizardPage = lazy(() =>
   import('./pages/SetupWizardPage').then((mod) => ({ default: mod.SetupWizardPage })),
@@ -252,6 +253,9 @@ const App: Component = () => {
               </Show>
               <Show when={currentTab() === 'files'}>
                 <FilesPage />
+              </Show>
+              <Show when={currentTab() === 'logo'}>
+                <LogoPage />
               </Show>
             </Suspense>
           </Layout>

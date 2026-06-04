@@ -4,6 +4,7 @@ import {
   Bot,
   DatabaseZap,
   Folder,
+  Image,
   MessageSquareCode,
   MessagesSquare,
   Search,
@@ -29,6 +30,7 @@ const IconCaps: Component = () => <Blocks class={iconClass} />;
 const IconSkills: Component = () => <SquareFunction class={iconClass} />;
 const IconFiles: Component = () => <Folder class={iconClass} />;
 const IconWebIm: Component = () => <MessagesSquare class={iconClass} />;
+const IconLogo: Component = () => <Image class={iconClass} />;
 
 export type LeafNode = {
   kind: 'leaf';
@@ -43,7 +45,8 @@ export type LeafNode = {
     | 'navCapabilities'
     | 'navLuaModules'
     | 'navFiles'
-    | 'navWebIm';
+    | 'navWebIm'
+    | 'navLogo';
   icon: Component;
 };
 export type GroupNode = {
@@ -74,6 +77,7 @@ export const NAV_TREE: NavNode[] = [
   { kind: 'leaf', id: 'capabilities', labelKey: 'navCapabilities', icon: IconCaps },
   { kind: 'leaf', id: 'skills', labelKey: 'navLuaModules', icon: IconSkills },
   { kind: 'leaf', id: 'files', labelKey: 'navFiles', icon: IconFiles },
+  { kind: 'leaf', id: 'logo', labelKey: 'navLogo', icon: IconLogo },
 ];
 
 export const LEAF_IDS = collectLeafIds(NAV_TREE);

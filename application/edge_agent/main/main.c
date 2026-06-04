@@ -35,6 +35,7 @@
 #include "settings_store.h"
 #include "spi_bus_arbiter.h"
 #include "app_sd_mirror.h"
+#include "logo.h"
 
 #define APP_ENABLE_MEM_LOG        (0)
 
@@ -508,6 +509,10 @@ void app_main(void)
     ESP_ERROR_CHECK(app_claw_ui_start());
     ESP_ERROR_CHECK(init_fatfs());
     ESP_ERROR_CHECK(init_ramfs());
+
+    /* If a custom SVG logo exists on FATFS, rasterize and display it
+     * on the LCD, replacing the emote idle animation. Non-fatal. */
+    logo_start();
 
     /* Persist incoming IM messages as JSONL into the inbox directory.
      * Best-effort — failures are logged but non-fatal. Prefer SD card if

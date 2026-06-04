@@ -34,7 +34,7 @@ peripherals:
     format: std-out
     config: &i2s0_config
       port: 0
-      sample_rate_hz: 16000
+      sample_rate_hz: 48000
       mclk_multiple: 256
       data_bit_width: 16
       slot_bit_width: I2S_SLOT_BIT_WIDTH_AUTO

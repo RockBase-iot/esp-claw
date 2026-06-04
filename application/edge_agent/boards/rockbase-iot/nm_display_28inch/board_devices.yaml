@@ -60,7 +60,7 @@ devices:
       dac_enabled: false
       adc_max_channel: 1
       adc_channel_mask: "1"
-      adc_init_gain: 0
+      adc_init_gain: 36
       mclk_enabled: true
     peripherals:
       - name: i2s_audio_in

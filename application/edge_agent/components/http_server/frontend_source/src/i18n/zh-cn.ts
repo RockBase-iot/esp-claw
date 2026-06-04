@@ -27,6 +27,7 @@ export const zhCn: Dict = {
   navLuaModules: 'Lua 模块管理',
   navFiles: '文件管理',
   navWebIm: '在线聊天',
+  navLogo: 'Logo 自定义',
 
   webimDesc: '通过 WebSocket 与 ESP-Claw 实时互动。',
   webimSend: '发送',
@@ -302,4 +303,19 @@ export const zhCn: Dict = {
   setupWechatLoginRequired: '已添加微信，请先完成二维码登录后再继续。',
   setupRestartBanner: '配置已经完成，需重启设备后才能全部生效。',
   setupRestartNow: '立即重启',
+
+  // Logo 页面
+  logoPageTitle: '自定义 Logo',
+  logoPageDesc: '上传或生成 SVG Logo，显示在设备屏幕上，替换默认动画。',
+  logoStatusActive: '已启用',
+  logoStatusInactive: '未设置自定义 Logo',
+  logoUploadBtn: '上传 SVG',
+  logoDeleteBtn: '删除 Logo',
+  logoPreviewLabel: '预览',
+  logoFileLabel: '文件大小',
+  logoUploadSuccess: 'Logo 已上传并显示',
+  logoUploadError: 'Logo 上传失败',
+  logoDeleteSuccess: 'Logo 已删除，已恢复默认动画',
+  logoDeleteError: 'Logo 删除失败',
+  logoNoPreview: '尚未设置自定义 Logo，请上传 SVG 文件。',
 };

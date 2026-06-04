@@ -65,6 +65,9 @@ dependencies:
   spi_bus_arbiter:
     path: ../../../components/common/spi_bus_arbiter
 
+  nanosvg:
+    path: ../../../components/common/nanosvg
+
   esp_video:
     path: ../../../components/common/esp_video
     matches:

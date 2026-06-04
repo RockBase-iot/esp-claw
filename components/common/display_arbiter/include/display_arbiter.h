@@ -17,6 +17,7 @@ typedef enum {
     DISPLAY_ARBITER_OWNER_NONE = 0,
     DISPLAY_ARBITER_OWNER_LUA,
     DISPLAY_ARBITER_OWNER_EMOTE,
+    DISPLAY_ARBITER_OWNER_LOGO,
 } display_arbiter_owner_t;
 
 typedef void (*display_arbiter_owner_changed_cb_t)(display_arbiter_owner_t owner, void *user_ctx);
@@ -26,6 +27,7 @@ esp_err_t display_arbiter_release(display_arbiter_owner_t owner);
 display_arbiter_owner_t display_arbiter_get_owner(void);
 bool display_arbiter_is_owner(display_arbiter_owner_t owner);
 esp_err_t display_arbiter_set_owner_changed_callback(display_arbiter_owner_changed_cb_t callback, void *user_ctx);
+esp_err_t display_arbiter_get_owner_changed_callback(display_arbiter_owner_changed_cb_t *callback, void **user_ctx);
 
 #ifdef __cplusplus
 }

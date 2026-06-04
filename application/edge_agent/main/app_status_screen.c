@@ -398,8 +398,20 @@ static void ass_paint_splash(void)
     ass_draw_text_centered(ASS_FONT_BODY, ESP_PAINTER_COLOR_LIGHTGREY,
                            title_y + 80, buf);
 
-    ass_draw_text_centered(ASS_FONT_BODY, ESP_PAINTER_COLOR_DARKGREY,
+    esp_board_info_t board_info = {0};
+    if (esp_board_manager_get_board_info(&board_info) == ESP_OK && board_info.name != NULL) {
+        if (strcmp(board_info.name, "nm_cyd_c5") == 0)
+        {
+            ass_draw_text_centered(ASS_FONT_BODY, ESP_PAINTER_COLOR_DARKGREY,
                            s_state.height - 22, "NM-CYD-C5  *  ESP32-C5");
+        }
+        else if (strcmp(board_info.name, "nm_display_28inch") == 0)
+        {
+            ass_draw_text_centered(ASS_FONT_BODY, ESP_PAINTER_COLOR_DARKGREY,
+                           s_state.height - 22, "NM-Display-28inch  *  ESP32-S3");
+        }
+    } 
+
 }
 
 static const char *ass_or_unset(const char *s)

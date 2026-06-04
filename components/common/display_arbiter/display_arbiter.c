@@ -19,6 +19,7 @@ typedef struct {
     SemaphoreHandle_t lock;
     display_arbiter_owner_t owner;
     uint32_t lua_depth;
+    bool logo_active;
     display_arbiter_owner_changed_cb_t callback;
     void *callback_user_ctx;
 } display_arbiter_state_t;
@@ -51,6 +52,8 @@ static const char *display_arbiter_owner_to_str(display_arbiter_owner_t owner)
         return "lua";
     case DISPLAY_ARBITER_OWNER_EMOTE:
         return "emote";
+    case DISPLAY_ARBITER_OWNER_LOGO:
+        return "logo";
     default:
         return "unknown";
     }
@@ -81,7 +84,8 @@ esp_err_t display_arbiter_acquire(display_arbiter_owner_t owner)
         return ret;
     }
 
-    ESP_GOTO_ON_FALSE(owner == DISPLAY_ARBITER_OWNER_LUA || owner == DISPLAY_ARBITER_OWNER_EMOTE, ESP_ERR_INVALID_ARG,
+    ESP_GOTO_ON_FALSE(owner == DISPLAY_ARBITER_OWNER_LUA || owner == DISPLAY_ARBITER_OWNER_EMOTE ||
+                      owner == DISPLAY_ARBITER_OWNER_LOGO, ESP_ERR_INVALID_ARG,
                       fail, TAG, "invalid owner");
 
     if (owner == DISPLAY_ARBITER_OWNER_LUA) {
@@ -90,6 +94,14 @@ esp_err_t display_arbiter_acquire(display_arbiter_owner_t owner)
             ESP_GOTO_ON_ERROR(display_arbiter_change_owner_locked(DISPLAY_ARBITER_OWNER_LUA), fail, TAG,
                               "switch to lua owner failed");
             notify_owner = DISPLAY_ARBITER_OWNER_LUA;
+            owner_changed = true;
+        }
+    } else if (owner == DISPLAY_ARBITER_OWNER_LOGO) {
+        s_state.logo_active = true;
+        if (s_state.owner != DISPLAY_ARBITER_OWNER_LOGO) {
+            ESP_GOTO_ON_ERROR(display_arbiter_change_owner_locked(DISPLAY_ARBITER_OWNER_LOGO), fail, TAG,
+                              "switch to logo owner failed");
+            notify_owner = DISPLAY_ARBITER_OWNER_LOGO;
             owner_changed = true;
         }
     } else if (s_state.owner != DISPLAY_ARBITER_OWNER_EMOTE) {
@@ -117,13 +129,25 @@ esp_err_t display_arbiter_release(display_arbiter_owner_t owner)
         return ret;
     }
 
-    ESP_GOTO_ON_FALSE(owner == DISPLAY_ARBITER_OWNER_LUA || owner == DISPLAY_ARBITER_OWNER_EMOTE, ESP_ERR_INVALID_ARG,
+    ESP_GOTO_ON_FALSE(owner == DISPLAY_ARBITER_OWNER_LUA || owner == DISPLAY_ARBITER_OWNER_EMOTE ||
+                      owner == DISPLAY_ARBITER_OWNER_LOGO, ESP_ERR_INVALID_ARG,
                       fail, TAG, "invalid owner");
 
     if (owner == DISPLAY_ARBITER_OWNER_LUA) {
         ESP_GOTO_ON_FALSE(s_state.lua_depth > 0, ESP_ERR_INVALID_STATE, fail, TAG, "lua owner is not active");
         s_state.lua_depth--;
         if (s_state.lua_depth == 0 && s_state.owner == DISPLAY_ARBITER_OWNER_LUA) {
+            display_arbiter_owner_t fallback = s_state.logo_active
+                                               ? DISPLAY_ARBITER_OWNER_LOGO
+                                               : DISPLAY_ARBITER_OWNER_EMOTE;
+            ESP_GOTO_ON_ERROR(display_arbiter_change_owner_locked(fallback), fail, TAG,
+                              "restore owner failed");
+            notify_owner = fallback;
+            owner_changed = true;
+        }
+    } else if (owner == DISPLAY_ARBITER_OWNER_LOGO) {
+        s_state.logo_active = false;
+        if (s_state.owner == DISPLAY_ARBITER_OWNER_LOGO) {
             ESP_GOTO_ON_ERROR(display_arbiter_change_owner_locked(DISPLAY_ARBITER_OWNER_EMOTE), fail, TAG,
                               "restore emote owner failed");
             notify_owner = DISPLAY_ARBITER_OWNER_EMOTE;
@@ -164,6 +188,23 @@ esp_err_t display_arbiter_set_owner_changed_callback(display_arbiter_owner_chang
 
     s_state.callback = callback;
     s_state.callback_user_ctx = user_ctx;
+    display_arbiter_unlock();
+    return ESP_OK;
+}
+
+esp_err_t display_arbiter_get_owner_changed_callback(display_arbiter_owner_changed_cb_t *callback, void **user_ctx)
+{
+    if (!callback || !user_ctx) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t ret = display_arbiter_lock();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    *callback = s_state.callback;
+    *user_ctx = s_state.callback_user_ctx;
     display_arbiter_unlock();
     return ESP_OK;
 }
