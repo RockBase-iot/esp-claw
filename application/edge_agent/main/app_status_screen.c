@@ -28,6 +28,8 @@
 #include "display_arbiter.h"
 #include "esp_painter.h"
 #include "esp_painter_font.h"
+#include "esp_vfs_fat.h"
+#include "sdcard_mount.h"
 #include "wifi_manager.h"
 
 static const char *TAG = "app_status_screen";
@@ -567,11 +569,11 @@ static void ass_paint_status(void)
                               ? s_state.settings.llm_backend_type : "(unset)";
         bool llm_ok = ass_present(s_state.settings.llm_api_key) &&
                       ass_present(s_state.settings.llm_model);
-        ass_paint_status_kv(&y, "LLM:", profile,
-                            llm_ok ? ESP_PAINTER_COLOR_GREEN
-                                   : ESP_PAINTER_COLOR_YELLOW);
+        // ass_paint_status_kv(&y, "LLM:", profile,
+        //                     llm_ok ? ESP_PAINTER_COLOR_GREEN
+        //                            : ESP_PAINTER_COLOR_YELLOW);
         ass_paint_status_kv(&y, "Model:", ass_or_unset(s_state.settings.llm_model),
-                            ESP_PAINTER_COLOR_WHITE);
+                            llm_ok ? ESP_PAINTER_COLOR_GREEN : ESP_PAINTER_COLOR_YELLOW);
     } else {
         ass_paint_status_kv(&y, "LLM:", "(no settings)", ESP_PAINTER_COLOR_DARKGREY);
     }
@@ -588,7 +590,7 @@ static void ass_paint_status(void)
         size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
         size_t free_psram    = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
         size_t low_internal  = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
-        char buf[64];
+        char buf[80];
         snprintf(buf, sizeof(buf), "int %uK (lo %uK)",
                  (unsigned)(free_internal / 1024),
                  (unsigned)(low_internal / 1024));
@@ -600,6 +602,61 @@ static void ass_paint_status(void)
             snprintf(buf, sizeof(buf), "%uK free",
                      (unsigned)(free_psram / 1024));
             ass_paint_status_kv(&y, "PSRAM:", buf, ESP_PAINTER_COLOR_WHITE);
+        }
+    }
+
+    // ----- Storage block -----
+    {
+        uint64_t fat_total = 0, fat_free = 0;
+        esp_err_t fat_err = esp_vfs_fat_info("/fatfs", &fat_total, &fat_free);
+        if (fat_err == ESP_OK) {
+            uint64_t fat_used = fat_total - fat_free;
+            char buf[80];
+            if (fat_total < (uint64_t)1024 * 1024) {
+                /* Display in KB when partition < 1 MB */
+                snprintf(buf, sizeof(buf), "%uK / %uK used",
+                         (unsigned)(fat_used / 1024),
+                         (unsigned)(fat_total / 1024));
+            } else {
+                /* Display in MB with one decimal place */
+                snprintf(buf, sizeof(buf), "%u.%01uM / %u.%01uM used",
+                         (unsigned)(fat_used / (1024 * 1024)),
+                         (unsigned)((fat_used % (1024 * 1024)) * 10 / (1024 * 1024)),
+                         (unsigned)(fat_total / (1024 * 1024)),
+                         (unsigned)((fat_total % (1024 * 1024)) * 10 / (1024 * 1024)));
+            }
+            uint16_t fat_color = (fat_free < 64 * 1024) ? ESP_PAINTER_COLOR_RED
+                                 : (fat_free < 256 * 1024) ? ESP_PAINTER_COLOR_YELLOW
+                                 : ESP_PAINTER_COLOR_WHITE;
+            ass_paint_status_kv(&y, "/fatfs:", buf, fat_color);
+        }
+
+        /* SD card (optional — shown only when mounted) */
+        if (sdcard_mount_is_mounted()) {
+            uint64_t sd_total = 0, sd_free = 0;
+            if (sdcard_mount_get_usage(&sd_total, &sd_free) == ESP_OK) {
+                uint64_t sd_used = sd_total - sd_free;
+                char buf[80];
+                if (sd_total < (uint64_t)1024 * 1024 * 1024) {
+                    /* Display in MB for cards < 1 GB */
+                    snprintf(buf, sizeof(buf), "%uM / %uM used",
+                             (unsigned)(sd_used / (1024 * 1024)),
+                             (unsigned)(sd_total / (1024 * 1024)));
+                } else {
+                    /* Display in GB for large cards */
+                    snprintf(buf, sizeof(buf), "%u.%01uG / %u.%01uG used",
+                             (unsigned)(sd_used / ((uint64_t)1024 * 1024 * 1024)),
+                             (unsigned)((sd_used % ((uint64_t)1024 * 1024 * 1024)) * 10 /
+                                        ((uint64_t)1024 * 1024 * 1024)),
+                             (unsigned)(sd_total / ((uint64_t)1024 * 1024 * 1024)),
+                             (unsigned)((sd_total % ((uint64_t)1024 * 1024 * 1024)) * 10 /
+                                        ((uint64_t)1024 * 1024 * 1024)));
+                }
+                uint16_t sd_color = (sd_free < (uint64_t)10 * 1024 * 1024)
+                                    ? ESP_PAINTER_COLOR_YELLOW
+                                    : ESP_PAINTER_COLOR_GREEN;
+                ass_paint_status_kv(&y, "/sdcard:", buf, sd_color);
+            }
         }
     }
 

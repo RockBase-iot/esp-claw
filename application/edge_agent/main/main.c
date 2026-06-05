@@ -254,6 +254,40 @@ static esp_err_t main_restart_device(void)
     return ok == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
 
+static esp_err_t main_get_storage_info(const char *mount_name,
+                                       http_server_storage_info_t *info)
+{
+    if (!info) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (strcmp(mount_name, "fatfs") == 0) {
+        info->mount_path = app_fatfs_base_path;
+        uint64_t total = 0, free_bytes = 0;
+        esp_err_t err = esp_vfs_fat_info(app_fatfs_base_path, &total, &free_bytes);
+        info->mounted = (err == ESP_OK);
+        info->total_bytes = total;
+        info->free_bytes = free_bytes;
+        return err;
+    }
+
+    if (strcmp(mount_name, "sdcard") == 0) {
+        info->mounted = sdcard_mount_is_mounted();
+        info->mount_path = sdcard_mount_get_mount_point();
+        if (!info->mount_path) {
+            info->mount_path = "/sdcard";
+        }
+        info->total_bytes = 0;
+        info->free_bytes = 0;
+        if (info->mounted) {
+            (void)sdcard_mount_get_usage(&info->total_bytes, &info->free_bytes);
+        }
+        return ESP_OK;
+    }
+
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
 static esp_err_t main_wechat_login_start(const char *account_id, bool force)
 {
@@ -506,9 +540,15 @@ void app_main(void)
         }
     }
 
-    ESP_ERROR_CHECK(app_claw_ui_start());
+    /* Mount FATFS (and RAMFS) BEFORE app_claw_ui_start(): emote_start()
+     * allocates large framebuffer/decoder buffers and fragments the
+     * internal heap, leaving no contiguous block big enough for the
+     * wear-levelling + FATFS mount of the larger (4 MB) storage partition,
+     * which then fails with ESP_ERR_NO_MEM. Mounting while the internal
+     * heap is still fresh avoids this. emote does not depend on FATFS. */
     ESP_ERROR_CHECK(init_fatfs());
     ESP_ERROR_CHECK(init_ramfs());
+    ESP_ERROR_CHECK(app_claw_ui_start());
 
     /* If a custom SVG logo exists on FATFS, rasterize and display it
      * on the LCD, replacing the emote idle animation. Non-fatal. */
@@ -606,6 +646,7 @@ void app_main(void)
             .save_config = main_save_config,
             .get_wifi_status = main_get_wifi_status,
             .restart_device = main_restart_device,
+            .get_storage_info = main_get_storage_info,
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
             .wechat_login_start = main_wechat_login_start,
             .wechat_login_get_status = main_wechat_login_get_status,

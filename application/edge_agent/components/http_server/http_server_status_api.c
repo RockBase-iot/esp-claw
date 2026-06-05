@@ -5,6 +5,39 @@
  */
 #include "http_server_priv.h"
 
+#include <stdint.h>
+
+#include "esp_log.h"
+#include "esp_vfs_fat.h"
+
+static const char *TAG = "http_status";
+
+/* ── Helpers ────────────────────────────────────────────────────────── */
+
+/**
+ * @brief  Append a storage-mount descriptor to `root`.
+ *
+ * Schema (all sizes in bytes):
+ *   { "mount": "/fatfs", "total": 3072000, "free": 2048000, "mounted": true }
+ */
+static void add_storage_entry(cJSON *parent, const char *key,
+                              const char *mount_path, bool mounted,
+                              uint64_t total, uint64_t free_bytes)
+{
+    cJSON *entry = cJSON_CreateObject();
+    if (!entry) {
+        return;
+    }
+    http_server_json_add_string(entry, "mount", mount_path);
+    cJSON_AddBoolToObject(entry, "mounted", mounted);
+    /* Use cJSON_AddNumberToObject (double) — safe up to 2^53 bytes (9 PB). */
+    cJSON_AddNumberToObject(entry, "total", (double)total);
+    cJSON_AddNumberToObject(entry, "free", (double)free_bytes);
+    cJSON_AddItemToObject(parent, key, entry);
+}
+
+/* ── Handlers ───────────────────────────────────────────────────────── */
+
 static esp_err_t status_handler(httpd_req_t *req)
 {
     http_server_ctx_t *ctx = http_server_ctx();
@@ -27,6 +60,46 @@ static esp_err_t status_handler(httpd_req_t *req)
     http_server_json_add_string(root, "ap_ssid", status.ap_ssid);
     http_server_json_add_string(root, "ap_ip", status.ap_ip);
     http_server_json_add_string(root, "wifi_mode", status.wifi_mode);
+
+    /* ── Storage mounts ────────────────────────────────────────────── */
+    {
+        cJSON *storage = cJSON_CreateObject();
+        if (storage) {
+            /* FATFS (internal SPI flash partition) */
+            http_server_storage_info_t fat_info = {0};
+            if (ctx->services.get_storage_info &&
+                    ctx->services.get_storage_info("fatfs", &fat_info) == ESP_OK) {
+                add_storage_entry(storage, "fatfs", fat_info.mount_path,
+                                  fat_info.mounted, fat_info.total_bytes,
+                                  fat_info.free_bytes);
+            } else {
+                /* Fallback: query FATFS directly */
+                uint64_t fat_total = 0, fat_free = 0;
+                esp_err_t fat_err = esp_vfs_fat_info(ctx->storage_base_path,
+                                                     &fat_total, &fat_free);
+                bool fat_mounted = (fat_err == ESP_OK);
+                add_storage_entry(storage, "fatfs", ctx->storage_base_path,
+                                  fat_mounted, fat_total, fat_free);
+                if (fat_err != ESP_OK) {
+                    ESP_LOGW(TAG, "FATFS info query failed: %s",
+                             esp_err_to_name(fat_err));
+                }
+            }
+
+            /* SD card (optional — queried via service callback) */
+            http_server_storage_info_t sd_info = {0};
+            if (ctx->services.get_storage_info &&
+                    ctx->services.get_storage_info("sdcard", &sd_info) == ESP_OK &&
+                    sd_info.mount_path) {
+                add_storage_entry(storage, "sdcard", sd_info.mount_path,
+                                  sd_info.mounted, sd_info.total_bytes,
+                                  sd_info.free_bytes);
+            }
+
+            cJSON_AddItemToObject(root, "storage", storage);
+        }
+    }
+
     return http_server_send_json_response(req, root);
 }
 

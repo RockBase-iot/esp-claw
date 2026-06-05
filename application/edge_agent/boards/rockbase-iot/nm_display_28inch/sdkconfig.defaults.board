@@ -21,6 +21,10 @@ CONFIG_SPIRAM_SPEED_80M=y
 # Enable display_lcd device support for the ST7789 SPI panel
 CONFIG_ESP_BOARD_DEV_DISPLAY_LCD_SUPPORT=y
 
+# Enable fs_fat device support for the SD card (SDMMC 1-bit)
+CONFIG_ESP_BOARD_DEV_FS_FAT_SUPPORT=y
+CONFIG_ESP_BOARD_DEV_FS_FAT_SUB_SDMMC_SUPPORT=y
+
 # Camera: OV5640 DVP 8-bit, RGB565 output
 # RGB565 allows image.resize to scale directly (RGB565→RGB565) without any
 # intermediate YUV→RGB conversion buffer (~1.44 MB for 800x600 UYVY), so even

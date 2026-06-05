@@ -14,7 +14,7 @@ This module describes how to correctly use storage when writing Lua scripts.
 - Call `storage.listdir(path)` to list directory entries
 - Call `storage.remove(path)` to remove a file or empty directory
 - Call `storage.rename(old_path, new_path)` to rename or move a path
-- Call `storage.get_free_space()` to get `{ total, free, used }` bytes for the storage root
+- Call `storage.get_free_space([path])` to get `{ total, free, used }` bytes for the storage root, or for a specific mounted volume such as `"/sdcard"` when `path` is given
 
 ## Path joining
 - Prefer `storage.join_path(...)` whenever building a path from `storage.get_root_dir()` and child names.

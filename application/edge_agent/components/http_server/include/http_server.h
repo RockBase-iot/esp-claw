@@ -23,6 +23,26 @@ typedef struct {
     const char *wifi_mode;
 } http_server_wifi_status_t;
 
+/**
+ * @brief  Storage mount-point descriptor returned by the storage-info callback.
+ */
+typedef struct {
+    const char *mount_path;   /**< VFS mount point, e.g. "/fatfs" or "/sdcard" */
+    bool mounted;             /**< true if the filesystem is currently mounted */
+    uint64_t total_bytes;     /**< Total capacity in bytes */
+    uint64_t free_bytes;      /**< Free space in bytes */
+} http_server_storage_info_t;
+
+/**
+ * @brief  Query storage info for a named mount.
+ *
+ * @param[in]   mount_name  Short name, e.g. "fatfs" or "sdcard".
+ * @param[out]  info        Filled on success.
+ * @return ESP_OK on success, ESP_ERR_NOT_SUPPORTED if unknown.
+ */
+typedef esp_err_t (*http_server_storage_info_fn)(const char *mount_name,
+                                                  http_server_storage_info_t *info);
+
 typedef struct {
     bool active;
     bool configured;
@@ -43,6 +63,7 @@ typedef struct {
     esp_err_t (*save_config)(const app_config_t *config);
     esp_err_t (*get_wifi_status)(http_server_wifi_status_t *status);
     esp_err_t (*restart_device)(void);
+    http_server_storage_info_fn get_storage_info;
     esp_err_t (*wechat_login_start)(const char *account_id, bool force);
     esp_err_t (*wechat_login_get_status)(http_server_wechat_login_status_t *status);
     esp_err_t (*wechat_login_cancel)(void);
