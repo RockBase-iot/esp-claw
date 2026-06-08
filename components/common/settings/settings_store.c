@@ -355,10 +355,30 @@ esp_err_t settings_store_dump_to_backup(void)
     }
     (void)value_buf;
 
+    int dumped_keys = cJSON_GetArraySize(root);
     char *json_str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (!json_str) {
         return ESP_ERR_NO_MEM;
+    }
+
+    /* Anti-clobber guard: never overwrite an existing, non-trivial backup
+     * with an empty object ("{}"). A transient empty NVS namespace (e.g. a
+     * partial wipe or a boot that runs before the config is loaded) must not
+     * be allowed to destroy a good SD backup that still holds the user's
+     * Wi-Fi / LLM / IM credentials. An empty backup can only be created when
+     * none exists yet. */
+    if (dumped_keys == 0) {
+        bool probe_locked = backup_lock();
+        struct stat st;
+        bool existing_nontrivial = (stat(s_backup_path, &st) == 0 && st.st_size > 2);
+        backup_unlock(probe_locked);
+        if (existing_nontrivial) {
+            ESP_LOGW(TAG, "skip dumping empty config over existing backup %s",
+                     s_backup_path);
+            free(json_str);
+            return ESP_OK;
+        }
     }
 
     esp_err_t io_err = ESP_OK;

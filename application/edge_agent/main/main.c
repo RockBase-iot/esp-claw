@@ -151,6 +151,37 @@ static void on_boot_button_pressed(void *user_ctx)
     app_status_screen_next_page();
 }
 
+/* Long-press (3 s) of the BOOT key toggles the local provisioning AP: if the
+ * AP is currently up it is turned off, and if it is down it is turned back on.
+ * This is a purely local, runtime action — it does not change the persisted
+ * "AP behavior" setting shown in the web UI. */
+static void on_boot_button_long_press(void *user_ctx)
+{
+    (void)user_ctx;
+
+    wifi_manager_status_t status = {0};
+    wifi_manager_get_status(&status);
+
+    esp_err_t err;
+    if (status.ap_active) {
+        ESP_LOGI(TAG, "BOOT long-press -> disabling local AP");
+        err = wifi_manager_disable_ap();
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to disable local AP: %s", esp_err_to_name(err));
+            return;
+        }
+    } else {
+        ESP_LOGI(TAG, "BOOT long-press -> enabling local AP");
+        err = wifi_manager_enable_ap();
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to enable local AP: %s", esp_err_to_name(err));
+            return;
+        }
+    }
+
+    app_status_screen_request_refresh();
+}
+
 static void on_touch_tap(int x, int y, int pressure, void *user_ctx)
 {
     (void)pressure;
@@ -480,6 +511,14 @@ void app_main(void)
     ESP_ERROR_CHECK(app_allocate_runtime_state());
     ESP_ERROR_CHECK(init_nvs());
     ESP_ERROR_CHECK(app_config_init());
+    /* Capture whether the config NVS namespace is empty BEFORE app_config_load()
+     * runs. app_config_load() seeds the "http_allow_ls" default key into the
+     * namespace, which would otherwise make a freshly erase-flashed device look
+     * "non-empty" by the time the SD-card backup restore below is evaluated --
+     * defeating the restore (and clobbering the SD backup with a near-empty
+     * config), forcing the user to reconfigure on every re-flash. */
+    bool nvs_was_empty_at_boot = false;
+    (void)settings_store_is_namespace_empty(&nvs_was_empty_at_boot);
     ESP_ERROR_CHECK(app_config_load(s_config));
     app_config_to_claw(s_config, s_claw_config);
     init_timezone(app_config_get_timezone(s_config)); // no need to check error
@@ -516,6 +555,9 @@ void app_main(void)
         }
         if (boot_err != ESP_OK) {
             ESP_LOGW(TAG, "BOOT button init failed: %s", esp_err_to_name(boot_err));
+        } else {
+            /* Hold BOOT for 3 s to re-open the local AP (see handler). */
+            app_boot_button_set_long_press(3000, on_boot_button_long_press, NULL);
         }
     } 
 
@@ -576,22 +618,37 @@ void app_main(void)
         if (settings_store_set_backup_path(backup_path,
                                            sd_settings_bus_lock,
                                            sd_settings_bus_unlock) == ESP_OK) {
-            bool nvs_empty = false;
-            if (settings_store_is_namespace_empty(&nvs_empty) == ESP_OK
-                    && nvs_empty) {
+            /* Decide whether to pull config FROM the SD backup or push the
+             * current NVS config TO it. We restore when the on-device config
+             * carries no usable Wi-Fi credentials (a fresh erase-flash leaves
+             * NVS empty; a partial wipe can leave NVS non-empty but without an
+             * SSID). In every other case we refresh the SD mirror so a future
+             * re-flash can recover. The dump path itself refuses to overwrite
+             * a good backup with an empty object (see settings_store). */
+            bool nvs_has_wifi = (s_config->wifi_ssid[0] != '\0');
+            if (nvs_was_empty_at_boot || !nvs_has_wifi) {
                 esp_err_t rerr = settings_store_restore_from_backup();
                 if (rerr == ESP_OK) {
-                    ESP_LOGI(TAG, "Restored app_config from SD backup");
                     app_config_load(s_config);
                     app_config_to_claw(s_config, s_claw_config);
                     app_status_screen_set_settings(s_config);
-                } else if (rerr != ESP_ERR_NOT_FOUND) {
+                    ESP_LOGI(TAG, "Restored app_config from SD backup %s "
+                             "(nvs_empty=%d, had_wifi=%d, now ssid='%s')",
+                             backup_path, (int)nvs_was_empty_at_boot,
+                             (int)nvs_has_wifi, s_config->wifi_ssid);
+                } else if (rerr == ESP_ERR_NOT_FOUND) {
+                    ESP_LOGI(TAG, "No SD backup at %s yet; seeding from NVS",
+                             backup_path);
+                    (void)settings_store_dump_to_backup();
+                } else {
                     ESP_LOGW(TAG, "SD restore failed: %s", esp_err_to_name(rerr));
                 }
             } else {
-                /* NVS already has values — make sure the SD mirror reflects
-                 * them so a subsequent re-flash can restore. */
-                (void)settings_store_dump_to_backup();
+                /* NVS already holds real credentials — keep the SD mirror in
+                 * sync so a subsequent re-flash can restore. */
+                esp_err_t derr = settings_store_dump_to_backup();
+                ESP_LOGI(TAG, "Mirrored NVS config to SD backup %s (%s)",
+                         backup_path, esp_err_to_name(derr));
             }
         }
 

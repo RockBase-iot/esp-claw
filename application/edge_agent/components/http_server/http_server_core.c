@@ -78,6 +78,18 @@ esp_err_t http_server_start(void)
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     ESP_RETURN_ON_ERROR(httpd_start(&s_ctx.server, &config), TAG, "Failed to start HTTP server");
+
+    /* While acting as a captive-portal AP, phones constantly probe connectivity
+     * URLs (e.g. generate_204, gslb, cw.html, mmtls, msg.xiaomi.net) and
+     * abruptly reset their sockets. The esp_http_server core logs each of these
+     * as a WARN ("URI not found", "Method not allowed", "httpd_sock_err: error
+     * in send/recv : 104/11", "parse_block: incomplete"). These are benign
+     * client-side behaviors, so quiet the internal httpd tags to ERROR to keep
+     * the console readable; the captive 404 handler below still redirects them. */
+    esp_log_level_set("httpd_uri", ESP_LOG_ERROR);
+    esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
+    esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
+
     ESP_RETURN_ON_ERROR(http_server_register_assets_routes(s_ctx.server), TAG, "Failed to register assets routes");
     ESP_RETURN_ON_ERROR(http_server_register_capabilities_routes(s_ctx.server), TAG, "Failed to register capability routes");
     ESP_RETURN_ON_ERROR(http_server_register_lua_modules_routes(s_ctx.server), TAG, "Failed to register Lua module routes");

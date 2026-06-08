@@ -6,6 +6,9 @@
 
 #include "app_boot_button.h"
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -17,6 +20,9 @@ typedef struct {
     int gpio;
     app_boot_button_press_cb_t cb;
     void *cb_ctx;
+    app_boot_button_press_cb_t long_cb;
+    void *long_cb_ctx;
+    uint32_t long_press_ms;
 } app_boot_button_state_t;
 
 static app_boot_button_state_t s_btn;
@@ -30,6 +36,8 @@ static void app_boot_button_task(void *arg)
     int last_stable = 1;          /* idle high (pull-up, pressed = low) */
     int debounce_count = 0;
     int last_sample = 1;
+    TickType_t press_tick = 0;
+    bool long_fired = false;
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(BOOT_POLL_INTERVAL_MS));
@@ -41,8 +49,13 @@ static void app_boot_button_task(void *arg)
             if (debounce_count >= BOOT_DEBOUNCE_SAMPLES && level != last_stable) {
                 /* Edge detected, stable. */
                 if (last_stable == 1 && level == 0) {
-                    /* Falling edge -> press. */
-                    if (s_btn.cb) {
+                    /* Falling edge -> press begins. */
+                    press_tick = xTaskGetTickCount();
+                    long_fired = false;
+                } else if (last_stable == 0 && level == 1) {
+                    /* Rising edge -> release. Deliver the short-press only if a
+                     * long press was not already fired during this hold. */
+                    if (!long_fired && s_btn.cb) {
                         s_btn.cb(s_btn.cb_ctx);
                     }
                 }
@@ -51,6 +64,17 @@ static void app_boot_button_task(void *arg)
         } else {
             last_sample = level;
             debounce_count = 0;
+        }
+
+        /* Long-press detection while the (stable) button is held down. */
+        if (last_stable == 0 && !long_fired && s_btn.long_cb &&
+                s_btn.long_press_ms > 0) {
+            uint32_t held_ms =
+                (uint32_t)(xTaskGetTickCount() - press_tick) * portTICK_PERIOD_MS;
+            if (held_ms >= s_btn.long_press_ms) {
+                long_fired = true;
+                s_btn.long_cb(s_btn.long_cb_ctx);
+            }
         }
     }
 }
@@ -90,10 +114,22 @@ esp_err_t app_boot_button_init(int gpio_num,
     }
 
     BaseType_t ok = xTaskCreate(app_boot_button_task, "boot_btn",
-                                4096, NULL, 2, NULL);
+                                6144, NULL, 2, NULL);
     if (ok != pdPASS) {
         return ESP_ERR_NO_MEM;
     }
     ESP_LOGI(TAG, "BOOT button on GPIO%d active-low ready", gpio_num);
+    return ESP_OK;
+}
+
+esp_err_t app_boot_button_set_long_press(uint32_t duration_ms,
+                                         app_boot_button_press_cb_t cb,
+                                         void *user_ctx)
+{
+    s_btn.long_press_ms = cb ? duration_ms : 0;
+    s_btn.long_cb = cb;
+    s_btn.long_cb_ctx = user_ctx;
+    ESP_LOGI(TAG, "BOOT long-press %s (%u ms)",
+             cb ? "enabled" : "disabled", (unsigned)duration_ms);
     return ESP_OK;
 }

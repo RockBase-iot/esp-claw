@@ -21,6 +21,17 @@ esp_err_t app_boot_button_init(int gpio_num,
                                app_boot_button_press_cb_t cb,
                                void *user_ctx);
 
+/**
+ * Register a long-press callback fired once when the BOOT key is held for at
+ * least @p duration_ms. While a long press is in effect the short-press
+ * callback passed to app_boot_button_init() is suppressed for that hold (it
+ * now fires on release rather than on the initial press). Pass cb = NULL to
+ * disable long-press detection. Must be called after app_boot_button_init().
+ */
+esp_err_t app_boot_button_set_long_press(uint32_t duration_ms,
+                                         app_boot_button_press_cb_t cb,
+                                         void *user_ctx);
+
 #ifdef __cplusplus
 }
 #endif

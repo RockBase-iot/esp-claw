@@ -50,6 +50,26 @@ typedef struct {
 esp_err_t wifi_manager_init(void);
 esp_err_t wifi_manager_start(const wifi_manager_config_t *config);
 esp_err_t wifi_manager_apply_sta_config(const wifi_manager_config_t *config);
+
+/**
+ * Bring the local soft-AP online on demand (e.g. from a long-press of the BOOT
+ * key) even when it was previously closed by the "close_on_sta" behavior. Uses
+ * APSTA mode when a station is configured so an active STA link is preserved.
+ * Also forces the in-RAM ap_behavior to "keep" (runtime only, not persisted)
+ * so the AP is not auto-closed again when STA (re)connects. Returns
+ * ESP_ERR_INVALID_STATE if Wi-Fi is not started.
+ */
+esp_err_t wifi_manager_enable_ap(void);
+
+/**
+ * Bring the local soft-AP down on demand (e.g. from a long-press of the BOOT
+ * key when the AP is already up). Switches to STA-only mode. Note that closing
+ * the AP while the station is not connected can leave the device unreachable
+ * until the AP is re-enabled. No-op when the AP is already down. Returns
+ * ESP_ERR_INVALID_STATE if Wi-Fi is not started.
+ */
+esp_err_t wifi_manager_disable_ap(void);
+
 esp_err_t wifi_manager_validate_config(const wifi_manager_config_t *config);
 esp_err_t wifi_manager_wait_connected(uint32_t timeout_ms);
 esp_err_t wifi_manager_register_state_callback(wifi_manager_state_cb_t cb, void *user_ctx);

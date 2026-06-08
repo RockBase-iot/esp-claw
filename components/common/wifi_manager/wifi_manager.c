@@ -527,6 +527,83 @@ esp_err_t wifi_manager_apply_sta_config(const wifi_manager_config_t *config)
     return ESP_OK;
 }
 
+esp_err_t wifi_manager_enable_ap(void)
+{
+    esp_err_t err;
+
+    if (!s_wifi_started) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* A manual enable implies the user wants the AP kept open until they turn
+     * it off again (BOOT long-press toggle), so override any "close_on_sta"
+     * behavior in RAM so a later STA (re)connect does not auto-close it. This
+     * is a runtime-only override; the persisted ap_behavior is left untouched
+     * and takes effect again after a reboot. */
+    strlcpy(s_ap_behavior, "keep", sizeof(s_ap_behavior));
+    s_config.ap_behavior = s_ap_behavior;
+
+    if (s_ap_active) {
+        return ESP_OK;
+    }
+
+    /* Use APSTA when a station is configured so bringing the AP online does
+     * not tear down an active/connecting STA link; otherwise AP-only is fine. */
+    wifi_mode_t target = s_sta_configured ? WIFI_MODE_APSTA : WIFI_MODE_AP;
+    err = esp_wifi_set_mode(target);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "enable AP: esp_wifi_set_mode failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    compose_ap_ssid();
+    apply_ap_config();
+
+    if (s_sta_configured) {
+        s_mode = s_connected ? WIFI_MODE_APSTA_OK : WIFI_MODE_APSTA_TRYING;
+    } else {
+        s_mode = WIFI_MODE_PROVISION_AP;
+    }
+
+    ESP_LOGI(TAG, "Local AP enabled on request (mode=%s)",
+             wifi_manager_mode_string(s_mode));
+    /* s_ap_active and the state-changed notification are driven by the
+     * WIFI_EVENT_AP_START event raised by the mode switch above. */
+    return ESP_OK;
+}
+
+esp_err_t wifi_manager_disable_ap(void)
+{
+    if (!s_wifi_started) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (!s_ap_active) {
+        /* Already down — nothing to do. */
+        return ESP_OK;
+    }
+
+    if (!s_connected) {
+        ESP_LOGW(TAG, "Disabling AP while STA not connected: the device may "
+                 "become unreachable until the AP is re-enabled");
+    }
+
+    /* Switching to STA-only mode brings the soft-AP down. The matching
+     * WIFI_EVENT_AP_STOP also clears s_ap_active, but we update state here too
+     * so callers see the change immediately. */
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "disable AP: esp_wifi_set_mode failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    s_ap_active = false;
+    s_mode = WIFI_MODE_STA_ONLY;
+    ESP_LOGI(TAG, "Local AP disabled on request");
+    notify_state_changed(true);
+    return ESP_OK;
+}
+
 esp_err_t wifi_manager_wait_connected(uint32_t timeout_ms)
 {
     if (!s_sta_configured) {
