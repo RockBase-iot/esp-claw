@@ -1,0 +1,31 @@
+menu "Claw Meshtastic Capability"
+
+config CAP_MESHTASTIC_UART_PORT
+    int "UART port number for the Meshtastic link"
+    default 1
+    range 0 2
+    help
+        UART peripheral connected to the Meshtastic (Heltec LoRa32 V3) device.
+        Avoid UART0 if it is used for the console.
+
+config CAP_MESHTASTIC_TX_GPIO
+    int "Mainboard TX GPIO (-> Heltec RX)"
+    default 5
+    help
+        GPIO that drives the mainboard UART TX line, cross-wired to the Heltec
+        RX pin. Default 5 matches NM-CYD-C5; use 43 for NM-Display-28inch.
+
+config CAP_MESHTASTIC_RX_GPIO
+    int "Mainboard RX GPIO (<- Heltec TX)"
+    default 4
+    help
+        GPIO that reads the mainboard UART RX line, cross-wired to the Heltec
+        TX pin. Default 4 matches NM-CYD-C5; use 44 for NM-Display-28inch.
+
+config CAP_MESHTASTIC_BAUD
+    int "UART baud rate"
+    default 115200
+    help
+        Must match the Meshtastic serial.baud setting (BAUD_115200 by default).
+
+endmenu

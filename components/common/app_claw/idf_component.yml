@@ -74,6 +74,11 @@ dependencies:
       - if: $CONFIG{APP_CLAW_CAP_WEB_SEARCH} == True
     path: ../../claw_capabilities/cap_web_search
 
+  cap_meshtastic:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_MESHTASTIC} == True
+    path: ../../claw_capabilities/cap_meshtastic
+
   claw_cap:
     path: ../../claw_modules/claw_cap
 

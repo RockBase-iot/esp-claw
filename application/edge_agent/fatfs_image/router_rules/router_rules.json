@@ -163,5 +163,49 @@
         }
       }
     ]
+  },
+  {
+    "id": "meshtastic_inbound_im_notify",
+    "description": "Forward inbound Meshtastic mesh messages to the target IM conversation immediately, without invoking the agent.",
+    "enabled": true,
+    "consume_on_match": true,
+    "ack": "meshtastic message forwarded to {{event.target_channel}}",
+    "match": {
+      "source_cap": "cap_meshtastic",
+      "event_type": "meshtastic_inbound",
+      "content_type": "text"
+    },
+    "actions": [
+      {
+        "type": "send_message",
+        "input": {
+          "channel": "{{event.target_channel}}",
+          "chat_id": "{{event.chat_id}}",
+          "message": "{{event.text}}"
+        }
+      }
+    ]
+  },
+  {
+    "id": "meshtastic_node_update_im_notify",
+    "description": "Notify the target IM conversation when a new Meshtastic node joins the mesh.",
+    "enabled": true,
+    "consume_on_match": true,
+    "ack": "meshtastic node update forwarded to {{event.target_channel}}",
+    "match": {
+      "source_cap": "cap_meshtastic",
+      "event_type": "meshtastic_node_update",
+      "content_type": "text"
+    },
+    "actions": [
+      {
+        "type": "send_message",
+        "input": {
+          "channel": "{{event.target_channel}}",
+          "chat_id": "{{event.chat_id}}",
+          "message": "{{event.text}}"
+        }
+      }
+    ]
   }
 ]

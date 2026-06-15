@@ -1,0 +1,102 @@
+---
+title: Meshtastic Bridge (Heltec LoRa32 V3)
+description: Bridge a Heltec LoRa32 V3 (Meshtastic) to an ESP-Claw mainboard over UART.
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+ESP-Claw supports connecting an external Meshtastic-capable LoRa module over UART for decentralized offline messaging. This guide uses the Heltec LoRa32 V3 and shows how to connect it to the NM-CYD-C5 or NM-Display-28inch mainboard UART.
+
+## Prerequisites
+
+- Heltec LoRa32 V3 flashed with Meshtastic firmware
+- NM-CYD-C5 or NM-Display-28inch mainboard running ESP-Claw
+- USB-C cable for configuring the Heltec Serial module
+- Dupont jumper wires or equivalent
+
+## Wiring
+
+The Heltec LoRa32 V3 is powered from the mainboard 5V rail, and the UART is cross-connected.
+
+<Aside type="caution" title="Cross-connect TX/RX">
+  UART must be cross-connected: RX on one side goes to TX on the other, and vice versa.
+</Aside>
+
+| ESP-Claw mainboard | Heltec LoRa32 V3 | Note |
+| --- | --- | --- |
+| 5V | 5V | Power supply |
+| GND | GND | Common ground |
+| GPIO5 (TX) | GPIO19 (RX) | Mainboard TX to Heltec RX |
+| GPIO4 (RX) | GPIO20 (TX) | Mainboard RX to Heltec TX |
+
+<Aside type="note" title="Pin assignment">
+  For the NM-CYD-C5 mainboard, use GPIO4/RX and GPIO5/TX; the Heltec side matches the Meshtastic Serial module settings `serial.rxd=19` and `serial.txd=20`. If these pins conflict with other peripherals, choose any free UART pins and update the Meshtastic configuration accordingly.
+  For the NM-Display-28inch mainboard, use GPIO44/RX and GPIO43/TX.
+</Aside>
+
+## Configure the Meshtastic Serial module
+
+### Using Meshtastic CLI
+
+Connect Heltec via USB-C to your computer and run:
+
+```bash
+meshtastic --set serial.enabled true
+meshtastic --set serial.mode PROTO
+meshtastic --set serial.baud BAUD_115200
+meshtastic --set serial.rxd 19
+meshtastic --set serial.txd 20
+meshtastic --reboot
+```
+
+<Aside type="caution" title="Use PROTO mode">
+  The ESP-Claw `cap_meshtastic` bridge speaks the Meshtastic **Stream API**
+  (protobuf). The Serial module must be in **PROTO** mode, not TEXTMSG. In TEXTMSG
+  mode the radio only emits plain text and the bridge will never connect.
+</Aside>
+
+### Using the Meshtastic App
+
+1. Pair your phone with the Heltec LoRa32 V3 over Bluetooth.
+2. Go to **Settings -> Modules -> Serial**.
+3. Turn on **Enabled**, and set **Mode** to **PROTO**.
+4. Set **Baud** to **115200**.
+5. Set **RX pin** to **19** and **TX pin** to **20**.
+6. Save and reboot the device.
+
+## Verification
+
+After reboot, ask the ESP-Claw agent (or use the console) for the mesh status. The
+`cap_meshtastic` bridge runs a background task that performs the protobuf handshake and
+streams the node database.
+
+```bash
+# On the ESP-Claw serial console
+mesh status      # link state + diagnostics (rx_bytes / frames_decoded)
+mesh nodes       # known mesh nodes
+mesh send "hello mesh"
+```
+
+If `connected` is false, read the `hint` field from `mesh status`:
+
+- `rx_bytes = 0`: no bytes arriving — check power, the TX<->RX crossover, and that the
+  baud rate matches `serial.baud`.
+- `rx_bytes > 0` but `frames_decoded = 0`: the radio is not in **PROTO** mode (or the
+  baud rate is wrong).
+- frames decoded but still not connected: wait a few seconds for the config handshake.
+
+## Notes
+
+<Aside type="tip" title="Power">
+  The Heltec LoRa32 V3 can draw more than 200mA during LoRa transmission. Make sure the mainboard 5V pin can deliver enough current, or use a separate 5V supply with a common ground.
+</Aside>
+
+<Aside type="tip" title="GPS or Meshtastic">
+  The NM-CYD-C5 serial header can be used for either a GPS or a Meshtastic device; there is no forced conflict. Just keep the wiring and configuration consistent.
+</Aside>
+
+<LinkCard
+    title="Back to tutorials"
+    href="@lang/tutorial"
+    description="Explore more ESP-Claw tutorials."
+/>

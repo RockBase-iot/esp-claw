@@ -142,6 +142,13 @@ menu "App Claw Config"
                 Enable the web search capability and keep app_claw's direct dependency
                 on cap_web_search.
 
+        config APP_CLAW_CAP_MESHTASTIC
+            bool "Enable Meshtastic bridge capability"
+            default y
+            help
+                Enable the Meshtastic LoRa bridge capability and keep app_claw's direct
+                dependency on cap_meshtastic.
+
         config APP_CLAW_CAP_ROUTER_MGR
             bool "Enable router manager capability"
             default y

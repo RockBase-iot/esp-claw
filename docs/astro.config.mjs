@@ -43,6 +43,7 @@ export default defineConfig({
             { slug: "tutorial/assemble" },
             { slug: "tutorial/get-started" },
             { slug: "tutorial/web-config" },
+            { slug: "tutorial/meshtastic-bridge" },
             { slug: "tutorial/faq" },
             { slug: "tutorial/skills-lab" },
           ],

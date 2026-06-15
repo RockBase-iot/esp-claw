@@ -63,6 +63,9 @@
 #if CONFIG_APP_CLAW_CAP_WEB_SEARCH
 #include "cap_web_search.h"
 #endif
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+#include "cap_meshtastic.h"
+#endif
 #include "claw_cap.h"
 #include "claw_memory.h"
 #include "esp_check.h"
@@ -525,6 +528,24 @@ static esp_err_t app_cap_register_web_search(const app_claw_config_t *config,
 }
 #endif
 
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+static esp_err_t app_cap_prepare_meshtastic(const app_claw_config_t *config,
+                                            const app_claw_storage_paths_t *paths)
+{
+    (void)config;
+    (void)paths;
+    return ESP_OK;
+}
+
+static esp_err_t app_cap_register_meshtastic(const app_claw_config_t *config,
+                                             const app_claw_storage_paths_t *paths)
+{
+    (void)config;
+    (void)paths;
+    return cap_meshtastic_register_group();
+}
+#endif
+
 #if CONFIG_APP_CLAW_CAP_ROUTER_MGR
 static esp_err_t app_cap_register_router_mgr(const app_claw_config_t *config,
                                              const app_claw_storage_paths_t *paths)
@@ -594,6 +615,9 @@ static const app_capability_group_entry_t s_capability_group_entries[] = {
 #if CONFIG_APP_CLAW_CAP_WEB_SEARCH
     { "cap_web_search", "Web Search", "Register web search cap", true, app_cap_prepare_web_search, app_cap_register_web_search },
 #endif
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+    { "cap_meshtastic", "Meshtastic", "Register Meshtastic bridge cap", false, app_cap_prepare_meshtastic, app_cap_register_meshtastic },
+#endif
 #if CONFIG_APP_CLAW_CAP_ROUTER_MGR
     { "cap_router_mgr", "Router Manager", "Register router manager cap", true, NULL, app_cap_register_router_mgr },
 #endif
@@ -650,6 +674,9 @@ static const app_capability_group_info_t s_capability_group_infos[] = {
 #endif
 #if CONFIG_APP_CLAW_CAP_WEB_SEARCH
     { "cap_web_search", "Web Search", false },
+#endif
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+    { "cap_meshtastic", "Meshtastic", false },
 #endif
 #if CONFIG_APP_CLAW_CAP_ROUTER_MGR
     { "cap_router_mgr", "Router Manager", false },

@@ -50,6 +50,9 @@
 #if CONFIG_APP_CLAW_CAP_WEB_SEARCH
 #include "cmd_cap_web_search.h"
 #endif
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+#include "cmd_cap_meshtastic.h"
+#endif
 #include "claw_cap.h"
 #include "claw_core.h"
 #include "claw_event_publisher.h"
@@ -733,6 +736,9 @@ static void register_cap_cli_commands(void)
 #endif
 #if CONFIG_APP_CLAW_CAP_WEB_SEARCH
     register_cap_web_search();
+#endif
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+    register_cap_meshtastic();
 #endif
 }
 

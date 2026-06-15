@@ -25,6 +25,9 @@
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
 #include "cap_im_wechat.h"
 #endif
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+#include "cap_meshtastic.h"
+#endif
 #include "app_config.h"
 #include "app_message_inbox.h"
 #include "app_status_screen.h"
@@ -142,6 +145,12 @@ static void on_im_message_observed(const char *channel,
     (void)chat_id;
     (void)user_ctx;
     app_message_inbox_record(channel, sender_id, text, timestamp_ms);
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+    /* Remember the most recent IM conversation so the Meshtastic bridge can
+     * push inbound mesh messages back to whoever last talked to the device,
+     * unless an explicit notify target was configured. */
+    cap_meshtastic_note_im_target(channel, chat_id);
+#endif
 }
 
 static void on_boot_button_pressed(void *user_ctx)

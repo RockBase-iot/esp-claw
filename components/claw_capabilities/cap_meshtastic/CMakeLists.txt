@@ -1,0 +1,15 @@
+idf_component_register(
+    SRCS
+        "src/cap_meshtastic.c"
+        "src/meshtastic_proto.c"
+        "src/cmd_cap_meshtastic.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        claw_cap
+        claw_event_router
+        driver
+        json
+        console
+        esp_timer
+)

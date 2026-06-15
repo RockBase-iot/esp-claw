@@ -22,6 +22,10 @@ if(CONFIG_APP_CLAW_CAP_IM_WECHAT)
     list(APPEND main_requires cap_im_wechat)
 endif()
 
+if(CONFIG_APP_CLAW_CAP_MESHTASTIC)
+    list(APPEND main_requires cap_meshtastic)
+endif()
+
 idf_component_register(
     SRC_DIRS
         "."

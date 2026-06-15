@@ -81,6 +81,10 @@ if(CONFIG_APP_CLAW_CAP_WEB_SEARCH)
     list(APPEND app_claw_requires cap_web_search)
 endif()
 
+if(CONFIG_APP_CLAW_CAP_MESHTASTIC)
+    list(APPEND app_claw_requires cap_meshtastic)
+endif()
+
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_BOARD_MANAGER)
     list(APPEND app_claw_requires lua_module_board_manager)
 endif()
