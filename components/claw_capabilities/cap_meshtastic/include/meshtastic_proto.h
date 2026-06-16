@@ -163,6 +163,12 @@ typedef struct {
 esp_err_t meshtastic_decode_fromradio(const uint8_t *data, size_t len,
                                       meshtastic_fromradio_t *out);
 
+/*
+ * Get statistics for FromRadio frames whose top-level payload tag is unknown.
+ * `count` is cumulative since boot; `last_tag` is the most recent unknown tag.
+ */
+void meshtastic_get_fromradio_unknown_stats(uint32_t *count, uint32_t *last_tag);
+
 /* Encode a ToRadio text message and prepend the 4-byte Stream API header. */
 esp_err_t meshtastic_encode_text_frame(const meshtastic_text_packet_t *packet,
                                        uint8_t *out, size_t out_size,

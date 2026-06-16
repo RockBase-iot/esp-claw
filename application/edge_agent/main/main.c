@@ -25,8 +25,18 @@
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
 #include "cap_im_wechat.h"
 #endif
+#if CONFIG_APP_CLAW_CAP_IM_FEISHU
+#include "cap_im_feishu.h"
+#endif
+#if CONFIG_APP_CLAW_CAP_IM_QQ
+#include "cap_im_qq.h"
+#endif
+#if CONFIG_APP_CLAW_CAP_IM_TG
+#include "cap_im_tg.h"
+#endif
 #if CONFIG_APP_CLAW_CAP_MESHTASTIC
 #include "cap_meshtastic.h"
+#include "meshtastic_store.h"
 #endif
 #include "app_config.h"
 #include "app_message_inbox.h"
@@ -382,6 +392,74 @@ static esp_err_t main_wechat_login_mark_persisted(void)
 }
 #endif
 
+/* ── Mesh (Meshtastic) HTTP service callbacks ────────────────────────── */
+
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+static esp_err_t main_sync_mesh_store_path(void)
+{
+    bool sd_mounted = sdcard_mount_is_mounted();
+    const char *base = sd_mounted ? sdcard_mount_get_mount_point() : app_fatfs_base_path;
+    size_t max_bytes = sd_mounted ? 0 : (256 * 1024);
+
+    esp_err_t err = cap_meshtastic_set_store_path(base, max_bytes);
+    if (err != ESP_OK && sd_mounted) {
+        /* If SD path setup failed, fail over to FATFS so APIs remain usable. */
+        ESP_LOGW(TAG, "mesh store SD init failed, falling back to FATFS");
+        err = cap_meshtastic_set_store_path(app_fatfs_base_path, (256 * 1024));
+    }
+    return err;
+}
+
+static esp_err_t main_get_mesh_messages(cJSON *array, size_t max_count)
+{
+    (void)main_sync_mesh_store_path();
+    return cap_meshtastic_read_stored_messages(array, max_count);
+}
+
+static esp_err_t main_get_mesh_status(http_server_mesh_status_t *status)
+{
+    if (!status) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    (void)main_sync_mesh_store_path();
+    status->count = cap_meshtastic_stored_count();
+    status->file_size_bytes = cap_meshtastic_store_file_size();
+    status->store_path = cap_meshtastic_store_path();
+    status->connected = cap_meshtastic_is_connected();
+    return ESP_OK;
+}
+
+static esp_err_t main_clear_mesh_messages(void)
+{
+    (void)main_sync_mesh_store_path();
+    return cap_meshtastic_clear_stored_messages();
+}
+
+static esp_err_t main_get_mesh_im_targets(http_server_mesh_im_t *out, size_t max,
+                                          size_t *out_count)
+{
+    if (!out || !out_count) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    cap_meshtastic_im_push_t states[CAP_MESHTASTIC_IM_PUSH_MAX];
+    size_t n = cap_meshtastic_get_im_push(states, CAP_MESHTASTIC_IM_PUSH_MAX);
+    size_t w = 0;
+    for (size_t i = 0; i < n && w < max; i++) {
+        strlcpy(out[w].channel, states[i].channel, sizeof(out[w].channel));
+        out[w].enabled = states[i].enabled;
+        out[w].has_target = states[i].has_target;
+        w++;
+    }
+    *out_count = w;
+    return ESP_OK;
+}
+
+static esp_err_t main_set_mesh_im_target(const char *channel, bool enabled)
+{
+    return cap_meshtastic_set_im_push_enabled(channel, enabled);
+}
+#endif
+
 static esp_err_t init_nvs(void)
 {
     esp_err_t err = nvs_flash_init();
@@ -705,6 +783,24 @@ void app_main(void)
     }
 
     ESP_ERROR_CHECK(wifi_manager_init());
+
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+    /* Configure Meshtastic persistent message store BEFORE app_claw_start.
+     * Use SD card if available, otherwise fall back to internal FATFS. */
+    {
+        /* The SD card shares the SPI host with the LCD, so all store file I/O
+         * must be serialized through the bus arbiter or the polling SDSPI
+         * driver races the LCD's DMA transactions and panics with
+         * spi_hal_setup_trans(spi_ll_get_running_cmd(hw) == 0). */
+        meshtastic_store_set_bus_lock(sd_settings_bus_lock, sd_settings_bus_unlock);
+        esp_err_t mesh_store_err = main_sync_mesh_store_path();
+        if (mesh_store_err != ESP_OK) {
+            ESP_LOGW(TAG, "mesh store init failed at startup: %s",
+                     esp_err_to_name(mesh_store_err));
+        }
+    }
+#endif
+
     ESP_ERROR_CHECK(http_server_init(&(http_server_config_t) {
         .storage_base_path = app_fatfs_base_path,
         .services = {
@@ -718,6 +814,13 @@ void app_main(void)
             .wechat_login_get_status = main_wechat_login_get_status,
             .wechat_login_cancel = main_wechat_login_cancel,
             .wechat_login_mark_persisted = main_wechat_login_mark_persisted,
+#endif
+#if CONFIG_APP_CLAW_CAP_MESHTASTIC
+            .get_mesh_messages = main_get_mesh_messages,
+            .get_mesh_status = main_get_mesh_status,
+            .clear_mesh_messages = main_clear_mesh_messages,
+            .get_mesh_im_targets = main_get_mesh_im_targets,
+            .set_mesh_im_target = main_set_mesh_im_target,
 #endif
         },
     }));

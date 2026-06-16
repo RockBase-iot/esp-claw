@@ -31,7 +31,7 @@ Heltec LoRa32 V3 通过主板 5V 供电，串口与主板交叉连接。
 
 <Aside type="note" title="引脚分配">
   主板（NM-CYD-C5）侧使用 GPIO4/RX、GPIO5/TX；Heltec 侧对应 Meshtastic Serial 模块的 `serial.rxd=19`、`serial.txd=20`。若这些引脚与你的板子其他外设冲突，可替换为任意空闲 UART 引脚，并同步修改 Meshtastic 配置。
-  若主板为（NM-Display-28inch）则使用：GPIO44/RX，GPIO43/TX。
+  若主板为（NM-Display-28inch）则使用：GPIO44/RX，GPIO43/TX。该板型的 sdkconfig 默认值已设为这两根引脚，编译时无需再手动配置。
 </Aside>
 
 ## 配置 Meshtastic Serial 模块

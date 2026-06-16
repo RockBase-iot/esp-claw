@@ -6,9 +6,13 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "app_config.h"
 #include "esp_err.h"
+
+/* Forward declaration to avoid pulling in cJSON.h for every includer. */
+typedef struct cJSON cJSON;
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,6 +62,32 @@ typedef struct {
     char base_url[160];
 } http_server_wechat_login_status_t;
 
+/* ── Mesh (Meshtastic) service callbacks ────────────────────────────── */
+
+typedef struct {
+    size_t count;           /**< Number of persisted messages */
+    size_t file_size_bytes; /**< Store file size */
+    const char *store_path; /**< Absolute path to store file */
+    bool connected;         /**< Meshtastic radio connected */
+} http_server_mesh_status_t;
+
+typedef esp_err_t (*http_server_mesh_messages_fn)(cJSON *array, size_t max_count);
+typedef esp_err_t (*http_server_mesh_status_fn)(http_server_mesh_status_t *status);
+typedef esp_err_t (*http_server_mesh_clear_fn)(void);
+
+/* One IM push channel exposed to the Meshtastic page. */
+typedef struct {
+    char channel[16];   /**< Logical IM channel ("feishu"/"qq"/"telegram"/"wechat") */
+    bool enabled;       /**< User opted to push inbound mesh messages here */
+    bool has_target;    /**< A destination conversation has been learned */
+} http_server_mesh_im_t;
+
+/* Fill `out` (capacity `max`) with IM push channels; writes the count. */
+typedef esp_err_t (*http_server_mesh_im_list_fn)(http_server_mesh_im_t *out, size_t max,
+                                                 size_t *out_count);
+/* Enable/disable push for one IM channel. */
+typedef esp_err_t (*http_server_mesh_im_set_fn)(const char *channel, bool enabled);
+
 typedef struct {
     esp_err_t (*load_config)(app_config_t *config);
     esp_err_t (*save_config)(const app_config_t *config);
@@ -68,6 +98,12 @@ typedef struct {
     esp_err_t (*wechat_login_get_status)(http_server_wechat_login_status_t *status);
     esp_err_t (*wechat_login_cancel)(void);
     esp_err_t (*wechat_login_mark_persisted)(void);
+    /* Mesh (Meshtastic) service callbacks (NULL if not available). */
+    http_server_mesh_messages_fn get_mesh_messages;
+    http_server_mesh_status_fn   get_mesh_status;
+    http_server_mesh_clear_fn    clear_mesh_messages;
+    http_server_mesh_im_list_fn  get_mesh_im_targets;
+    http_server_mesh_im_set_fn   set_mesh_im_target;
 } http_server_services_t;
 
 typedef struct {

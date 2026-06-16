@@ -21,6 +21,7 @@ set(http_server_srcs
     "http_server_status_api.c"
     "http_server_files_api.c"
     "http_server_logo_api.c"
+    "http_server_mesh_api.c"
     "http_server_wechat_api.c"
     "http_server_webim_api.c"
     "http_server_json.c"

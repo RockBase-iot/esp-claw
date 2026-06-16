@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2026 Chengdu RockBase IoT Co., Ltd.
+ * SPDX-FileCopyrightText: 2026 Chengdu RockBase Technology Co., Ltd.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "cJSON.h"
 #include "claw_cap.h"
@@ -20,6 +21,8 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "meshtastic_proto.h"
+#include "meshtastic_store.h"
+#include "nvs.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "cap_meshtastic";
@@ -33,6 +36,9 @@ static const char *TAG = "cap_meshtastic";
 
 #define CAP_MESHTASTIC_MAX_NODES 32
 #define CAP_MESHTASTIC_MAX_MESSAGES 16
+/* NVS namespace used to persist per-IM push preferences. */
+#define CAP_MESHTASTIC_NVS_NS "claw_mesh_im"
+#define CAP_MESHTASTIC_NVS_KEY_EN "en_mask"
 #define CAP_MESHTASTIC_UART_RX_BUF 2048
 #define CAP_MESHTASTIC_READ_CHUNK 256
 #define CAP_MESHTASTIC_TASK_STACK 6144
@@ -135,6 +141,13 @@ static struct {
     char notify_chat_id[96];
     bool notify_target_explicit;   /* set via API -> never overwritten by auto-learn */
 
+    /* Per-IM push preferences (parallel to s_im_channel_names). When a channel
+     * is enabled and has a learned conversation, inbound mesh messages are
+     * forwarded to it via the event router. */
+    bool im_push_enabled[CAP_MESHTASTIC_IM_PUSH_MAX];
+    char im_push_chat[CAP_MESHTASTIC_IM_PUSH_MAX][96];
+    bool im_push_loaded;
+
     cap_meshtastic_node_t nodes[CAP_MESHTASTIC_MAX_NODES];
     cap_meshtastic_message_t messages[CAP_MESHTASTIC_MAX_MESSAGES];
     size_t message_head;     /* next write slot */
@@ -153,6 +166,107 @@ static struct {
         .baud_rate = CONFIG_CAP_MESHTASTIC_BAUD,
     },
 };
+
+/* ===================================================================== */
+/* Wall-clock + IM push helpers                                          */
+/* ===================================================================== */
+
+/* Canonical IM channels we can push inbound mesh messages to. Index order is
+ * stable and used as the NVS bit/key index, so never reorder. */
+static const char *const s_im_channel_names[CAP_MESHTASTIC_IM_PUSH_MAX] = {
+    "feishu", "qq", "telegram", "wechat",
+};
+
+static int im_channel_index(const char *channel)
+{
+    if (!channel) {
+        return -1;
+    }
+    for (int i = 0; i < CAP_MESHTASTIC_IM_PUSH_MAX; i++) {
+        if (strcmp(channel, s_im_channel_names[i]) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/*
+ * Current wall-clock time in epoch milliseconds. Falls back to monotonic boot
+ * time if the system clock has not been set yet (SNTP not synced), so message
+ * ordering still works; once time is synced the stored timestamps are real
+ * epoch values the web UI can render correctly.
+ */
+static int64_t cap_meshtastic_now_ms(void)
+{
+    struct timeval tv;
+    if (gettimeofday(&tv, NULL) == 0 && tv.tv_sec > 1609459200 /* 2021-01-01 */) {
+        return (int64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    }
+    return esp_timer_get_time() / 1000;
+}
+
+/* Load persisted IM push preferences from NVS (best effort). */
+static void im_push_load(void)
+{
+    if (s_ctx.im_push_loaded) {
+        return;
+    }
+    s_ctx.im_push_loaded = true;
+
+    nvs_handle_t h;
+    if (nvs_open(CAP_MESHTASTIC_NVS_NS, NVS_READONLY, &h) != ESP_OK) {
+        return;
+    }
+    uint8_t mask = 0;
+    nvs_get_u8(h, CAP_MESHTASTIC_NVS_KEY_EN, &mask);
+    for (int i = 0; i < CAP_MESHTASTIC_IM_PUSH_MAX; i++) {
+        s_ctx.im_push_enabled[i] = (mask >> i) & 0x1;
+        char key[8];
+        snprintf(key, sizeof(key), "cid%d", i);
+        size_t len = sizeof(s_ctx.im_push_chat[i]);
+        if (nvs_get_str(h, key, s_ctx.im_push_chat[i], &len) != ESP_OK) {
+            s_ctx.im_push_chat[i][0] = '\0';
+        }
+    }
+    nvs_close(h);
+}
+
+/* Persist the enabled bitmask to NVS (best effort). */
+static void im_push_save_enabled(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(CAP_MESHTASTIC_NVS_NS, NVS_READWRITE, &h) != ESP_OK) {
+        return;
+    }
+    uint8_t mask = 0;
+    for (int i = 0; i < CAP_MESHTASTIC_IM_PUSH_MAX; i++) {
+        if (s_ctx.im_push_enabled[i]) {
+            mask |= (uint8_t)(1u << i);
+        }
+    }
+    if (nvs_set_u8(h, CAP_MESHTASTIC_NVS_KEY_EN, mask) == ESP_OK) {
+        nvs_commit(h);
+    }
+    nvs_close(h);
+}
+
+/* Persist a single channel's learned conversation id to NVS (best effort). */
+static void im_push_save_chat(int idx)
+{
+    if (idx < 0 || idx >= CAP_MESHTASTIC_IM_PUSH_MAX) {
+        return;
+    }
+    nvs_handle_t h;
+    if (nvs_open(CAP_MESHTASTIC_NVS_NS, NVS_READWRITE, &h) != ESP_OK) {
+        return;
+    }
+    char key[8];
+    snprintf(key, sizeof(key), "cid%d", idx);
+    if (nvs_set_str(h, key, s_ctx.im_push_chat[idx]) == ESP_OK) {
+        nvs_commit(h);
+    }
+    nvs_close(h);
+}
 
 /* ===================================================================== */
 /* Node database helpers (caller must hold s_ctx.lock)                   */
@@ -217,25 +331,15 @@ static void node_touch_locked(cap_meshtastic_node_t *node, uint32_t rx_time)
 /* ===================================================================== */
 
 /*
- * Publish an event that the router delivers to the configured IM conversation.
+ * Publish one inbound-mesh notification event to a specific IM conversation.
  * Builds a self-contained claw_event_t carrying the target channel/chat so the
  * default `meshtastic_inbound_im_notify` rule can forward `{{event.text}}`
- * without invoking the LLM. No-op when no IM target is known yet.
+ * without invoking the LLM.
  */
-static void meshtastic_publish_im_notify(const char *event_type, const char *text)
+static void meshtastic_publish_to(const char *channel, const char *chat_id,
+                                  const char *event_type, const char *text)
 {
-    char channel[16];
-    char chat_id[96];
-
-    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
-    strlcpy(channel, s_ctx.notify_channel, sizeof(channel));
-    strlcpy(chat_id, s_ctx.notify_chat_id, sizeof(chat_id));
-    xSemaphoreGive(s_ctx.lock);
-
-    if (!channel[0] || !chat_id[0]) {
-        /* No IM conversation to notify yet; the message is still buffered and
-         * retrievable via meshtastic_get_messages / meshtastic_list_nodes. */
-        ESP_LOGD(TAG, "no IM notify target set; skipping push for %s", event_type);
+    if (!channel || !channel[0] || !chat_id || !chat_id[0]) {
         return;
     }
 
@@ -255,19 +359,58 @@ static void meshtastic_publish_im_notify(const char *event_type, const char *tex
     strlcpy(event->chat_id, chat_id, sizeof(event->chat_id));
     strlcpy(event->content_type, "text", sizeof(event->content_type));
     event->session_policy = CLAW_EVENT_SESSION_POLICY_NOSAVE;
-    event->timestamp_ms = esp_timer_get_time() / 1000;
+    event->timestamp_ms = cap_meshtastic_now_ms();
     event->text = (char *)text;   /* publish() clones the event, including text */
 
     esp_err_t err = claw_event_router_publish(event);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "publish IM notify (%s) failed: %s", event_type, esp_err_to_name(err));
+        ESP_LOGW(TAG, "publish IM notify (%s->%s) failed: %s",
+                 event_type, channel, esp_err_to_name(err));
     }
     free(event);
+}
+
+/*
+ * Dispatch an inbound-mesh notification to every IM channel the user explicitly
+ * enabled for push (and that has a known conversation). The per-channel toggles
+ * are the single source of truth: if no channel is enabled, nothing is sent, so
+ * unchecking a channel reliably stops mesh messages from reaching that IM. The
+ * message itself is still buffered and retrievable via the HTTP API regardless.
+ */
+static void meshtastic_dispatch_im_notify(const char *event_type, const char *text)
+{
+    char channels[CAP_MESHTASTIC_IM_PUSH_MAX][16];
+    char chats[CAP_MESHTASTIC_IM_PUSH_MAX][96];
+    int count = 0;
+
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    for (int i = 0; i < CAP_MESHTASTIC_IM_PUSH_MAX; i++) {
+        if (s_ctx.im_push_enabled[i] && s_ctx.im_push_chat[i][0]) {
+            strlcpy(channels[count], s_im_channel_names[i], sizeof(channels[count]));
+            strlcpy(chats[count], s_ctx.im_push_chat[i], sizeof(chats[count]));
+            count++;
+        }
+    }
+    xSemaphoreGive(s_ctx.lock);
+
+    if (count == 0) {
+        /* No IM channel is enabled for push (or none has a known conversation
+         * yet); honour the user's choice and do not forward. The message stays
+         * buffered and is retrievable via the HTTP API / meshtastic_get_messages. */
+        ESP_LOGD(TAG, "no IM push channel enabled; skipping push for %s", event_type);
+        return;
+    }
+
+    for (int i = 0; i < count; i++) {
+        meshtastic_publish_to(channels[i], chats[i], event_type, text);
+    }
 }
 
 static void store_message(uint32_t from, const char *from_id, uint32_t channel,
                           uint32_t packet_id, const char *text)
 {
+    int64_t ts_ms = cap_meshtastic_now_ms();
+
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     cap_meshtastic_message_t *slot = &s_ctx.messages[s_ctx.message_head];
     memset(slot, 0, sizeof(*slot));
@@ -277,12 +420,21 @@ static void store_message(uint32_t from, const char *from_id, uint32_t channel,
     slot->channel = channel;
     slot->packet_id = packet_id;
     strlcpy(slot->text, text, sizeof(slot->text));
-    slot->received_ms = esp_timer_get_time() / 1000;
+    slot->received_ms = ts_ms;
     s_ctx.message_head = (s_ctx.message_head + 1) % CAP_MESHTASTIC_MAX_MESSAGES;
     if (s_ctx.message_count < CAP_MESHTASTIC_MAX_MESSAGES) {
         s_ctx.message_count++;
     }
     xSemaphoreGive(s_ctx.lock);
+
+    /* Persist to JSONL store (non-fatal on failure). */
+    if (meshtastic_store_is_ready()) {
+        esp_err_t err = meshtastic_store_append(from, from_id, channel,
+                                                 packet_id, text, ts_ms);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "store append failed: %s", esp_err_to_name(err));
+        }
+    }
 }
 
 static void handle_text_message(const meshtastic_meshpacket_t *pkt)
@@ -316,12 +468,12 @@ static void handle_text_message(const meshtastic_meshpacket_t *pkt)
     }
     xSemaphoreGive(s_ctx.lock);
 
-    /* Push the message straight to the configured IM conversation so the user
-     * is notified promptly without spending an LLM turn. */
+    /* Push the message to every IM conversation the user enabled for mesh
+     * notifications (falls back to the last active conversation). */
     char notify[320];
     snprintf(notify, sizeof(notify), "\xF0\x9F\x93\xA1 Mesh %s (ch %u): %s",
              sender_label, (unsigned int)pkt->channel, text);
-    meshtastic_publish_im_notify(CAP_MESHTASTIC_EVENT_INBOUND, notify);
+    meshtastic_dispatch_im_notify(CAP_MESHTASTIC_EVENT_INBOUND, notify);
 }
 
 static void apply_packet_payload(const meshtastic_meshpacket_t *pkt)
@@ -459,7 +611,7 @@ static void handle_nodeinfo(const meshtastic_nodeinfo_t *ni)
     if (created && config_complete && label[0]) {
         char notify[120];
         snprintf(notify, sizeof(notify), "\xF0\x9F\x9F\xA2 Mesh node joined: %s", label);
-        meshtastic_publish_im_notify(CAP_MESHTASTIC_EVENT_NODE_UPDATE, notify);
+        meshtastic_dispatch_im_notify(CAP_MESHTASTIC_EVENT_NODE_UPDATE, notify);
     }
 }
 
@@ -647,12 +799,18 @@ static void cap_meshtastic_task(void *arg)
 
         /* Periodically log RX stats so wiring/baud/mode faults are visible. */
         if (now_ms - last_stat_log_ms >= CAP_MESHTASTIC_RX_STAT_LOG_MS) {
+            uint32_t unknown_count = 0;
+            uint32_t unknown_last_tag = 0;
+            meshtastic_get_fromradio_unknown_stats(&unknown_count, &unknown_last_tag);
             if (!config_done) {
                 ESP_LOGW(TAG,
                          "not connected: rx_bytes=%u frames=%u cfg_reqs=%u "
+                         "fr_unknown=%u last_unknown_tag=%u "
                          "(check baud=%d, serial.mode=PROTO, TX<->RX crossover on GPIO%d/%d)",
                          (unsigned)s_ctx.rx_bytes, (unsigned)s_ctx.frames_decoded,
-                         (unsigned)s_ctx.config_requests, s_ctx.uart.baud_rate,
+                         (unsigned)s_ctx.config_requests,
+                         (unsigned)unknown_count, (unsigned)unknown_last_tag,
+                         s_ctx.uart.baud_rate,
                          s_ctx.uart.tx_gpio, s_ctx.uart.rx_gpio);
             } else {
                 size_t node_count = 0;
@@ -664,11 +822,13 @@ static void cap_meshtastic_task(void *arg)
                 int64_t since_rx = now_ms - s_ctx.last_rx_ms;
                 ESP_LOGI(TAG,
                          "stat: rx_bytes=%u frames=%u fail=%u pkts=%u encrypted=%u "
-                         "nodes=%u msgs=%u last_rx=%lldms_ago",
+                         "nodes=%u msgs=%u fr_unknown=%u last_unknown_tag=%u "
+                         "last_rx=%lldms_ago",
                          (unsigned)s_ctx.rx_bytes, (unsigned)s_ctx.frames_decoded,
                          (unsigned)s_ctx.frames_failed, (unsigned)s_ctx.packets_received,
                          (unsigned)s_ctx.packets_encrypted,
                          (unsigned)node_count, (unsigned)s_ctx.message_count,
+                         (unsigned)unknown_count, (unsigned)unknown_last_tag,
                          (long long)since_rx);
             }
             last_stat_log_ms = now_ms;
@@ -820,12 +980,65 @@ void cap_meshtastic_note_im_target(const char *channel, const char *chat_id)
     if (!s_ctx.lock) {
         return;
     }
+    int idx = im_channel_index(channel);
+    bool chat_changed = false;
     xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
     if (!s_ctx.notify_target_explicit) {
         strlcpy(s_ctx.notify_channel, channel, sizeof(s_ctx.notify_channel));
         strlcpy(s_ctx.notify_chat_id, chat_id, sizeof(s_ctx.notify_chat_id));
     }
+    /* Remember the latest conversation per IM channel so an enabled push has a
+     * concrete destination even across reboots. */
+    if (idx >= 0 && strcmp(s_ctx.im_push_chat[idx], chat_id) != 0) {
+        strlcpy(s_ctx.im_push_chat[idx], chat_id, sizeof(s_ctx.im_push_chat[idx]));
+        chat_changed = true;
+    }
     xSemaphoreGive(s_ctx.lock);
+
+    if (chat_changed) {
+        im_push_save_chat(idx);
+    }
+}
+
+size_t cap_meshtastic_get_im_push(cap_meshtastic_im_push_t *out, size_t max)
+{
+    if (!out || max == 0) {
+        return 0;
+    }
+    size_t n = 0;
+    bool locked = s_ctx.lock != NULL;
+    if (locked) {
+        xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    }
+    for (int i = 0; i < CAP_MESHTASTIC_IM_PUSH_MAX && n < max; i++) {
+        strlcpy(out[n].channel, s_im_channel_names[i], sizeof(out[n].channel));
+        out[n].enabled = s_ctx.im_push_enabled[i];
+        out[n].has_target = s_ctx.im_push_chat[i][0] != '\0';
+        n++;
+    }
+    if (locked) {
+        xSemaphoreGive(s_ctx.lock);
+    }
+    return n;
+}
+
+esp_err_t cap_meshtastic_set_im_push_enabled(const char *channel, bool enabled)
+{
+    int idx = im_channel_index(channel);
+    if (idx < 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    bool locked = s_ctx.lock != NULL;
+    if (locked) {
+        xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+    }
+    s_ctx.im_push_enabled[idx] = enabled;
+    if (locked) {
+        xSemaphoreGive(s_ctx.lock);
+    }
+    im_push_save_enabled();
+    ESP_LOGI(TAG, "IM push %s for channel %s", enabled ? "enabled" : "disabled", channel);
+    return ESP_OK;
 }
 
 /* ===================================================================== */
@@ -883,6 +1096,40 @@ static void node_to_json(const cap_meshtastic_node_t *node, cJSON *obj)
             }
         }
     }
+}
+
+static void append_ram_messages(cJSON *arr, size_t max_count)
+{
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+
+    size_t count = s_ctx.message_count;
+    size_t start = (s_ctx.message_head + CAP_MESHTASTIC_MAX_MESSAGES - count) %
+                   CAP_MESHTASTIC_MAX_MESSAGES;
+
+    if (max_count > 0 && count > max_count) {
+        start = (start + (count - max_count)) % CAP_MESHTASTIC_MAX_MESSAGES;
+        count = max_count;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        const cap_meshtastic_message_t *msg =
+            &s_ctx.messages[(start + i) % CAP_MESHTASTIC_MAX_MESSAGES];
+        if (!msg->used) {
+            continue;
+        }
+        cJSON *obj = cJSON_CreateObject();
+        if (obj) {
+            cJSON_AddStringToObject(obj, "from", msg->from_id);
+            cJSON_AddNumberToObject(obj, "from_num", msg->from);
+            cJSON_AddNumberToObject(obj, "channel", msg->channel);
+            cJSON_AddNumberToObject(obj, "packet_id", msg->packet_id);
+            cJSON_AddStringToObject(obj, "text", msg->text);
+            cJSON_AddNumberToObject(obj, "ts", (double)msg->received_ms);
+            cJSON_AddItemToArray(arr, obj);
+        }
+    }
+
+    xSemaphoreGive(s_ctx.lock);
 }
 
 static esp_err_t emit_json(cJSON *root, char *output, size_t output_size)
@@ -1076,6 +1323,19 @@ static esp_err_t tool_get_status(const char *input_json, const claw_cap_call_con
     cJSON_AddNumberToObject(root, "rx_bytes", s_ctx.rx_bytes);
     cJSON_AddNumberToObject(root, "frames_decoded", s_ctx.frames_decoded);
     cJSON_AddNumberToObject(root, "config_requests", s_ctx.config_requests);
+    /* Packet-level counters: text/position/telemetry all arrive as
+     * FromRadio.packet AFTER config sync. packets_received==0 with a high
+     * frames_decoded means only the node-DB dump was seen and no live mesh
+     * traffic has arrived yet, so an empty message queue is expected. */
+    cJSON_AddNumberToObject(root, "packets_received", s_ctx.packets_received);
+    cJSON_AddNumberToObject(root, "packets_encrypted", s_ctx.packets_encrypted);
+    cJSON_AddNumberToObject(root, "messages_buffered", s_ctx.message_count);
+    if (s_ctx.config_complete && s_ctx.packets_received == 0) {
+        cJSON_AddStringToObject(root, "messages_hint",
+                                "link is up and the node database synced, but no live "
+                                "mesh packets have arrived yet; send a text from another "
+                                "node to populate the message queue");
+    }
     if (!s_ctx.connected) {
         const char *hint;
         if (s_ctx.rx_bytes == 0) {
@@ -1106,28 +1366,22 @@ static esp_err_t tool_get_messages(const char *input_json, const claw_cap_call_c
     }
     cJSON *arr = cJSON_AddArrayToObject(root, "messages");
 
-    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
-    /* Iterate from oldest to newest. */
-    size_t count = s_ctx.message_count;
-    size_t start = (s_ctx.message_head + CAP_MESHTASTIC_MAX_MESSAGES - count) %
-                   CAP_MESHTASTIC_MAX_MESSAGES;
-    for (size_t i = 0; i < count; i++) {
-        const cap_meshtastic_message_t *msg =
-            &s_ctx.messages[(start + i) % CAP_MESHTASTIC_MAX_MESSAGES];
-        if (!msg->used) {
-            continue;
-        }
-        cJSON *obj = cJSON_CreateObject();
-        if (obj) {
-            cJSON_AddStringToObject(obj, "from", msg->from_id);
-            cJSON_AddNumberToObject(obj, "channel", msg->channel);
-            cJSON_AddNumberToObject(obj, "packet_id", msg->packet_id);
-            cJSON_AddStringToObject(obj, "text", msg->text);
-            cJSON_AddItemToArray(arr, obj);
+    /* Try persistent store first (newest first, up to 200). */
+    size_t stored_count = 0;
+    if (meshtastic_store_is_ready()) {
+        if (meshtastic_store_read(arr, 200) == ESP_OK) {
+            stored_count = (size_t)cJSON_GetArraySize(arr);
         }
     }
-    cJSON_AddNumberToObject(root, "count", (double)count);
-    xSemaphoreGive(s_ctx.lock);
+
+    /* If the persistent store is empty or unavailable, fall back to RAM. */
+    if (stored_count == 0) {
+        append_ram_messages(arr, 200);
+        stored_count = (size_t)cJSON_GetArraySize(arr);
+    }
+
+    cJSON_AddNumberToObject(root, "count", (double)stored_count);
+    cJSON_AddBoolToObject(root, "from_store", stored_count > 0 && meshtastic_store_is_ready());
 
     return emit_json(root, output, output_size);
 }
@@ -1174,6 +1428,8 @@ esp_err_t cap_meshtastic_set_uart_config(const cap_meshtastic_uart_config_t *con
 
 static esp_err_t cap_meshtastic_group_start(void)
 {
+    esp_log_level_set(TAG, ESP_LOG_WARN);
+
     if (!s_ctx.lock) {
         s_ctx.lock = xSemaphoreCreateMutex();
     }
@@ -1183,6 +1439,9 @@ static esp_err_t cap_meshtastic_group_start(void)
     if (!s_ctx.lock || !s_ctx.tx_lock) {
         return ESP_ERR_NO_MEM;
     }
+
+    /* Restore persisted per-IM push preferences before the RX task starts. */
+    im_push_load();
 
     esp_err_t err = cap_meshtastic_uart_start();
     if (err != ESP_OK) {
@@ -1284,8 +1543,70 @@ static const claw_cap_group_t s_group = {
     .group_stop = cap_meshtastic_group_stop,
 };
 
+/* ===================================================================== */
+/* Persistent store public API wrappers                                   */
+/* ===================================================================== */
+
+esp_err_t cap_meshtastic_set_store_path(const char *base_path, size_t max_bytes)
+{
+    meshtastic_store_config_t cfg = {
+        .base_path = base_path,
+        .max_file_bytes = max_bytes,
+    };
+    esp_err_t err = meshtastic_store_init(&cfg);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "persistent store: %s (max %u bytes)",
+                 meshtastic_store_path(), (unsigned)max_bytes);
+    } else {
+        ESP_LOGW(TAG, "persistent store init failed: %s", esp_err_to_name(err));
+    }
+    return err;
+}
+
+esp_err_t cap_meshtastic_read_stored_messages(cJSON *array, size_t max_count)
+{
+    if (!array) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (meshtastic_store_is_ready()) {
+        esp_err_t err = meshtastic_store_read(array, max_count);
+        if (err == ESP_OK) {
+            return ESP_OK;
+        }
+    }
+
+    append_ram_messages(array, max_count);
+    return ESP_OK;
+}
+
+esp_err_t cap_meshtastic_clear_stored_messages(void)
+{
+    if (!meshtastic_store_is_ready()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return meshtastic_store_clear();
+}
+
+size_t cap_meshtastic_stored_count(void)
+{
+    return meshtastic_store_count();
+}
+
+size_t cap_meshtastic_store_file_size(void)
+{
+    return meshtastic_store_file_size();
+}
+
+const char *cap_meshtastic_store_path(void)
+{
+    return meshtastic_store_path();
+}
+
 esp_err_t cap_meshtastic_register_group(void)
 {
+    esp_log_level_set(TAG, ESP_LOG_WARN);
+
     if (claw_cap_group_exists(s_group.group_id)) {
         return ESP_OK;
     }

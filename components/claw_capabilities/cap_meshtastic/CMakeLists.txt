@@ -2,6 +2,7 @@ idf_component_register(
     SRCS
         "src/cap_meshtastic.c"
         "src/meshtastic_proto.c"
+        "src/meshtastic_store.c"
         "src/cmd_cap_meshtastic.c"
     INCLUDE_DIRS
         "include"
@@ -12,4 +13,5 @@ idf_component_register(
         json
         console
         esp_timer
+        nvs_flash
 )

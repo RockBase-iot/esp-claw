@@ -70,7 +70,12 @@ esp_err_t http_server_start(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = 80;
     config.ctrl_port = HTTP_SERVER_CTRL_PORT;
-    config.max_uri_handlers = 32;
+    /* Raised from 32: the base routes already fill 32 slots, so the Meshtastic
+     * API routes (/api/mesh/messages, /api/mesh/status, /api/mesh/im) would
+     * overflow and make httpd_register_uri_handler return
+     * ESP_ERR_HTTPD_HANDLERS_FULL, aborting startup. Keep headroom for future
+     * routes. */
+    config.max_uri_handlers = 40;
     config.stack_size = 8192;
     config.max_open_sockets = 8;
     config.lru_purge_enable = true;
@@ -102,6 +107,7 @@ esp_err_t http_server_start(void)
     ESP_RETURN_ON_ERROR(http_server_register_wechat_routes(s_ctx.server), TAG, "Failed to register WeChat routes");
     ESP_RETURN_ON_ERROR(http_server_register_webim_routes(s_ctx.server), TAG, "Failed to register Web IM routes");
     ESP_RETURN_ON_ERROR(http_server_register_logo_routes(s_ctx.server), TAG, "Failed to register logo routes");
+    ESP_RETURN_ON_ERROR(http_server_register_mesh_routes(s_ctx.server), TAG, "Failed to register mesh routes");
     ESP_RETURN_ON_ERROR(httpd_register_err_handler(s_ctx.server, HTTPD_404_NOT_FOUND, http_server_captive_404_handler),
                         TAG, "Failed to register captive 404 handler");
 

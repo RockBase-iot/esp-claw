@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2026 Chengdu RockBase IoT Co., Ltd.
+ * SPDX-FileCopyrightText: 2026 Chengdu RockBase Technology Co., Ltd.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -10,6 +10,9 @@
 #include <stdint.h>
 
 #include "esp_err.h"
+
+/* Forward declaration to avoid pulling in cJSON.h for every includer. */
+typedef struct cJSON cJSON;
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,6 +63,63 @@ esp_err_t cap_meshtastic_set_notify_target(const char *channel, const char *chat
  * target has been configured. Safe to call from the IM message observer.
  */
 void cap_meshtastic_note_im_target(const char *channel, const char *chat_id);
+
+/* ===================================================================== */
+/* Per-IM push preferences                                                */
+/* ===================================================================== */
+
+/* IM channels that inbound mesh messages can be pushed to. */
+#define CAP_MESHTASTIC_IM_PUSH_MAX 4
+
+/* Runtime state of one IM push channel. */
+typedef struct {
+    char channel[16];   /* logical IM channel ("feishu"/"qq"/"telegram"/"wechat") */
+    bool enabled;       /* user opted to push inbound mesh messages here */
+    bool has_target;    /* a destination conversation has been learned */
+} cap_meshtastic_im_push_t;
+
+/*
+ * Fill `out` with the push state of every known IM channel (up to `max`).
+ * Returns the number of entries written. The "configured/available" check
+ * (compiled-in + credentials present) is the caller's responsibility.
+ */
+size_t cap_meshtastic_get_im_push(cap_meshtastic_im_push_t *out, size_t max);
+
+/*
+ * Enable or disable proactive IM push for a specific channel. The preference
+ * is persisted in NVS. Unknown channels return ESP_ERR_INVALID_ARG.
+ */
+esp_err_t cap_meshtastic_set_im_push_enabled(const char *channel, bool enabled);
+
+/* ===================================================================== */
+/* Persistent message store                                               */
+/* ===================================================================== */
+
+/**
+ * Configure the persistent message store path.
+ * @param base_path  VFS mount point (e.g. "/fatfs" or "/sdcard").
+ * @param max_bytes  Max file size in bytes; 0 = unlimited.
+ */
+esp_err_t cap_meshtastic_set_store_path(const char *base_path, size_t max_bytes);
+
+/**
+ * Read persisted messages into a cJSON array (newest first).
+ * @param array      Pre-created cJSON array; objects are appended.
+ * @param max_count  Maximum messages to return (0 = all).
+ */
+esp_err_t cap_meshtastic_read_stored_messages(cJSON *array, size_t max_count);
+
+/** Delete all persisted messages. */
+esp_err_t cap_meshtastic_clear_stored_messages(void);
+
+/** Number of persisted messages. */
+size_t cap_meshtastic_stored_count(void);
+
+/** Store file size in bytes. */
+size_t cap_meshtastic_store_file_size(void);
+
+/** Absolute path to the store file, or NULL if not initialised. */
+const char *cap_meshtastic_store_path(void);
 
 #ifdef __cplusplus
 }

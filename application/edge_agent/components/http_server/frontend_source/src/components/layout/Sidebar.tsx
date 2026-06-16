@@ -7,6 +7,7 @@ import {
   Image,
   MessageSquareCode,
   MessagesSquare,
+  Radio,
   Search,
   Settings,
   SquareFunction,
@@ -31,6 +32,7 @@ const IconSkills: Component = () => <SquareFunction class={iconClass} />;
 const IconFiles: Component = () => <Folder class={iconClass} />;
 const IconWebIm: Component = () => <MessagesSquare class={iconClass} />;
 const IconLogo: Component = () => <Image class={iconClass} />;
+const IconMesh: Component = () => <Radio class={iconClass} />;
 
 export type LeafNode = {
   kind: 'leaf';
@@ -46,7 +48,8 @@ export type LeafNode = {
     | 'navLuaModules'
     | 'navFiles'
     | 'navWebIm'
-    | 'navLogo';
+    | 'navLogo'
+    | 'navMeshtastic';
   icon: Component;
 };
 export type GroupNode = {
@@ -77,6 +80,7 @@ export const NAV_TREE: NavNode[] = [
   { kind: 'leaf', id: 'capabilities', labelKey: 'navCapabilities', icon: IconCaps },
   { kind: 'leaf', id: 'skills', labelKey: 'navLuaModules', icon: IconSkills },
   { kind: 'leaf', id: 'files', labelKey: 'navFiles', icon: IconFiles },
+  { kind: 'leaf', id: 'meshtastic', labelKey: 'navMeshtastic', icon: IconMesh },
   { kind: 'leaf', id: 'logo', labelKey: 'navLogo', icon: IconLogo },
 ];
 

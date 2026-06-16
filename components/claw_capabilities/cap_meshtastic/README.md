@@ -44,6 +44,12 @@ UART is cross-connected (mainboard TX -> Heltec RX, mainboard RX -> Heltec TX).
 Pins, UART port and baud rate are configurable under
 `Component config -> Claw Meshtastic Capability` (`CONFIG_CAP_MESHTASTIC_*`).
 
+## Interface reference
+
+For the full interface reference (HTTP REST API `/api/mesh/*`, LLM tools, console
+commands, C API, config and troubleshooting) see
+[docs/meshtastic-interface.md](docs/meshtastic-interface.md).
+
 ## Programmatic API
 
 See [include/cap_meshtastic.h](include/cap_meshtastic.h):

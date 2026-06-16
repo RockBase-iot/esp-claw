@@ -31,7 +31,7 @@ The Heltec LoRa32 V3 is powered from the mainboard 5V rail, and the UART is cros
 
 <Aside type="note" title="Pin assignment">
   For the NM-CYD-C5 mainboard, use GPIO4/RX and GPIO5/TX; the Heltec side matches the Meshtastic Serial module settings `serial.rxd=19` and `serial.txd=20`. If these pins conflict with other peripherals, choose any free UART pins and update the Meshtastic configuration accordingly.
-  For the NM-Display-28inch mainboard, use GPIO44/RX and GPIO43/TX.
+  For the NM-Display-28inch mainboard, use GPIO44/RX and GPIO43/TX. The board defaults already set these pins, so no manual sdkconfig change is needed when compiling for this board.
 </Aside>
 
 ## Configure the Meshtastic Serial module
@@ -66,9 +66,8 @@ meshtastic --reboot
 
 ## Verification
 
-After reboot, ask the ESP-Claw agent (or use the console) for the mesh status. The
-`cap_meshtastic` bridge runs a background task that performs the protobuf handshake and
-streams the node database.
+After reboot, ask the ESP-Claw agent (or use the console) for the mesh status. The `cap_meshtastic` bridge
+runs a background task that performs the protobuf handshake and streams the node database.
 
 ```bash
 # On the ESP-Claw serial console
@@ -81,8 +80,7 @@ If `connected` is false, read the `hint` field from `mesh status`:
 
 - `rx_bytes = 0`: no bytes arriving — check power, the TX<->RX crossover, and that the
   baud rate matches `serial.baud`.
-- `rx_bytes > 0` but `frames_decoded = 0`: the radio is not in **PROTO** mode (or the
-  baud rate is wrong).
+- `rx_bytes > 0` but `frames_decoded = 0`: the radio is not in **PROTO** mode (or the baud rate is wrong).
 - frames decoded but still not connected: wait a few seconds for the config handshake.
 
 ## Notes

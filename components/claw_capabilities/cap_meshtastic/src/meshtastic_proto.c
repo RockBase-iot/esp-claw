@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2026 Chengdu RockBase IoT Co., Ltd.
+ * SPDX-FileCopyrightText: 2026 Chengdu RockBase Technology Co., Ltd.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -15,11 +15,26 @@
 #define PB_WIRE_32BIT 5
 
 /* ---- FromRadio field numbers ---- */
-#define FR_PACKET 1
+#define FR_ID 1
+#define FR_PACKET 2
+#define FR_PACKET_LEGACY 1
 #define FR_MY_INFO 3
 #define FR_NODE_INFO 4
+#define FR_CONFIG 5
+#define FR_LOG_RECORD 6
 #define FR_CONFIG_COMPLETE_ID 7
-#define FR_METADATA 14
+#define FR_REBOOTED 8
+#define FR_MODULE_CONFIG 9
+#define FR_CHANNEL 10
+#define FR_QUEUE_STATUS 11
+#define FR_XMODEM_PACKET 12
+#define FR_METADATA 13
+#define FR_METADATA_LEGACY 14
+#define FR_MQTT_PROXY_MSG 14
+#define FR_FILE_INFO 15
+#define FR_CLIENT_NOTIFICATION 16
+#define FR_DEVICE_UI_CONFIG 17
+#define FR_LOCKDOWN_STATUS 18
 
 /* ---- ToRadio field numbers ---- */
 #define TR_PACKET 1
@@ -71,8 +86,10 @@
 
 /* ---- MyNodeInfo field numbers ---- */
 #define MNI_MY_NODE_NUM 1
-#define MNI_REBOOT_COUNT 4
-#define MNI_MIN_APP_VERSION 8
+#define MNI_REBOOT_COUNT 8
+#define MNI_REBOOT_COUNT_LEGACY 4
+#define MNI_MIN_APP_VERSION 11
+#define MNI_MIN_APP_VERSION_LEGACY 8
 
 /* ---- DeviceMetrics field numbers ---- */
 #define DM_BATTERY_LEVEL 1
@@ -88,6 +105,10 @@
 #define MD_FIRMWARE_VERSION 1
 #define MD_ROLE 7
 #define MD_HW_MODEL 9
+
+/* Unknown FromRadio top-level payload tag diagnostics. */
+static uint32_t s_fromradio_unknown_count = 0;
+static uint32_t s_fromradio_unknown_last_tag = 0;
 
 /* ===================================================================== */
 /* Reader                                                                */
@@ -403,6 +424,7 @@ static void decode_data(const uint8_t *data, size_t len, meshtastic_data_t *out)
             case DATA_WANT_RESPONSE:
                 out->want_response = v != 0;
                 break;
+            /* Legacy compatibility: older schemas could be decoded as varint. */
             case DATA_DEST:
                 out->dest = (uint32_t)v;
                 break;
@@ -414,6 +436,27 @@ static void decode_data(const uint8_t *data, size_t len, meshtastic_data_t *out)
                 break;
             case DATA_REPLY_ID:
                 out->reply_id = (uint32_t)v;
+                break;
+            default:
+                break;
+            }
+        } else if (wire == PB_WIRE_32BIT) {
+            uint32_t bits;
+            if (!pb_read_fixed32(&r, &bits)) {
+                return;
+            }
+            switch (field) {
+            case DATA_DEST:
+                out->dest = bits;
+                break;
+            case DATA_SOURCE:
+                out->source = bits;
+                break;
+            case DATA_REQUEST_ID:
+                out->request_id = bits;
+                break;
+            case DATA_REPLY_ID:
+                out->reply_id = bits;
                 break;
             default:
                 break;
@@ -568,6 +611,7 @@ static void decode_mynodeinfo(const uint8_t *data, size_t len, meshtastic_mynode
 {
     pb_reader_t r = { data, data + len };
     uint32_t field, wire;
+    bool saw_legacy_reboot = false;
 
     while (pb_read_tag(&r, &field, &wire)) {
         if (wire == PB_WIRE_VARINT) {
@@ -575,18 +619,24 @@ static void decode_mynodeinfo(const uint8_t *data, size_t len, meshtastic_mynode
             if (!pb_read_varint(&r, &v)) {
                 return;
             }
-            switch (field) {
-            case MNI_MY_NODE_NUM:
+            if (field == MNI_MY_NODE_NUM) {
                 out->my_node_num = (uint32_t)v;
-                break;
-            case MNI_REBOOT_COUNT:
+            } else if (field == MNI_REBOOT_COUNT_LEGACY) {
                 out->reboot_count = (uint32_t)v;
-                break;
-            case MNI_MIN_APP_VERSION:
+                saw_legacy_reboot = true;
+            } else if (field == MNI_MIN_APP_VERSION) {
                 out->min_app_version = (uint32_t)v;
-                break;
-            default:
-                break;
+            } else if (field == MNI_REBOOT_COUNT) {
+                /* Tag 8 is ambiguous across firmware generations:
+                 * - legacy: min_app_version
+                 * - current: reboot_count
+                 * If legacy reboot tag (4) was observed, treat tag 8 as legacy
+                 * min_app_version; otherwise treat it as current reboot_count. */
+                if (saw_legacy_reboot) {
+                    out->min_app_version = (uint32_t)v;
+                } else {
+                    out->reboot_count = (uint32_t)v;
+                }
             }
         } else if (!pb_skip_field(&r, wire)) {
             return;
@@ -642,6 +692,8 @@ esp_err_t meshtastic_decode_fromradio(const uint8_t *data, size_t len,
 
     pb_reader_t r = { data, data + len };
     uint32_t field, wire;
+    bool decoded_known = false;
+    uint32_t first_unknown_tag = 0;
 
     while (pb_read_tag(&r, &field, &wire)) {
         if (wire == PB_WIRE_LEN) {
@@ -651,24 +703,48 @@ esp_err_t meshtastic_decode_fromradio(const uint8_t *data, size_t len,
                 return ESP_ERR_INVALID_SIZE;
             }
             switch (field) {
+            case FR_PACKET_LEGACY:
             case FR_PACKET:
                 out->which = MESHTASTIC_FROMRADIO_PACKET;
                 decode_meshpacket(sub, sub_len, &out->packet);
-                return ESP_OK;
+                decoded_known = true;
+                break;
             case FR_MY_INFO:
                 out->which = MESHTASTIC_FROMRADIO_MY_INFO;
                 decode_mynodeinfo(sub, sub_len, &out->my_info);
-                return ESP_OK;
+                decoded_known = true;
+                break;
             case FR_NODE_INFO:
                 out->which = MESHTASTIC_FROMRADIO_NODE_INFO;
                 decode_nodeinfo(sub, sub_len, &out->node_info);
-                return ESP_OK;
+                decoded_known = true;
+                break;
+            case FR_METADATA_LEGACY:
             case FR_METADATA:
                 out->which = MESHTASTIC_FROMRADIO_METADATA;
                 decode_metadata(sub, sub_len, &out->metadata);
-                return ESP_OK;
-            default:
+                decoded_known = true;
                 break;
+            /* Known but currently ignored variants. */
+            case FR_CONFIG:
+            case FR_LOG_RECORD:
+            case FR_MODULE_CONFIG:
+            case FR_CHANNEL:
+            case FR_QUEUE_STATUS:
+            case FR_XMODEM_PACKET:
+            case FR_FILE_INFO:
+            case FR_CLIENT_NOTIFICATION:
+            case FR_DEVICE_UI_CONFIG:
+            case FR_LOCKDOWN_STATUS:
+                break;
+            default:
+                if (first_unknown_tag == 0) {
+                    first_unknown_tag = field;
+                }
+                break;
+            }
+            if (decoded_known) {
+                return ESP_OK;
             }
         } else if (wire == PB_WIRE_VARINT) {
             uint64_t v;
@@ -680,12 +756,34 @@ esp_err_t meshtastic_decode_fromradio(const uint8_t *data, size_t len,
                 out->config_complete_id = (uint32_t)v;
                 return ESP_OK;
             }
+            /* Known but currently ignored scalar fields. */
+            if (field == FR_ID || field == FR_REBOOTED) {
+                continue;
+            }
+            if (first_unknown_tag == 0) {
+                first_unknown_tag = field;
+            }
         } else if (!pb_skip_field(&r, wire)) {
             return ESP_ERR_INVALID_SIZE;
         }
     }
 
+    if (first_unknown_tag != 0) {
+        s_fromradio_unknown_count++;
+        s_fromradio_unknown_last_tag = first_unknown_tag;
+    }
+
     return ESP_OK;
+}
+
+void meshtastic_get_fromradio_unknown_stats(uint32_t *count, uint32_t *last_tag)
+{
+    if (count) {
+        *count = s_fromradio_unknown_count;
+    }
+    if (last_tag) {
+        *last_tag = s_fromradio_unknown_last_tag;
+    }
 }
 
 /* ===================================================================== */

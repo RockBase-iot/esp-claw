@@ -330,6 +330,70 @@ export async function restartDevice() {
   );
 }
 
+export type MeshStatus = {
+  connected: boolean;
+  message_count: number;
+  file_size_bytes: number;
+  store_path?: string;
+};
+
+export type MeshMessage = {
+  from?: string;
+  from_num?: number;
+  channel?: number;
+  packet_id?: number;
+  text?: string;
+  ts?: number;
+};
+
+export function fetchMeshStatus(signal?: AbortSignal) {
+  return request<MeshStatus>('/api/mesh/status', { signal }, 'Failed to load mesh status');
+}
+
+export async function fetchMeshMessages(limit = 500, signal?: AbortSignal) {
+  const data = await request<{ messages: MeshMessage[]; count?: number }>(
+    '/api/mesh/messages?limit=' + encodeURIComponent(String(limit)),
+    { signal },
+    'Failed to load mesh messages',
+  );
+  return Array.isArray(data.messages) ? data.messages : [];
+}
+
+export async function clearMeshMessages() {
+  return request<{ ok?: boolean; message?: string }>(
+    '/api/mesh/messages',
+    { method: 'DELETE' },
+    'Failed to clear mesh messages',
+  );
+}
+
+export type MeshImChannel = {
+  channel: string;
+  enabled: boolean;
+  has_target: boolean;
+};
+
+export async function fetchMeshImChannels(signal?: AbortSignal) {
+  const data = await request<{ channels: MeshImChannel[] }>(
+    '/api/mesh/im',
+    { signal },
+    'Failed to load mesh IM channels',
+  );
+  return Array.isArray(data.channels) ? data.channels : [];
+}
+
+export async function setMeshImChannel(channel: string, enabled: boolean) {
+  return request<{ ok?: boolean; channel?: string; enabled?: boolean }>(
+    '/api/mesh/im',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel, enabled }),
+    },
+    'Failed to update mesh IM channel',
+  );
+}
+
 export type WebImLink = { url: string; label: string };
 export type WebImMessage = {
   seq: number;
